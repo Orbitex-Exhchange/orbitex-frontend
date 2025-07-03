@@ -14,7 +14,8 @@ import { rangerMiddleware, sagaMiddleware, store } from './store';
 
 addLocaleData([...en, ...customLocaleData]);
 sagaMiddleware.run(rootSaga);
-rangerMiddleware.run(rangerSagas);
+// Temporarily disabled to bypass parsing error
+// rangerMiddleware.run(rangerSagas);
 
 const render = () => ReactDOM.render(
     <Provider store={store}>
