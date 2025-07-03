@@ -48,7 +48,7 @@
         "mockWS": "node mocks/mockWS.js",
         "start": "npm-run-all -p watch:css start-js",
         "start-mock": "npm-run-all -p watch:css start-js mockAPI mockWS",
-        "start-mock-no-hooks": "HUSKY_SKIP_HOOKS=1 npm-run-all -p watch:css start-js mockAPI mockWS",
+        "start-mock-no-hooks": "SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true npm-run-all -p watch:css start-js mockAPI mockWS",
         "start-js": "react-scripts start",
         "build-js": "react-scripts build",
         "build": "npm-run-all build:css build-js clean:mapfiles",
