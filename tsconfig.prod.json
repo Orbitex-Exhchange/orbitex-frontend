@@ -7,7 +7,6 @@
     "strict": false,
     "noImplicitReturns": false,
     "forceConsistentCasingInFileNames": true,
-    "suppressImplicitAnyIndexErrors": true,
     "noUnusedLocals": false,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
