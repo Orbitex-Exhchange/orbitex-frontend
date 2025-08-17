@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import "@radix-ui/themes/styles.css";
-import { Theme } from '@radix-ui/themes'
 import { Providers } from '@/store/providers'
 import Navigation from '@/components/layout/Navigation'
 import { ConditionalNavigation } from '@/components/layout/ConditionalNavigation'
@@ -51,19 +49,17 @@ export default function RootLayout({
         <meta name="theme-color" content="#2563eb" />
       </head>
       <body className={inter.className}>
-        <Theme appearance="dark" accentColor="green" radius="medium" scaling="95%">
-          <Providers>
-            <div className="min-h-screen trading-layout">
-              {/* Conditional Navigation - only show on authenticated pages */}
-              <ConditionalNavigation user={mockUser} />
-              
-              {/* Main Content */}
-              <main className="flex-1">
-                {children}
-              </main>
-            </div>
-          </Providers>
-        </Theme>
+        <Providers>
+          <div className="min-h-screen trading-layout">
+            {/* Conditional Navigation - only show on authenticated pages */}
+            <ConditionalNavigation user={mockUser} />
+            
+            {/* Main Content */}
+            <main className="flex-1">
+              {children}
+            </main>
+          </div>
+        </Providers>
       </body>
     </html>
   )
