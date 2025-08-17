@@ -1,0 +1,9 @@
+Enhance and migrate trading UI and components based on this 3rd party frontend source code @frontend/ and  apply mocks @frontend/ Also check trading UI examples for a crypto exchange orderbook, advanced trading chart by trading view for a charting_library with all the controls and ticker search panel,  "Market Data Panel" or "Trading Panel" - a tabbed interface that lets you switch between:
+
+Order Book/Depth
+
+Recent Trades/Time & Sales
+
+Sometimes additional tabs like Trade Ideas or Market Stats. Order Froms Buy and Sell forms. I already installed some of the packages to make the UI look great! such as: radix-ui, lucide-react, class-variance-authority, tailwindcss-animate, embla-carousel-react, recharts, react-hook-form, react-resizable-panels, sonner, react-day-picker, input-otp, vaul, @radix-ui/react-icons, cmdk. 
+
+Check lightweight charts react wrapper here: @https://github.com/trash-and-fire/lightweight-charts-react-wrapper I already installed the package for it anf lightweight-charts. This is the exampls of the trading chart library I wish to see @https://charting-library.tradingview-widget.com/ Reverse engineer this charting_library @charting_library_0409/javascript code: /Users/cryptodelic/Documents/2025Projects/Orbitex/Development/OrbitexExchange/frontend/public/charting_library_0409/charting_library.standalone.js  and custom css here: /Users/cryptodelic/Documents/2025Projects/Orbitex/Development/OrbitexExchange/frontend/public/charting_library_0409/custome/style.css  and all the bundles files inside it: /Users/cryptodelic/Documents/2025Projects/Orbitex/Development/OrbitexExchange/frontend/public/charting_library_0409/bundles/ 

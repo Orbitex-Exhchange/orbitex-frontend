@@ -3,7 +3,9 @@ const http = require('http');
 const mockserver = require('mockserver');
 var markets = require('./markets.js');
 var RangerMock = require('./ranger.js');
-const argv = require('yargs').argv;
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
+const argv = yargs(hideBin(process.argv)).argv;
 const fs = require('fs');
 const portWS = argv.portWS || 9003;
 

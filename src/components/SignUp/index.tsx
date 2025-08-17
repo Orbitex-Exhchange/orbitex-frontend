@@ -7,6 +7,8 @@ import { CustomInput } from '../';
 import * as React from 'react';
 import { EMAIL_REGEX, PASSWORD_REGEX } from '../../helpers';
 
+import type { JSX } from "react";
+
 export interface SignUpFormProps {
     isLoading?: boolean;
     title?: string;

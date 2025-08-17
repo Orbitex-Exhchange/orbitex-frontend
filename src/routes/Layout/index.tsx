@@ -1,25 +1,8 @@
-import { Loader } from '@openware/components';
-import { History } from 'history';
 import * as React from 'react';
-import { connect, MapDispatchToProps, MapStateToProps } from 'react-redux';
-import { Route, Switch } from 'react-router';
-import { Redirect, withRouter } from 'react-router-dom';
+import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import { minutesUntilAutoLogout } from '../../api';
 import { WalletsFetch } from '../../containers';
 import { toggleColorTheme } from '../../helpers';
-import {
-    logoutFetch,
-    Market,
-    RootState,
-    selectCurrentColorTheme,
-    selectCurrentMarket,
-    selectUserFetching,
-    selectUserInfo,
-    selectUserLoggedIn,
-    User,
-    userFetch,
-    walletsReset,
-} from '../../modules';
 import {
     ChangeForgottenPasswordScreen,
     ConfirmScreen,
@@ -35,30 +18,12 @@ import {
     VerificationScreen,
     WalletsScreen,
 } from '../../screens';
-
-interface ReduxProps {
-    colorTheme: string;
-    currentMarket: Market | undefined;
-    user: User;
-    isLoggedIn: boolean;
-    userLoading?: boolean;
-}
-
-interface DispatchProps {
-    logout: typeof logoutFetch;
-    userFetch: typeof userFetch;
-    walletsReset: typeof walletsReset;
-}
-
-interface OwnProps {
-    history: History;
-}
-
-export type LayoutProps = ReduxProps & DispatchProps & OwnProps;
+import { useUIState } from '../../store/calculationsStore';
+import { useBusinessStore } from '../../store/businessStore';
 
 const renderLoader = () => (
     <div className="pg-loader-container">
-        <Loader />
+        <div>Loading...</div>
     </div>
 );
 
@@ -70,17 +35,12 @@ const PrivateRoute: React.FunctionComponent<any> = ({ component: CustomComponent
     if (loading) {
         return renderLoader();
     }
-    const renderCustomerComponent = props => <CustomComponent {...props} />;
 
     if (isLogged) {
-        return <Route {...rest} render={renderCustomerComponent} />;
+        return <Route {...rest} element={<CustomComponent />} />;
     }
 
-    return (
-        <Route {...rest}>
-            <Redirect to={'/signin'} />
-        </Route>
-    );
+    return <Navigate to="/signin" replace />;
 };
 
 //tslint:disable-next-line no-any
@@ -90,146 +50,114 @@ const PublicRoute: React.FunctionComponent<any> = ({ component: CustomComponent,
     }
 
     if (isLogged) {
-        return <Route {...rest}><Redirect to={'/wallets'} /></Route>;
+        return <Navigate to="/wallets" replace />;
     }
 
-    const renderCustomerComponent = props => <CustomComponent {...props} />;
-    return <Route {...rest} render={renderCustomerComponent} />;
+    return <Route {...rest} element={<CustomComponent />} />;
 };
 
-class LayoutComponent extends React.Component<LayoutProps> {
-    public static eventsListen = [
-        'click',
-        'keydown',
-        'scroll',
-        'resize',
-        'mousemove',
-        'TabSelect',
-        'TabHide',
-    ];
+// ===== MODERN STATE MANAGEMENT COMPONENT =====
 
-    public timer;
-    public walletsFetchInterval;
+const LayoutComponent: React.FC = () => {
+    const navigate = useNavigate();
+    const { theme } = useUIState();
+    const { user, isAuthenticated, logout } = useBusinessStore();
 
-    constructor(props: LayoutProps) {
-        super(props);
-        this.initListener();
-    }
+    // Mock loading state for now
+    const userLoading = false;
 
-    public componentDidMount() {
-        this.props.userFetch();
-        this.initInterval();
-        this.check();
-    }
-
-    public componentDidUpdate(next: LayoutProps) {
-        const { isLoggedIn, history } = this.props;
-
-        if (!isLoggedIn && next.isLoggedIn) {
-            this.props.walletsReset();
-            if (!history.location.pathname.includes('/trading')) {
-                history.push('/trading/');
-            }
-        }
-    }
-    public componentWillUnmount() {
-        for (const type of LayoutComponent.eventsListen) {
-            document.body.removeEventListener(type, this.reset);
-        }
-        clearInterval(this.timer);
-        clearInterval(this.walletsFetchInterval);
-    }
-
-    public render() {
-        const {
-            colorTheme,
-            isLoggedIn,
-            userLoading,
-        } = this.props;
-
-        const tradingCls = window.location.pathname.includes('/trading') ? 'trading-layout' : '';
-        toggleColorTheme(colorTheme);
-
-        return (
-            <div className={`container-fluid pg-layout ${tradingCls}`}>
-                <Switch>
-                    <PublicRoute loading={userLoading} isLogged={isLoggedIn} path="/signin" component={SignInScreen} />
-                    <PublicRoute loading={userLoading} isLogged={isLoggedIn} path="/accounts/confirmation" component={VerificationScreen} />
-                    <PublicRoute loading={userLoading} isLogged={isLoggedIn} path="/signup" component={SignUpScreen} />
-                    <PublicRoute loading={userLoading} isLogged={isLoggedIn} path="/forgot_password" component={ForgotPasswordScreen} />
-                    <PublicRoute loading={userLoading} isLogged={isLoggedIn} path="/accounts/password_reset" component={ChangeForgottenPasswordScreen} />
-                    <PublicRoute loading={userLoading} isLogged={isLoggedIn} path="/email-verification" component={EmailVerificationScreen} />
-                    <Route exact={true} path="/trading/:market?" component={TradingScreen} />
-                    <PrivateRoute loading={userLoading} isLogged={isLoggedIn} path="/orders" component={OrdersTabScreen} />
-                    <PrivateRoute loading={userLoading} isLogged={isLoggedIn} path="/history" component={HistoryScreen} />
-                    <PrivateRoute loading={userLoading} isLogged={isLoggedIn} path="/confirm" component={ConfirmScreen} />
-                    <PrivateRoute loading={userLoading} isLogged={isLoggedIn} path="/profile" component={ProfileScreen} />
-                    <PrivateRoute loading={userLoading} isLogged={isLoggedIn} path="/wallets" component={WalletsScreen} />
-                    <PrivateRoute loading={userLoading} isLogged={isLoggedIn} path="/security/2fa" component={ProfileTwoFactorAuthScreen} />
-                    <Route path="**"><Redirect to="/trading/" /></Route>
-                </Switch>
-                {isLoggedIn && <WalletsFetch/>}
-            </div>
-        );
-    }
-
-    private getLastAction = () => {
+    // Auto-logout functionality
+    const getLastAction = React.useCallback(() => {
         if (localStorage.getItem(STORE_KEY) !== null) {
             return parseInt(localStorage.getItem(STORE_KEY) || '0', 10);
         }
         return 0;
-    };
+    }, []);
 
-    private setLastAction = (lastAction: number) => {
+    const setLastAction = React.useCallback((lastAction: number) => {
         localStorage.setItem(STORE_KEY, lastAction.toString());
-    }
+    }, []);
 
-    private initListener = () => {
-        this.reset();
-        for (const type of LayoutComponent.eventsListen) {
-            document.body.addEventListener(type, this.reset);
-        }
-    }
+    const reset = React.useCallback(() => {
+        setLastAction(Date.now());
+    }, [setLastAction]);
 
-    private reset = () => {
-        this.setLastAction(Date.now());
-    }
-
-    private initInterval = () => {
-        this.timer = setInterval(() => {
-            this.check();
-        }, CHECK_INTERVAL);
-    }
-
-    private check = () => {
-        const { user } = this.props;
+    const check = React.useCallback(() => {
         const now = Date.now();
-        const timeleft = this.getLastAction() + parseFloat(minutesUntilAutoLogout()) * 60 * 1000;
+        const timeleft = getLastAction() + parseFloat(minutesUntilAutoLogout()) * 60 * 1000;
         const diff = timeleft - now;
         const isTimeout = diff < 0;
-        if (isTimeout && user.email) {
-            this.props.logout();
+        if (isTimeout && user?.email) {
+            logout();
         }
-    }
-}
+    }, [getLastAction, logout, user?.email]);
 
-const mapStateToProps: MapStateToProps<ReduxProps, {}, RootState> = state => ({
-    colorTheme: selectCurrentColorTheme(state),
-    currentMarket: selectCurrentMarket(state),
-    user: selectUserInfo(state),
-    isLoggedIn: selectUserLoggedIn(state),
-    userLoading: selectUserFetching(state),
-});
+    // Event listeners for auto-logout
+    React.useEffect(() => {
+        const eventsListen = [
+            'click',
+            'keydown',
+            'scroll',
+            'resize',
+            'mousemove',
+            'TabSelect',
+            'TabHide',
+        ];
 
-const mapDispatchToProps: MapDispatchToProps<DispatchProps, {}> = dispatch => ({
-    logout: () => dispatch(logoutFetch()),
-    userFetch: () => dispatch(userFetch()),
-    walletsReset: () => dispatch(walletsReset()),
-});
+        reset();
+        eventsListen.forEach(type => {
+            document.body.addEventListener(type, reset);
+        });
 
-// tslint:disable-next-line no-any
-const Layout = withRouter(connect(mapStateToProps, mapDispatchToProps)(LayoutComponent) as any) as any;
+        const timer = setInterval(() => {
+            check();
+        }, CHECK_INTERVAL);
 
-export {
-    Layout,
+        return () => {
+            eventsListen.forEach(type => {
+                document.body.removeEventListener(type, reset);
+            });
+            clearInterval(timer);
+        };
+    }, [reset, check]);
+
+    // Handle authentication state changes
+    React.useEffect(() => {
+        if (isAuthenticated && !window.location.pathname.includes('/trading')) {
+            navigate('/trading/');
+        }
+    }, [isAuthenticated, navigate]);
+
+    // Apply theme
+    React.useEffect(() => {
+        toggleColorTheme(theme);
+    }, [theme]);
+
+    const tradingCls = window.location.pathname.includes('/trading') ? 'trading-layout' : '';
+
+    return (
+        <div className={`container-fluid pg-layout ${tradingCls}`}>
+            <Routes>
+                <Route path="/signin" element={<PublicRoute loading={userLoading} isLogged={isAuthenticated} component={SignInScreen} />} />
+                <Route path="/accounts/confirmation" element={<PublicRoute loading={userLoading} isLogged={isAuthenticated} component={VerificationScreen} />} />
+                <Route path="/signup" element={<PublicRoute loading={userLoading} isLogged={isAuthenticated} component={SignUpScreen} />} />
+                <Route path="/forgot_password" element={<PublicRoute loading={userLoading} isLogged={isAuthenticated} component={ForgotPasswordScreen} />} />
+                <Route path="/accounts/password_reset" element={<PublicRoute loading={userLoading} isLogged={isAuthenticated} component={ChangeForgottenPasswordScreen} />} />
+                <Route path="/email-verification" element={<PublicRoute loading={userLoading} isLogged={isAuthenticated} component={EmailVerificationScreen} />} />
+                <Route path="/trading/:market?" element={<TradingScreen />} />
+                <Route path="/orders" element={<PrivateRoute loading={userLoading} isLogged={isAuthenticated} component={OrdersTabScreen} />} />
+                <Route path="/history" element={<PrivateRoute loading={userLoading} isLogged={isAuthenticated} component={HistoryScreen} />} />
+                <Route path="/confirm" element={<PrivateRoute loading={userLoading} isLogged={isAuthenticated} component={ConfirmScreen} />} />
+                <Route path="/profile" element={<PrivateRoute loading={userLoading} isLogged={isAuthenticated} component={ProfileScreen} />} />
+                <Route path="/wallets" element={<PrivateRoute loading={userLoading} isLogged={isAuthenticated} component={WalletsScreen} />} />
+                <Route path="/security/2fa" element={<PrivateRoute loading={userLoading} isLogged={isAuthenticated} component={ProfileTwoFactorAuthScreen} />} />
+                <Route path="*" element={<Navigate to="/trading/" replace />} />
+            </Routes>
+            {isAuthenticated && <WalletsFetch/>}
+        </div>
+    );
 };
+
+// ===== EXPORT =====
+
+export const Layout = LayoutComponent;

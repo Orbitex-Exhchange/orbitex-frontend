@@ -1,4 +1,3 @@
-import { CellData, Table } from '@openware/components';
 import classnames from 'classnames';
 import * as React from 'react';
 
@@ -6,30 +5,15 @@ export interface HistoryProps {
     /**
      * List of history data
      */
-    data: CellData[][];
+    data: React.ReactNode[][];
     /**
      * List of headers for history table
      */
     headers?: string[];
 }
 
-export class History extends React.PureComponent<HistoryProps> {
-    private defaultHeaders = ['Time', 'Action', 'Price', 'Amount', 'Total'];
-    private title = 'Trades History';
-
-    public render() {
-        const { headers = this.defaultHeaders } = this.props;
-        const tableData = this.props.data.map(row => row.map(this.mapRows));
-        return (
-            <Table
-                data={tableData}
-                header={headers}
-                titleComponent={this.title}
-            />
-        );
-    }
-
-    public renderAction(actionType: string) {
+export const History: React.FC<HistoryProps> = ({ data, headers = ['Time', 'Action', 'Price', 'Amount', 'Total'] }) => {
+    const renderAction = React.useCallback((actionType: string) => {
         const action = actionType ? actionType.toLowerCase() : actionType;
         const className = classnames('cr-history-action', {
             'cr-history-action--buy': action === 'bid',
@@ -37,11 +21,38 @@ export class History extends React.PureComponent<HistoryProps> {
         });
 
         return <span className={className}>{action}</span>;
-    }
+    }, []);
 
-    private mapRows = (cell: CellData, index: number) => {
-        const { headers = this.defaultHeaders } = this.props;
+    const mapRows = React.useCallback((cell: React.ReactNode, index: number) => {
         const actionIndex = headers.findIndex(header => header === 'Action');
-        return index === actionIndex ? this.renderAction(cell as string) : cell;
-    }
-}
+        return index === actionIndex ? renderAction(cell as string) : cell;
+    }, [headers, renderAction]);
+
+    const tableData = data.map(row => row.map(mapRows));
+
+    return (
+        <div className="history-table">
+            <div className="history-table__header">
+                <h3>Trades History</h3>
+            </div>
+            <table className="history-table__content">
+                <thead>
+                    <tr>
+                        {headers.map((header, index) => (
+                            <th key={index}>{header}</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {tableData.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                            {row.map((cell, cellIndex) => (
+                                <td key={cellIndex}>{cell}</td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};

@@ -1,0 +1,726 @@
+"use client";
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { createChart, ColorType } from 'lightweight-charts';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { 
+  BarChart3, 
+  LineChart, 
+  TrendingUp, 
+  TrendingDown, 
+  Settings,
+  Fullscreen,
+  Download,
+  Layers,
+  Minus,
+  Plus,
+  Activity,
+  Square,
+  Circle,
+  Type,
+  MousePointer,
+  Maximize2,
+  Volume2,
+  Target,
+  Ruler,
+  PenTool,
+  ChevronDown,
+  X,
+  Search,
+  Star,
+  Filter,
+  ArrowUpDown,
+  Eye,
+  Clock,
+  Zap,
+  Globe,
+  Bitcoin,
+  DollarSign
+} from 'lucide-react';
+import { TickerSearchPanel } from './TickerSearchPanel';
+
+interface TradingViewChartProps {
+  symbol: string;
+  interval: string;
+  theme?: 'light' | 'dark';
+  width?: string;
+  height?: string;
+  data?: any[];
+  onMarketSelect?: (market: string) => void;
+  selectedMarket?: string;
+}
+
+interface Indicator {
+  id: string;
+  name: string;
+  type: 'sma' | 'ema' | 'rsi' | 'bollinger' | 'macd' | 'stoch';
+  enabled: boolean;
+  params: any;
+  color?: string;
+}
+
+const timeframes = [
+  { value: '1m', label: '1m' },
+  { value: '5m', label: '5m' },
+  { value: '15m', label: '15m' },
+  { value: '30m', label: '30m' },
+  { value: '1h', label: '1h' },
+  { value: '4h', label: '4h' },
+  { value: '1d', label: '1D' },
+  { value: '1w', label: '1W' }
+];
+
+const chartTypes = [
+  { value: 'candlestick', icon: BarChart3, label: 'Candlestick' },
+  { value: 'line', icon: LineChart, label: 'Line' },
+  { value: 'area', icon: Activity, label: 'Area' }
+];
+
+const drawingTools = [
+  { value: 'cursor', icon: MousePointer, label: 'Cursor' },
+  { value: 'trendline', icon: TrendingUp, label: 'Trend Line' },
+  { value: 'horizontal', icon: Minus, label: 'Horizontal Line' },
+  { value: 'vertical', icon: Type, label: 'Vertical Line' },
+  { value: 'rectangle', icon: Square, label: 'Rectangle' },
+  { value: 'circle', icon: Circle, label: 'Circle' },
+  { value: 'fibonacci', icon: TrendingDown, label: 'Fibonacci' },
+  { value: 'measure', icon: Ruler, label: 'Measure' }
+];
+
+export function TradingViewChart({ 
+  symbol, 
+  interval, 
+  theme = 'dark', 
+  width = '100%', 
+  height = '100%',
+  data = [],
+  onMarketSelect,
+  selectedMarket
+}: TradingViewChartProps) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<any>(null);
+  const candlestickSeriesRef = useRef<any>(null);
+  const volumeSeriesRef = useRef<any>(null);
+  
+  const [selectedTimeframe, setSelectedTimeframe] = useState('1h');
+  const [chartType, setChartType] = useState<'candlestick' | 'line' | 'area'>('candlestick');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [selectedDrawingTool, setSelectedDrawingTool] = useState('cursor');
+  const [showVolume, setShowVolume] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [autoScale, setAutoScale] = useState(false);
+  const [marketDropdownOpen, setMarketDropdownOpen] = useState(false);
+  
+  const [indicators, setIndicators] = useState<Indicator[]>([
+    { id: 'sma-20', name: 'SMA 20', type: 'sma', enabled: false, params: { period: 20 }, color: '#FF6B35' },
+    { id: 'ema-12', name: 'EMA 12', type: 'ema', enabled: false, params: { period: 12 }, color: '#4ECDC4' },
+    { id: 'ema-26', name: 'EMA 26', type: 'ema', enabled: false, params: { period: 26 }, color: '#45B7D1' },
+    { id: 'rsi-14', name: 'RSI 14', type: 'rsi', enabled: false, params: { period: 14 }, color: '#FFD93D' },
+    { id: 'bb-20', name: 'Bollinger Bands 20', type: 'bollinger', enabled: false, params: { period: 20, stdDev: 2 }, color: '#6C5CE7' },
+    { id: 'macd', name: 'MACD', type: 'macd', enabled: false, params: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 }, color: '#A29BFE' },
+    { id: 'stoch-14', name: 'Stochastic 14', type: 'stoch', enabled: false, params: { kPeriod: 14, dPeriod: 3 }, color: '#FD79A8' }
+  ]);
+
+  // Mock market data
+  const [marketData] = useState({
+    lastPrice: 43250.50,
+    change24h: 2.45,
+    high24h: 44100.00,
+    low24h: 42800.00,
+    volume: 2847.65,
+    openInterest: 125000000
+  });
+
+  // Market selection handlers
+  const handleMarketSelect = useCallback((market: string) => {
+    onMarketSelect?.(market);
+    setMarketDropdownOpen(false);
+  }, [onMarketSelect]);
+
+  // Initialize chart
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    const chart = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
+      height: Math.max(chartContainerRef.current.clientHeight, 600),
+      layout: {
+        background: { 
+          type: ColorType.Solid,
+          color: theme === 'dark' ? '#0a0a0a' : '#ffffff'
+        },
+        textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+      },
+      grid: {
+        vertLines: { 
+          color: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+          visible: showGrid
+        },
+        horzLines: { 
+          color: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+          visible: showGrid
+        },
+      },
+      crosshair: {
+        mode: 1,
+        vertLine: {
+          color: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
+          width: 1,
+          style: 3,
+        },
+        horzLine: {
+          color: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
+          width: 1,
+          style: 3,
+        },
+      },
+      rightPriceScale: {
+        borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+        textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+        autoScale: autoScale,
+      },
+      timeScale: {
+        borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+      },
+      handleScale: {
+        axisPressedMouseMove: true,
+        mouseWheel: true,
+        pinch: true,
+      },
+    });
+
+    // Create main price series
+    let mainSeries;
+    if (chartType === 'candlestick') {
+      mainSeries = chart.addCandlestickSeries({
+        upColor: '#00ff88',
+        downColor: '#ff4444',
+        borderVisible: false,
+        wickUpColor: '#00ff88',
+        wickDownColor: '#ff4444',
+      });
+    } else if (chartType === 'line') {
+      mainSeries = chart.addLineSeries({
+        color: '#00ff88',
+        lineWidth: 2,
+      });
+    } else {
+      mainSeries = chart.addAreaSeries({
+        topColor: 'rgba(0, 255, 136, 0.3)',
+        bottomColor: 'rgba(0, 255, 136, 0.05)',
+        lineColor: '#00ff88',
+        lineWidth: 2,
+      });
+    }
+
+    // Create volume series
+    let volumeSeries;
+    if (showVolume) {
+      volumeSeries = chart.addHistogramSeries({
+        color: '#00ff88',
+        priceFormat: {
+          type: 'volume',
+        },
+        priceScaleId: '',
+      });
+    }
+
+    // Generate and set mock data
+    const mockData = generateMockData(selectedTimeframe);
+    if (chartType === 'candlestick') {
+      mainSeries.setData(mockData.candlesticks);
+    } else {
+      const lineData = mockData.candlesticks.map(d => ({
+        time: d.time as any,
+        value: d.close
+      }));
+      mainSeries.setData(lineData);
+    }
+    
+    if (volumeSeries) {
+      volumeSeries.setData(mockData.volumes);
+    }
+
+    chartRef.current = chart;
+    candlestickSeriesRef.current = mainSeries;
+    volumeSeriesRef.current = volumeSeries;
+
+    // Handle resize
+    const handleResize = () => {
+      if (chartContainerRef.current) {
+        chart.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+          height: Math.max(chartContainerRef.current.clientHeight, 600),
+        });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chart.remove();
+    };
+  }, [symbol, theme, chartType, showVolume, showGrid, autoScale, selectedTimeframe]);
+
+  // Chart controls
+  const resetChart = () => {
+    if (chartRef.current) {
+      chartRef.current.timeScale().fitContent();
+    }
+  };
+
+  const zoomIn = () => {
+    if (chartRef.current) {
+      const timeScale = chartRef.current.timeScale();
+      const range = timeScale.getVisibleLogicalRange();
+      if (range) {
+        const newRange = {
+          from: range.from + (range.to - range.from) * 0.1,
+          to: range.to - (range.to - range.from) * 0.1
+        };
+        timeScale.setVisibleLogicalRange(newRange);
+      }
+    }
+  };
+
+  const zoomOut = () => {
+    if (chartRef.current) {
+      const timeScale = chartRef.current.timeScale();
+      const range = timeScale.getVisibleLogicalRange();
+      if (range) {
+        const newRange = {
+          from: range.from - (range.to - range.from) * 0.1,
+          to: range.to + (range.to - range.from) * 0.1
+        };
+        timeScale.setVisibleLogicalRange(newRange);
+      }
+    }
+  };
+
+  // Real-time price updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (candlestickSeriesRef.current) {
+        const lastCandle = candlestickSeriesRef.current.data().slice(-1)[0];
+        if (lastCandle) {
+          const newCandle = {
+            ...lastCandle,
+            close: lastCandle.close + (Math.random() - 0.5) * 10,
+            high: lastCandle.high + (Math.random() - 0.5) * 5,
+            low: lastCandle.low + (Math.random() - 0.5) * 5,
+          };
+          candlestickSeriesRef.current.update(newCandle);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className={`tradingview-chart ${isFullscreen ? 'fixed inset-0 z-50 bg-[#0a0a0a]' : 'relative'} shadow-lg overflow-hidden bg-gradient-to-br from-[#0f0f0f] to-[#1a1a1a] h-full`} style={{ width, height }}>
+      {/* Left Control Panel */}
+      <div className="absolute left-0 top-12 bottom-0 z-20 w-10 bg-gradient-to-b from-[#1a1a1a]/95 to-[#0f0f0f]/95 backdrop-blur-sm border-r border-[#2a2a2a] flex flex-col items-center py-1 gap-1">
+        {/* Chart Type Control */}
+        <div className="relative group">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-[#00ff88] bg-[#00ff88]/10 hover:bg-[#00ff88]/20 rounded-md transition-all duration-200 hover:scale-105"
+            title="Chart Type"
+          >
+            {chartType === 'candlestick' && <BarChart3 className="h-4 w-4" />}
+            {chartType === 'line' && <LineChart className="h-4 w-4" />}
+            {chartType === 'area' && <Activity className="h-4 w-4" />}
+          </Button>
+          {/* Popup Menu */}
+          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[100px] z-50">
+            {chartTypes.map((type) => (
+              <Button
+                key={type.value}
+                variant="ghost"
+                size="sm"
+                onClick={() => setChartType(type.value as any)}
+                className={`w-full justify-start px-2 py-1 text-xs ${
+                  chartType === type.value 
+                    ? 'bg-[#00ff88] text-black' 
+                    : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+                }`}
+              >
+                <type.icon className="h-3 w-3 mr-1" />
+                {type.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Drawing Tools Control */}
+        <div className="relative group">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            title="Drawing Tools"
+          >
+            <PenTool className="h-4 w-4" />
+          </Button>
+          {/* Popup Menu */}
+          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[120px] z-50">
+            {drawingTools.map((tool) => (
+              <Button
+                key={tool.value}
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedDrawingTool(tool.value)}
+                className={`w-full justify-start px-2 py-1 text-xs ${
+                  selectedDrawingTool === tool.value 
+                    ? 'bg-[#00ff88] text-black' 
+                    : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+                }`}
+              >
+                <tool.icon className="h-3 w-3 mr-1" />
+                {tool.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Indicators Control */}
+        <div className="relative group">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            title="Indicators"
+          >
+            <TrendingUp className="h-4 w-4" />
+          </Button>
+          {/* Popup Menu */}
+          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[140px] max-h-[250px] overflow-y-auto z-50">
+            {indicators.map((indicator) => (
+              <Button
+                key={indicator.id}
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIndicators(prev => 
+                    prev.map(ind => 
+                      ind.id === indicator.id 
+                        ? { ...ind, enabled: !ind.enabled } 
+                        : ind
+                    )
+                  );
+                }}
+                className={`w-full justify-start px-2 py-1 text-xs ${
+                  indicator.enabled 
+                    ? 'bg-[#00ff88] text-black' 
+                    : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+                }`}
+              >
+                <span 
+                  className="w-1.5 h-1.5 rounded-full mr-1"
+                  style={{ backgroundColor: indicator.enabled ? 'currentColor' : indicator.color }}
+                />
+                {indicator.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Zoom Controls */}
+        <div className="relative group">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            title="Zoom Controls"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </Button>
+          {/* Popup Menu */}
+          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[100px] z-50">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={zoomOut}
+              className="w-full justify-start px-2 py-1 text-xs text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]"
+            >
+              <Minus className="h-3 w-3 mr-1" />
+              Zoom Out
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetChart}
+              className="w-full justify-start px-2 py-1 text-xs text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]"
+            >
+              <Target className="h-3 w-3 mr-1" />
+              Reset
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={zoomIn}
+              className="w-full justify-start px-2 py-1 text-xs text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Zoom In
+            </Button>
+          </div>
+        </div>
+
+        {/* Display Options */}
+        <div className="relative group">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            title="Display Options"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+          {/* Popup Menu */}
+          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[100px] z-50">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowVolume(!showVolume)}
+              className={`w-full justify-start px-2 py-1 text-xs ${
+                showVolume ? 'bg-[#00ff88] text-black' : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+              }`}
+            >
+              <Volume2 className="h-3 w-3 mr-1" />
+              Volume
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowGrid(!showGrid)}
+              className={`w-full justify-start px-2 py-1 text-xs ${
+                showGrid ? 'bg-[#00ff88] text-black' : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+              }`}
+            >
+              <Layers className="h-3 w-3 mr-1" />
+              Grid
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAutoScale(!autoScale)}
+              className={`w-full justify-start px-2 py-1 text-xs ${
+                autoScale ? 'bg-[#00ff88] text-black' : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+              }`}
+            >
+              <Target className="h-3 w-3 mr-1" />
+              Auto Scale
+            </Button>
+          </div>
+        </div>
+
+        {/* Fullscreen */}
+        <div className="relative group">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            title="Fullscreen"
+          >
+            <Fullscreen className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Top Toolbar - Symbol, Market Stats & Timeframes */}
+      <div className="absolute top-0 left-10 right-0 z-20 flex items-center justify-between p-2 bg-gradient-to-r from-[#1a1a1a]/95 to-[#0f0f0f]/95 backdrop-blur-sm border-b border-[#2a2a2a] shadow-lg">
+        {/* Left Section - Market Selection & Market Stats */}
+        <div className="flex items-center gap-3 flex-1">
+          {/* Market Selection Dropdown */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              onClick={() => setMarketDropdownOpen(!marketDropdownOpen)}
+              className="flex items-center space-x-1 text-white hover:text-[#00ff88] transition-colors duration-200 h-8 px-2"
+            >
+              <Bitcoin className="h-4 w-4" />
+              <span className="font-mono font-bold text-sm">
+                {selectedMarket || symbol}
+              </span>
+              <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${marketDropdownOpen ? 'rotate-180' : ''}`} />
+            </Button>
+            
+            {/* Market Dropdown Popup */}
+            {marketDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-[500px] bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl z-[9999] max-h-[700px] overflow-hidden">
+                <div className="p-3 border-b border-[#2a2a2a] flex items-center justify-between bg-[#0f0f0f]">
+                  <h3 className="font-bold text-white text-sm">Markets</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setMarketDropdownOpen(false)}
+                    className="text-[#888] hover:text-white h-6 w-6 p-0"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+                
+                {/* TickerSearchPanel Integration */}
+                <div className="h-[600px] overflow-hidden">
+                  <TickerSearchPanel
+                    onMarketSelect={handleMarketSelect}
+                    selectedMarket={selectedMarket || symbol}
+                    compact={true}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <Badge variant="outline" className="bg-[#2a2a2a] text-[#00ff88] border-[#00ff88]/30 text-xs px-2 py-0.5">
+            {interval}
+          </Badge>
+          
+          {/* Market Stats */}
+          <div className="hidden md:flex items-center gap-3 text-xs">
+            <div className="bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#3a3a3a]">
+              <span className="text-[#888] text-xs">Price: </span>
+              <span className="font-mono font-bold text-white text-xs">
+                ${marketData.lastPrice.toFixed(2)}
+              </span>
+              <span className={`font-medium ml-1 text-xs ${marketData.change24h >= 0 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
+                {marketData.change24h >= 0 ? '+' : ''}{marketData.change24h}%
+              </span>
+            </div>
+            <div className="bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#3a3a3a]">
+              <span className="text-[#888] text-xs">High: </span>
+              <span className="font-mono text-white text-xs">${marketData.high24h.toFixed(2)}</span>
+            </div>
+            <div className="bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#3a3a3a]">
+              <span className="text-[#888] text-xs">Low: </span>
+              <span className="font-mono text-white text-xs">${marketData.low24h.toFixed(2)}</span>
+            </div>
+            <div className="bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#3a3a3a]">
+              <span className="text-[#888] text-xs">Vol: </span>
+              <span className="font-mono text-white text-xs">{marketData.volume.toFixed(2)} BTC</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Section - Timeframe Selector */}
+        <div className="flex items-center gap-1">
+          <div className="flex border border-[#3a3a3a] rounded bg-[#2a2a2a] overflow-hidden shadow-lg">
+            {timeframes.map((tf) => (
+              <Button
+                key={tf.value}
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedTimeframe(tf.value);
+                  // Update the chart interval when timeframe changes
+                  if (chartRef.current) {
+                    // Trigger chart update with new timeframe
+                    const mockData = generateMockData(tf.value);
+                    if (candlestickSeriesRef.current) {
+                      if (chartType === 'candlestick') {
+                        candlestickSeriesRef.current.setData(mockData.candlesticks);
+                      } else {
+                        const lineData = mockData.candlesticks.map(d => ({
+                          time: d.time as any,
+                          value: d.close
+                        }));
+                        candlestickSeriesRef.current.setData(lineData);
+                      }
+                    }
+                    if (volumeSeriesRef.current && showVolume) {
+                      volumeSeriesRef.current.setData(mockData.volumes);
+                    }
+                  }
+                }}
+                className={`h-6 px-2 text-xs font-medium border-r border-[#3a3a3a] last:border-r-0 transition-all duration-200 hover:scale-105 ${
+                  selectedTimeframe === tf.value 
+                    ? 'bg-[#00ff88] text-black hover:bg-[#00cc6a] shadow-inner' 
+                    : 'text-[#d1d5db] hover:text-white hover:bg-[#1a1a1a] hover:shadow-md'
+                }`}
+              >
+                {tf.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Chart Area - Fixed positioning and proper sizing */}
+      <div className="absolute inset-0 left-10 top-12 bottom-0 bg-gradient-to-br from-[#0a0a0a] via-[#0f0f0f] to-[#1a1a1a] chart-area" ref={chartContainerRef} />
+    </div>
+  );
+}
+
+// Mock data generation
+function generateMockData(timeframe: string = '1h') {
+  const candlesticks = [];
+  const volumes = [];
+  const basePrice = 43250.50;
+  let currentPrice = basePrice;
+  
+  // Calculate interval in seconds based on timeframe
+  const getIntervalSeconds = (tf: string) => {
+    switch (tf) {
+      case '1m': return 60;
+      case '5m': return 300;
+      case '15m': return 900;
+      case '30m': return 1800;
+      case '1h': return 3600;
+      case '4h': return 14400;
+      case '1d': return 86400;
+      case '1w': return 604800;
+      default: return 3600;
+    }
+  };
+  
+  const intervalSeconds = getIntervalSeconds(timeframe);
+  const dataPoints = timeframe === '1w' ? 52 : timeframe === '1d' ? 365 : 200;
+  
+  for (let i = 0; i < dataPoints; i++) {
+    const time = Math.floor(Date.now() / 1000) - (dataPoints - i) * intervalSeconds;
+    const volatility = timeframe === '1m' ? 0.005 : 
+                      timeframe === '5m' ? 0.008 : 
+                      timeframe === '15m' ? 0.01 : 
+                      timeframe === '30m' ? 0.012 : 
+                      timeframe === '1h' ? 0.015 : 
+                      timeframe === '4h' ? 0.02 : 
+                      timeframe === '1d' ? 0.03 : 0.05;
+    
+    const change = (Math.random() - 0.5) * volatility * currentPrice;
+    const open = currentPrice;
+    const close = currentPrice + change;
+    const high = Math.max(open, close) + Math.random() * volatility * currentPrice * 0.5;
+    const low = Math.min(open, close) - Math.random() * volatility * currentPrice * 0.5;
+    const volume = Math.random() * 50 + 10;
+    
+    candlesticks.push({
+      time: time as any,
+      open,
+      high,
+      low,
+      close,
+    });
+    
+    volumes.push({
+      time: time as any,
+      value: volume,
+      color: close >= open ? '#00ff88' : '#ff4444',
+    });
+    
+    currentPrice = close;
+  }
+  
+  return { candlesticks, volumes };
+}

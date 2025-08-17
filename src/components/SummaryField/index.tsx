@@ -1,6 +1,8 @@
 import classnames from 'classnames';
 import * as React from 'react';
 
+import type { JSX } from "react";
+
 export interface SummaryFieldProps {
     /**
      * Additional class name for styling. By default element receives `cr-input` class

@@ -2,7 +2,9 @@
 const http = require('http');
 const mockserver = require('mockserver');
 
-const argv = require('yargs').argv;
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
+const argv = yargs(hideBin(process.argv)).argv;
 const portAPI = argv.portAPI || 9002;
 const directory = argv.dir || 'mocks';
 

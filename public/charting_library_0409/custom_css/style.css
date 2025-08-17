@@ -1,0 +1,13 @@
+:root:not(.theme-dark) {
+    --tv-color-platform-background: #000000 !important;
+    --tv-color-pane-background: #000000 !important;
+}
+
+.theme-dark:root {
+    --tv-color-platform-background:#000000 !important;
+    --tv-color-pane-background: #000000 !important;
+    --tv-color-toolbar-toggle-button-background-active-hover: #FA8B3B;
+    --tv-color-toolbar-toggle-button-background-active:  #FA8B3B;
+    --tv-color-toolbar-button-text: rgba(255, 255, 255, 0.5);
+    --tv-color-popup-element-background-active: rgba(255, 90, 49, 1);
+}

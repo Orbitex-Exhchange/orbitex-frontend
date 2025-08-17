@@ -1,28 +1,101 @@
-/.npmrc
+# Frontend .gitignore
 
-# dependencies
+# ===== DEPENDENCIES =====
 /node_modules
+/.pnp
+.pnp.js
+.npmrc
 
-# testing
-/coverage
-
-# production
+# ===== BUILD OUTPUTS =====
 /build
-/.idea
+/dist
+/.next
+/out
+/.nuxt
+/.output
+/.svelte-kit
 
-# misc
-.DS_Store
+# ===== ENVIRONMENT FILES =====
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env
+.env.staging
 env.js
 
+# ===== TESTING =====
+/coverage
+.nyc_output
+test-results/
+playwright-report/
+test-results.xml
+
+# ===== LOGS =====
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-index.css
+pnpm-debug.log*
+lerna-debug.log*
 
-# environment config
+# ===== CACHE =====
+.cache/
+.parcel-cache/
+.eslintcache
+.webpack/
+
+# ===== IDE FILES =====
+/.idea
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.atom/
+.brackets.json
+
+# ===== OS FILES =====
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ===== TEMPORARY FILES =====
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.swp
+*.swo
+*~
+
+# ===== DEPLOYMENT =====
+# Vercel
+.vercel/
+# Netlify
+.netlify/
+# Railway
+.railway/
+
+# ===== SECURITY =====
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+.secrets
+
+# ===== CONFIG FILES =====
 public/config/
+config.local.js
+config.local.json
+
+# ===== MISC =====
+*.tgz
+*.tar.gz
+*.zip
+*.rar
+.vercel

@@ -1,46 +1,37 @@
 {
   "compilerOptions": {
-    "sourceMap": false,
-    "sourceRoot": null,
-    "rootDir": "src",
-    "allowJs": false,
-    "strict": false,
-    "noImplicitReturns": false,
-    "forceConsistentCasingInFileNames": true,
-    "noUnusedLocals": false,
-    "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": true,
-    "types": [
-      "node",
-      "jest"
-    ],
-    "typeRoots": [
-      "./node_modules/@types"
-    ],
     "target": "es5",
-    "module": "esnext",
-    "lib": [
-      "es2015",
-      "dom",
-      "es2017"
-    ],
+    "lib": ["dom", "dom.iterable", "es6"],
+    "allowJs": true,
     "skipLibCheck": true,
-    "esModuleInterop": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
+    "strict": true,
     "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "jsx": "preserve",
-    "noImplicitAny": false,
-    "isolatedModules": true
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/containers/*": ["./src/containers/*"],
+      "@/pages/*": ["./src/pages/*"],
+      "@/styles/*": ["./src/styles/*"],
+      "@/utils/*": ["./src/utils/*"],
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/types/*": ["./src/types/*"],
+      "@/store/*": ["./src/store/*"],
+      "@/api/*": ["./src/api/*"]
+    }
   },
-  "include": [
-    "./src/assets",
-    "./src",
-    "./images.d.ts"
-  ],
-  "exclude": [
-    "./node_modules",
-    "./src/*.test.*",
-    "./src/charting_library"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }
