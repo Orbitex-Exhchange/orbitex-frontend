@@ -11,12 +11,28 @@ import {
   User,
   Phone,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Globe
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+interface SignUpFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+  acceptTerms: boolean;
+  acceptMarketing: boolean;
+  language: string;
+  country: string;
+}
 
 export default function SignUpPage() {
-  const [formData, setFormData] = useState({
+  const router = useRouter();
+  const [formData, setFormData] = useState<SignUpFormData>({
     firstName: '',
     lastName: '',
     email: '',
@@ -24,12 +40,15 @@ export default function SignUpPage() {
     password: '',
     confirmPassword: '',
     acceptTerms: false,
-    acceptMarketing: false
+    acceptMarketing: false,
+    language: 'en',
+    country: 'US'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [success, setSuccess] = useState(false);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -44,10 +63,14 @@ export default function SignUpPage() {
 
     if (!formData.firstName.trim()) {
       newErrors.firstName = 'First name is required';
+    } else if (formData.firstName.length < 2) {
+      newErrors.firstName = 'First name must be at least 2 characters';
     }
 
     if (!formData.lastName.trim()) {
       newErrors.lastName = 'Last name is required';
+    } else if (formData.lastName.length < 2) {
+      newErrors.lastName = 'Last name must be at least 2 characters';
     }
 
     if (!formData.email) {
@@ -58,14 +81,16 @@ export default function SignUpPage() {
 
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
+    } else if (!/^\+?[\d\s\-\(\)]+$/.test(formData.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
     }
 
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters long';
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character';
     }
 
     if (!formData.confirmPassword) {
@@ -87,33 +112,90 @@ export default function SignUpPage() {
     if (!validateForm()) return;
 
     setIsLoading(true);
+    setErrors({});
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const authServiceUrl = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'https://orbitex-auth-service-976099405307.us-central1.run.app';
       
-      // Mock successful registration
-      console.log('Registration successful:', formData);
-      // Redirect to email verification or dashboard
+      const response = await fetch(`${authServiceUrl}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone: formData.phone,
+          language: formData.language,
+          country: formData.country,
+          marketing_consent: formData.acceptMarketing,
+          terms_accepted: formData.acceptTerms,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
+
+      setSuccess(true);
       
-    } catch (error) {
+      // Redirect to email verification page
+      setTimeout(() => {
+        router.push(`/email-verification?email=${encodeURIComponent(formData.email)}`);
+      }, 2000);
+      
+    } catch (error: any) {
       console.error('Registration failed:', error);
-      setErrors({ general: 'Registration failed. Please try again.' });
+      setErrors({ 
+        general: error.message || 'Registration failed. Please try again.' 
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            <div className="text-center">
+              <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
+              <h2 className="mt-4 text-xl font-semibold text-gray-900">
+                Account Created Successfully!
+              </h2>
+              <p className="mt-2 text-sm text-gray-600">
+                We've sent a verification email to {formData.email}. Please check your inbox and click the verification link to activate your account.
+              </p>
+              <div className="mt-6">
+                <Button
+                  onClick={() => router.push('/auth/signin')}
+                  className="w-full"
+                >
+                  Continue to Sign In
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-              <div className="sm:mx-auto sm:w-full">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="h-12 w-12 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-xl font-bold">V</span>
+            <span className="text-white text-xl font-bold">O</span>
           </div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Create your account
+          Create your Orbitex account
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           Or{' '}
@@ -123,7 +205,7 @@ export default function SignUpPage() {
         </p>
       </div>
 
-              <div className="mt-8 sm:mx-auto sm:w-full">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {errors.general && (
@@ -234,12 +316,42 @@ export default function SignUpPage() {
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   className={`pl-10 ${errors.phone ? 'border-red-500' : ''}`}
-                  placeholder="Enter your phone number"
+                  placeholder="+1 (555) 123-4567"
                 />
               </div>
               {errors.phone && (
                 <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
               )}
+            </div>
+
+            {/* Country Field */}
+            <div>
+              <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                Country
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Globe className="h-5 w-5 text-gray-400" />
+                </div>
+                <select
+                  id="country"
+                  name="country"
+                  value={formData.country}
+                  onChange={(e) => handleInputChange('country', e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="US">United States</option>
+                  <option value="CA">Canada</option>
+                  <option value="GB">United Kingdom</option>
+                  <option value="DE">Germany</option>
+                  <option value="FR">France</option>
+                  <option value="JP">Japan</option>
+                  <option value="AU">Australia</option>
+                  <option value="SG">Singapore</option>
+                  <option value="HK">Hong Kong</option>
+                  <option value="KR">South Korea</option>
+                </select>
+              </div>
             </div>
 
             {/* Password Field */}
@@ -260,7 +372,7 @@ export default function SignUpPage() {
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
                   className={`pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
-                  placeholder="Create a password"
+                  placeholder="Create a strong password"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                   <button
@@ -280,7 +392,7 @@ export default function SignUpPage() {
                 <p className="mt-1 text-sm text-red-600">{errors.password}</p>
               )}
               <p className="mt-1 text-sm text-gray-500">
-                Must be at least 8 characters with uppercase, lowercase, and number
+                Must be at least 8 characters with uppercase, lowercase, number, and special character
               </p>
             </div>
 
@@ -339,11 +451,11 @@ export default function SignUpPage() {
                 <div className="ml-3 text-sm">
                   <label htmlFor="acceptTerms" className="text-gray-700">
                     I agree to the{' '}
-                    <a href="#" className="text-blue-600 hover:text-blue-500">
+                    <a href="/terms" target="_blank" className="text-blue-600 hover:text-blue-500">
                       Terms and Conditions
                     </a>{' '}
                     and{' '}
-                    <a href="#" className="text-blue-600 hover:text-blue-500">
+                    <a href="/privacy" target="_blank" className="text-blue-600 hover:text-blue-500">
                       Privacy Policy
                     </a>
                   </label>

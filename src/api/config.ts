@@ -1,13 +1,15 @@
-import { STORAGE_DEFAULT_LIMIT } from '../constants';
 import { Config } from './types';
+
+// Define storage default limit locally since it's not found in constants
+const STORAGE_DEFAULT_LIMIT = 50;
 
 export const defaultConfig: Config = {
     api: {
-        authUrl: '',
-        tradeUrl: '',
-        applogicUrl: '',
-        rangerUrl: '',
-        arkeUrl: '',
+        authUrl: 'https://orbitex-backend-976099405307.us-central1.run.app',
+        tradeUrl: 'https://orbitex-backend-976099405307.us-central1.run.app',
+        applogicUrl: 'https://orbitex-backend-976099405307.us-central1.run.app',
+        rangerUrl: 'wss://orbitex-backend-976099405307.us-central1.run.app',
+        arkeUrl: 'https://orbitex-backend-976099405307.us-central1.run.app',
     },
     minutesUntilAutoLogout: '5',
     rangerReconnectPeriod: '1',

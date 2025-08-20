@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { useTheme } from '@/contexts/ThemeContext';
 import { 
   ChevronUp, 
   ChevronDown,
@@ -63,6 +64,7 @@ export function EnhancedOrderBook({
   onPriceClick,
   compact = false 
 }: OrderBookProps) {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<'orderbook' | 'trades'>('orderbook');
   const [grouping, setGrouping] = useState(1);
   const [depth, setDepth] = useState(compact ? 10 : 20);
@@ -191,7 +193,7 @@ export function EnhancedOrderBook({
     return (
       <div 
         className={cn(
-          "relative group cursor-pointer transition-all duration-200 hover:bg-[#2a2a2a]/50",
+          "relative group cursor-pointer transition-all duration-200 hover:bg-[hsl(var(--trading-bg-tertiary))]/50",
           animate && "hover:scale-[1.02]"
         )}
         onClick={() => handlePriceClick(entry.price)}
@@ -215,19 +217,19 @@ export function EnhancedOrderBook({
           <div className={cn("font-mono font-medium", priceColor)}>
             {formatNumber(entry.price, 2)}
           </div>
-          <div className="text-white text-right font-mono">
+          <div className="text-[hsl(var(--trading-text))] text-right font-mono">
             {showSizePercent 
               ? `${((entry.size / orderBookData.asks[0]?.total || 1) * 100).toFixed(1)}%`
               : formatNumber(entry.size, 4)
             }
           </div>
-          <div className="text-[#888] text-right font-mono text-xs">
+          <div className="text-[hsl(var(--trading-text-muted))] text-right font-mono text-xs">
             {formatNumber(entry.total, 2)}
           </div>
         </div>
 
         {/* Hover overlay */}
-        <div className="absolute inset-0 bg-[#00ff88]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="absolute inset-0 bg-[hsl(var(--trading-accent))]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
       </div>
     );
   };
@@ -246,7 +248,7 @@ export function EnhancedOrderBook({
     return (
       <div 
         className={cn(
-          "group cursor-pointer transition-all duration-200 hover:bg-[#2a2a2a]/50",
+          "group cursor-pointer transition-all duration-200 hover:bg-[hsl(var(--trading-bg-tertiary))]/50",
           animate && "hover:scale-[1.02]"
         )}
         onClick={() => handlePriceClick(trade.price)}
@@ -255,26 +257,26 @@ export function EnhancedOrderBook({
           <div className={cn("font-mono font-medium", priceColor)}>
             {formatNumber(trade.price, 2)}
           </div>
-          <div className="text-white text-right font-mono">
+          <div className="text-[hsl(var(--trading-text))] text-right font-mono">
             {formatNumber(trade.size, 4)}
           </div>
-          <div className="text-[#888] text-right font-mono text-xs">
+          <div className="text-[hsl(var(--trading-text-muted))] text-right font-mono text-xs">
             {formatTimeAgo(timeAgo)}
           </div>
         </div>
         
         {/* Hover overlay */}
-        <div className="absolute inset-0 bg-[#00ff88]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="absolute inset-0 bg-[hsl(var(--trading-accent))]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
       </div>
     );
   };
 
   return (
     <div className={cn(
-      "bg-[#1a1a1a] flex flex-col h-full"
+      "bg-[hsl(var(--trading-bg-secondary))] flex flex-col h-full"
     )}>
       {/* Interactive Tab Navigation - Moved to top */}
-      <div className="flex border-b border-[#2a2a2a] bg-[#0f0f0f]">
+      <div className="flex border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))]">
         <button
           onClick={() => {
             console.log('Order Book tab clicked');
@@ -283,8 +285,8 @@ export function EnhancedOrderBook({
           className={cn(
             "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all duration-200 relative cursor-pointer z-10",
             activeTab === 'orderbook'
-              ? "text-[#00ff88] bg-[#1a1a1a] border-b-2 border-[#00ff88]"
-              : "text-[#888] hover:text-white hover:bg-[#2a2a2a]/50"
+              ? "text-[hsl(var(--trading-accent))] bg-[hsl(var(--trading-bg-secondary))] border-b-2 border-[hsl(var(--trading-accent))]"
+              : "text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]/50"
           )}
         >
           <BookOpen className="h-4 w-4" />
@@ -298,8 +300,8 @@ export function EnhancedOrderBook({
           className={cn(
             "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all duration-200 relative cursor-pointer z-10",
             activeTab === 'trades'
-              ? "text-[#00ff88] bg-[#1a1a1a] border-b-2 border-[#00ff88]"
-              : "text-[#888] hover:text-white hover:bg-[#2a2a2a]/50"
+              ? "text-[hsl(var(--trading-accent))] bg-[hsl(var(--trading-bg-secondary))] border-b-2 border-[hsl(var(--trading-accent))]"
+              : "text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]/50"
           )}
         >
           <Clock className="h-4 w-4" />
@@ -308,9 +310,9 @@ export function EnhancedOrderBook({
       </div>
 
       {/* Header with Controls - Now below tabs */}
-      <div className="flex items-center justify-between p-4 border-b border-[#2a2a2a]">
+      <div className="flex items-center justify-between p-4 border-b border-[hsl(var(--trading-border))]">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs bg-[#2a2a2a] border-[#3a3a3a] text-[#d1d5db]">
+          <Badge variant="outline" className="text-xs bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))]">
             {market}
           </Badge>
         </div>
@@ -322,7 +324,7 @@ export function EnhancedOrderBook({
             onClick={() => setShowDepthChart(!showDepthChart)}
             className={cn(
               "h-7 w-7 p-0",
-              showDepthChart ? "text-[#00ff88]" : "text-[#888]"
+              showDepthChart ? "text-[hsl(var(--trading-accent))]" : "text-[hsl(var(--trading-text-muted))]"
             )}
             title="Toggle Depth Chart"
           >
@@ -334,16 +336,16 @@ export function EnhancedOrderBook({
             onClick={() => setShowSizePercent(!showSizePercent)}
             className={cn(
               "h-7 w-7 p-0",
-              showSizePercent ? "text-[#00ff88]" : "text-[#888]"
+              showSizePercent ? "text-[hsl(var(--trading-accent))]" : "text-[hsl(var(--trading-text-muted))]"
             )}
             title="Toggle Size Percentage"
           >
             <Eye className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-[#888] hover:text-white">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-[#888] hover:text-white">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]">
             <Settings className="h-4 w-4" />
           </Button>
         </div>
@@ -353,11 +355,11 @@ export function EnhancedOrderBook({
       {activeTab === 'orderbook' ? (
         <>
           {/* Controls */}
-          <div className="flex items-center justify-between p-3 border-b border-[#2a2a2a] bg-[#0f0f0f]">
+          <div className="flex items-center justify-between p-3 border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))]">
             {/* Price Grouping */}
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[#888]">Group:</span>
-              <div className="flex border border-[#3a3a3a] rounded overflow-hidden">
+              <span className="text-xs text-[hsl(var(--trading-text-muted))]">Group:</span>
+              <div className="flex border border-[hsl(var(--trading-border))] rounded overflow-hidden">
                 {priceGroupings.slice(0, 4).map((group) => (
                   <Button
                     key={group.value}
@@ -365,10 +367,10 @@ export function EnhancedOrderBook({
                     size="sm"
                     onClick={() => setGrouping(group.value)}
                     className={cn(
-                      "h-6 px-2 text-xs border-r border-[#3a3a3a] last:border-r-0",
+                      "h-6 px-2 text-xs border-r border-[hsl(var(--trading-border))] last:border-r-0",
                       grouping === group.value 
-                        ? "bg-[#00ff88] text-black" 
-                        : "text-[#d1d5db] hover:bg-[#3a3a3a]"
+                        ? "bg-[hsl(var(--trading-accent))] text-black" 
+                        : "text-[hsl(var(--trading-text-secondary))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
                     )}
                   >
                     {group.label}
@@ -379,7 +381,7 @@ export function EnhancedOrderBook({
           </div>
 
           {/* Column Headers */}
-          <div className="grid grid-cols-3 gap-2 px-3 py-2 text-xs text-[#888] bg-[#0f0f0f] border-b border-[#2a2a2a]">
+          <div className="grid grid-cols-3 gap-2 px-3 py-2 text-xs text-[hsl(var(--trading-text-muted))] bg-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))]">
             <div>Price ({market.split('-')[1] || 'USDT'})</div>
             <div className="text-right">Size ({market.split('-')[0] || 'BTC'})</div>
             <div className="text-right">Total</div>
@@ -388,7 +390,7 @@ export function EnhancedOrderBook({
           {/* Order Book Content */}
           <div className="overflow-hidden flex-1 flex flex-col">
             {/* Asks (Sell Orders) - Red */}
-            <div className="flex-1 overflow-y-auto bg-red-500/5 border-b border-[#2a2a2a]">
+            <div className="flex-1 overflow-y-auto bg-red-500/5 border-b border-[hsl(var(--trading-border))]">
               {orderBookData.asks.slice(0, Math.ceil(depth / 2)).map((ask, index) => (
                 <OrderRow 
                   key={`ask-${ask.price}`}
@@ -400,24 +402,24 @@ export function EnhancedOrderBook({
             </div>
 
             {/* Spread Display */}
-            <div className="relative py-3 px-3 bg-[#0f0f0f] border-b border-[#2a2a2a] border-t border-[#2a2a2a] flex-shrink-0">
+            <div className="relative py-3 px-3 bg-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))] border-t border-[hsl(var(--trading-border))] flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-[#888]">Spread:</span>
+                  <span className="text-xs text-[hsl(var(--trading-text-muted))]">Spread:</span>
                   <span 
-                    className="font-mono font-bold text-[#00ff88] transition-colors duration-1000"
+                    className="font-mono font-bold text-[hsl(var(--trading-accent))] transition-colors duration-1000"
                     style={{ fontSize: '14px' }}
                   >
                     ${orderBookData.spread.toFixed(2)}
                   </span>
-                  <span className="text-xs text-[#888]">
+                  <span className="text-xs text-[hsl(var(--trading-text-muted))]">
                     ({orderBookData.spreadPercentage.toFixed(3)}%)
                   </span>
                 </div>
                 
                 <div className="flex items-center gap-1">
-                  <Zap className="h-3 w-3 text-[#00ff88] animate-pulse" />
-                  <span className="text-xs text-[#888]">Live</span>
+                  <Zap className="h-3 w-3 text-[hsl(var(--trading-accent))] animate-pulse" />
+                  <span className="text-xs text-[hsl(var(--trading-text-muted))]">Live</span>
                 </div>
               </div>
             </div>
@@ -436,16 +438,16 @@ export function EnhancedOrderBook({
           </div>
 
           {/* Footer Stats */}
-          <div className="flex items-center justify-between p-3 border-t border-[#2a2a2a] bg-[#0f0f0f] text-xs">
+          <div className="flex items-center justify-between p-3 border-t border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))] text-xs">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1">
-                <span className="text-[#888]">Ask Sum:</span>
+                <span className="text-[hsl(var(--trading-text-muted))]">Ask Sum:</span>
                 <span className="text-red-400 font-medium">
                   {formatNumber(orderBookData.asks.reduce((sum, ask) => sum + ask.size, 0), 2)}
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[#888]">Bid Sum:</span>
+                <span className="text-[hsl(var(--trading-text-muted))]">Bid Sum:</span>
                 <span className="text-green-400 font-medium">
                   {formatNumber(orderBookData.bids.reduce((sum, bid) => sum + bid.size, 0), 2)}
                 </span>
@@ -453,13 +455,13 @@ export function EnhancedOrderBook({
             </div>
             
             <div className="flex items-center gap-2">
-              <span className="text-[#888]">Depth: {depth}</span>
+              <span className="text-[hsl(var(--trading-text-muted))]">Depth: {depth}</span>
               <div className="flex gap-1">
                 <Button 
                   variant="ghost" 
                   size="sm"
                   onClick={() => setDepth(Math.max(5, depth - 5))}
-                  className="h-5 w-5 p-0 text-[#888] hover:text-white"
+                  className="h-5 w-5 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]"
                 >
                   <ChevronDown className="h-3 w-3" />
                 </Button>
@@ -467,7 +469,7 @@ export function EnhancedOrderBook({
                   variant="ghost" 
                   size="sm"
                   onClick={() => setDepth(Math.min(50, depth + 5))}
-                  className="h-5 w-5 p-0 text-[#888] hover:text-white"
+                  className="h-5 w-5 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]"
                 >
                   <ChevronUp className="h-3 w-3" />
                 </Button>
@@ -478,7 +480,7 @@ export function EnhancedOrderBook({
       ) : (
         <>
           {/* Recent Trades Column Headers */}
-          <div className="grid grid-cols-3 gap-2 px-3 py-2 text-xs text-[#888] bg-[#0f0f0f] border-b border-[#2a2a2a]">
+          <div className="grid grid-cols-3 gap-2 px-3 py-2 text-xs text-[hsl(var(--trading-text-muted))] bg-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))]">
             <div>Price ({market.split('-')[1] || 'USDT'})</div>
             <div className="text-right">Size ({market.split('-')[0] || 'BTC'})</div>
             <div className="text-right">Time</div>
@@ -494,25 +496,25 @@ export function EnhancedOrderBook({
           </div>
 
           {/* Recent Trades Footer */}
-          <div className="flex items-center justify-between p-3 border-t border-[#2a2a2a] bg-[#0f0f0f] text-xs">
+          <div className="flex items-center justify-between p-3 border-t border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))] text-xs">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1">
-                <span className="text-[#888]">Total Trades:</span>
-                <span className="text-white font-medium">
+                <span className="text-[hsl(var(--trading-text-muted))]">Total Trades:</span>
+                <span className="text-[hsl(var(--trading-text))] font-medium">
                   {recentTrades.length}
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[#888]">Last Price:</span>
-                <span className="text-[#00ff88] font-medium">
+                <span className="text-[hsl(var(--trading-text-muted))]">Last Price:</span>
+                <span className="text-[hsl(var(--trading-accent))] font-medium">
                   ${lastPrice.toFixed(2)}
                 </span>
               </div>
             </div>
             
             <div className="flex items-center gap-1">
-              <Zap className="h-3 w-3 text-[#00ff88] animate-pulse" />
-              <span className="text-[#888]">Live</span>
+              <Zap className="h-3 w-3 text-[hsl(var(--trading-accent))] animate-pulse" />
+              <span className="text-[hsl(var(--trading-text-muted))]">Live</span>
             </div>
           </div>
         </>

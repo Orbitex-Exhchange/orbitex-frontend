@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -23,7 +24,11 @@ import {
   Shield,
   Activity,
   Target,
-  Rocket
+  Rocket,
+  LogOut,
+  Wallet,
+  History,
+  AlertTriangle
 } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
 import { TradingViewChart } from '@/components/trade/TradingViewChart';
@@ -31,14 +36,45 @@ import { EnhancedOrderBook } from '@/components/trade/EnhancedOrderBook';
 import { EnhancedOrderForm } from '@/components/trade/EnhancedOrderForm';
 import { MarketDataPanel } from '@/components/trade/MarketDataPanel';
 import { useToast } from '@/hooks/use-toast';
+import { authService } from '@/lib/auth';
 
 export default function TradingPage() {
+  const router = useRouter();
   const [selectedMarket, setSelectedMarket] = useState('BTC-USDT');
   const [currentPrice, setCurrentPrice] = useState(43250.50);
   const [priceChange24h, setPriceChange24h] = useState(2.45);
   const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showAuthWarning, setShowAuthWarning] = useState(false);
   
   const { toast } = useToast();
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = () => {
+      const currentUser = authService.getUser();
+      const authenticated = authService.isAuthenticated();
+      
+      setUser(currentUser);
+      setIsAuthenticated(authenticated);
+      
+      if (!authenticated) {
+        setShowAuthWarning(true);
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to access trading features",
+        });
+      }
+    };
+
+    checkAuth();
+    
+    // Check auth status every 30 seconds
+    const authInterval = setInterval(checkAuth, 30000);
+    
+    return () => clearInterval(authInterval);
+  }, [toast]);
 
   // Simulate real-time price updates
   useEffect(() => {
@@ -77,16 +113,55 @@ export default function TradingPage() {
     }, 1000);
   };
 
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out",
+      });
+      router.push('/auth/signin');
+    } catch (error) {
+      toast({
+        title: "Logout Error",
+        description: "Failed to logout. Please try again.",
+      });
+    }
+  };
+
+  const handleProfileClick = () => {
+    router.push('/profile');
+  };
+
+  const handleWalletClick = () => {
+    router.push('/wallet');
+  };
+
+  const handleHistoryClick = () => {
+    router.push('/history');
+  };
+
   return (
-    <div className="h-screen trading-layout flex flex-col trading-font overflow-hidden bg-gradient-to-br from-[#0a0a0a] via-[#0f0f0f] to-[#0a0a0a]">
+    <div className="h-screen trading-layout flex flex-col trading-font overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
       {/* Enhanced Top Status Bar */}
-      <div className="h-8 bg-gradient-to-r from-[#1a1a1a] to-[#0f0f0f] border-b border-[#2a2a2a] flex items-center justify-between px-4 text-xs glass">
+      <div className="h-8 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))] flex items-center justify-between px-4 text-xs glass">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-gradient-to-r from-[#00ff88] to-[#00cc6a] rounded-full animate-pulse shadow-lg"></div>
-            <span className="text-gradient-primary font-medium">Live</span>
+            <div className={`w-2 h-2 rounded-full animate-pulse shadow-lg ${isAuthenticated ? 'bg-gradient-to-r from-[#00ff88] to-[#00cc6a]' : 'bg-gradient-to-r from-[#ff4444] to-[#cc3333]'}`}></div>
+            <span className={`font-medium ${isAuthenticated ? 'text-gradient-primary' : 'text-[#ff4444]'}`}>
+              {isAuthenticated ? 'Live' : 'Unauthorized'}
+            </span>
           </div>
-          <span className="text-[#888888]">Last updated: {new Date().toLocaleTimeString()}</span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Last updated: {new Date().toLocaleTimeString()}</span>
+          {user && (
+            <div className="flex items-center space-x-2">
+              <User className="h-3 w-3 text-[hsl(var(--trading-text-muted))]" />
+              <span className="text-[hsl(var(--trading-text))] font-medium">{user.email}</span>
+              <Badge variant="outline" className="text-xs">
+                KYC Level {user.kyc_level || 0}
+              </Badge>
+            </div>
+          )}
         </div>
         <div className="flex items-center space-x-4">
           <Button
@@ -94,13 +169,13 @@ export default function TradingPage() {
             size="sm"
             onClick={handleRefresh}
             disabled={isLoading}
-            className="text-[#888888] hover:text-white h-6 px-2 transition-all duration-300"
+            className="text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] h-6 px-2 transition-all duration-300"
           >
             <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <div className="flex items-center space-x-2">
-            <span className="text-[#888888]">Ping:</span>
+            <span className="text-[hsl(var(--trading-text-muted))]">Ping:</span>
             <span className="text-gradient-primary font-mono font-medium">12ms</span>
           </div>
         </div>
@@ -111,7 +186,7 @@ export default function TradingPage() {
         {/* Enhanced Center Panel - Chart & Market Data */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Enhanced Chart Area - Fixed height with proper overflow */}
-          <div className="flex-1 min-h-0 relative border border-[#2a2a2a] rounded-lg m-2 overflow-hidden shadow-xl">
+          <div className="flex-1 min-h-0 relative border border-[hsl(var(--trading-border))] rounded-lg m-2 overflow-hidden shadow-xl">
             <TradingViewChart
               symbol={selectedMarket}
               interval="1h"
@@ -124,7 +199,7 @@ export default function TradingPage() {
           </div>
 
           {/* Enhanced Market Data Panel - Fixed height */}
-          <div className="h-64 border-t border-[#2a2a2a] trading-panel flex-shrink-0 overflow-hidden m-2 mt-0 shadow-lg">
+          <div className="h-64 border-t border-[hsl(var(--trading-border))] trading-panel flex-shrink-0 overflow-hidden m-2 mt-0 shadow-lg">
             <MarketDataPanel
               market={selectedMarket}
               onPriceClick={handlePriceClick}
@@ -136,7 +211,7 @@ export default function TradingPage() {
         {/* Enhanced Right Panel - Order Book & Order Form */}
         <div className="w-[600px] flex gap-2 p-2 flex-shrink-0 overflow-hidden">
           {/* Enhanced Order Book Panel */}
-          <div className="w-[300px] trading-panel border border-[#2a2a2a] rounded-lg shadow-xl overflow-hidden">
+          <div className="w-[300px] trading-panel border border-[hsl(var(--trading-border))] rounded-lg shadow-xl overflow-hidden">
             <EnhancedOrderBook
               market={selectedMarket}
               onPriceClick={handlePriceClick}
@@ -145,7 +220,7 @@ export default function TradingPage() {
           </div>
 
           {/* Enhanced Order Form Panel */}
-          <div className="w-[300px] trading-panel border border-[#2a2a2a] rounded-lg shadow-xl overflow-hidden">
+          <div className="w-[300px] trading-panel border border-[hsl(var(--trading-border))] rounded-lg shadow-xl overflow-hidden">
             <EnhancedOrderForm
               market={selectedMarket}
               currentPrice={currentPrice}
@@ -157,45 +232,85 @@ export default function TradingPage() {
       </div>
 
       {/* Enhanced Bottom Status Bar */}
-      <div className="h-6 bg-gradient-to-r from-[#1a1a1a] to-[#0f0f0f] border-t border-[#2a2a2a] flex items-center justify-between px-4 text-xs glass">
+      <div className="h-6 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] border-t border-[hsl(var(--trading-border))] flex items-center justify-between px-4 text-xs glass">
         <div className="flex items-center space-x-4">
-          <span className="text-[#888888]">Connection: <span className="text-gradient-primary font-medium">Stable</span></span>
-          <span className="text-[#888888]">Orders: <span className="text-white font-medium">0 Active</span></span>
-          <span className="text-[#888888]">Balance: <span className="text-white font-medium">$0.00</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Connection: <span className="text-gradient-primary font-medium">Stable</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Orders: <span className="text-[hsl(var(--trading-text))] font-medium">0 Active</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Balance: <span className="text-[hsl(var(--trading-text))] font-medium">$0.00</span></span>
+          {user && (
+            <>
+              <span className="text-[hsl(var(--trading-text-muted))]">KYC: <span className={`font-medium ${user.kyc_level >= 2 ? 'text-gradient-primary' : 'text-[#ff4444]'}`}>Level {user.kyc_level || 0}</span></span>
+              <span className="text-[hsl(var(--trading-text-muted))]">Email: <span className={`font-medium ${user.email_verified ? 'text-gradient-primary' : 'text-[#ff4444]'}`}>{user.email_verified ? 'Verified' : 'Unverified'}</span></span>
+            </>
+          )}
         </div>
         <div className="flex items-center space-x-4">
-          <span className="text-[#888888]">24h P&L: <span className="text-gradient-primary font-medium">+$0.00</span></span>
-          <span className="text-[#888888]">Total P&L: <span className="text-gradient-primary font-medium">+$0.00</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">24h P&L: <span className="text-gradient-primary font-medium">+$0.00</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Total P&L: <span className="text-gradient-primary font-medium">+$0.00</span></span>
+          {!isAuthenticated && (
+            <span className="text-[#ff4444] font-medium">⚠️ Demo Mode</span>
+          )}
         </div>
       </div>
 
       {/* Enhanced Floating Action Buttons */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col space-y-2">
-        <Button
-          size="sm"
-          className="btn-gradient-primary rounded-full shadow-2xl w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
-          onClick={() => {
-            toast({
-              title: "Quick Trade",
-              description: "Quick trade feature coming soon!",
-            });
-          }}
-        >
-          <TrendingUp className="h-5 w-5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="border-[#2a2a2a] text-[#d1d5db] hover:text-white hover:bg-[#1a1a1a] rounded-full shadow-2xl w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
-          onClick={() => {
-            toast({
-              title: "Settings",
-              description: "Trading settings panel opened",
-            });
-          }}
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
+        {isAuthenticated ? (
+          <>
+            <Button
+              size="sm"
+              className="btn-gradient-primary rounded-full shadow-2xl w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
+              onClick={() => {
+                toast({
+                  title: "Quick Trade",
+                  description: "Quick trade feature coming soon!",
+                });
+              }}
+            >
+              <TrendingUp className="h-5 w-5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-secondary))] rounded-full shadow-2xl w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
+              onClick={handleWalletClick}
+            >
+              <Wallet className="h-5 w-5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-secondary))] rounded-full shadow-2xl w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
+              onClick={handleHistoryClick}
+            >
+              <History className="h-5 w-5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-secondary))] rounded-full shadow-2xl w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
+              onClick={handleProfileClick}
+            >
+              <User className="h-5 w-5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-[hsl(var(--trading-border))] text-[#ff4444] hover:text-[#ff6666] hover:bg-[hsl(var(--trading-bg-secondary))] rounded-full shadow-2xl w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="sm"
+            className="btn-gradient-primary rounded-full shadow-2xl w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
+            onClick={() => router.push('/auth/signin')}
+          >
+            <User className="h-5 w-5" />
+          </Button>
+        )}
       </div>
 
       {/* Enhanced Market Quick Stats Overlay */}
@@ -280,6 +395,36 @@ export default function TradingPage() {
           </div>
         </div>
       </div>
+
+      {/* Authentication Warning Overlay */}
+      {showAuthWarning && !isAuthenticated && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="glass border border-[#2a2a2a] rounded-lg p-6 shadow-2xl backdrop-blur-xl max-w-md w-full mx-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <AlertTriangle className="h-6 w-6 text-[#ff4444]" />
+              <h3 className="text-lg font-semibold text-white">Authentication Required</h3>
+            </div>
+            <p className="text-[hsl(var(--trading-text-muted))] mb-6">
+              You need to be signed in to access trading features. Please sign in to continue.
+            </p>
+            <div className="flex space-x-3">
+              <Button
+                className="flex-1 btn-gradient-primary"
+                onClick={() => router.push('/auth/signin')}
+              >
+                Sign In
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))]"
+                onClick={() => setShowAuthWarning(false)}
+              >
+                Continue as Guest
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,13 +4,14 @@
 
 @layer base {
   :root {
+    /* Light theme colors */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
@@ -22,24 +23,36 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    
+    /* Light theme trading colors */
+    --trading-bg: 0 0% 100%;
+    --trading-bg-secondary: 210 40% 98%;
+    --trading-bg-tertiary: 220 14% 96%;
+    --trading-border: 214 31% 91%;
+    --trading-border-secondary: 220 13% 91%;
+    --trading-text: 222 84% 5%;
+    --trading-text-secondary: 215 16% 47%;
+    --trading-text-muted: 220 9% 46%;
+    --trading-accent: 221 83% 53%;
+    --trading-accent-secondary: 217 91% 60%;
+    --trading-success: 142 76% 36%;
+    --trading-error: 0 84% 60%;
+    --trading-warning: 38 92% 50%;
+    --trading-info: 199 89% 48%;
   }
 
   .dark {
+    /* Dark theme colors */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
@@ -50,12 +63,23 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --ring: 224.3 76.3% 94.1%;
+    
+    /* Dark theme trading colors */
+    --trading-bg: 222 84% 5%;
+    --trading-bg-secondary: 217 33% 18%;
+    --trading-bg-tertiary: 215 28% 17%;
+    --trading-border: 217 33% 18%;
+    --trading-border-secondary: 215 28% 17%;
+    --trading-text: 210 40% 98%;
+    --trading-text-secondary: 215 20% 65%;
+    --trading-text-muted: 217 19% 27%;
+    --trading-accent: 217 91% 60%;
+    --trading-accent-secondary: 221 83% 53%;
+    --trading-success: 142 76% 36%;
+    --trading-error: 0 84% 60%;
+    --trading-warning: 38 92% 50%;
+    --trading-info: 199 89% 48%;
   }
 }
 
@@ -68,300 +92,99 @@
   }
 }
 
-/* Custom Trading Theme */
-.trading-font {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-/* Enhanced Navigation Styles */
-.nav-dark {
-  @apply bg-gradient-to-r from-[#0a0a0a] via-[#0f0f0f] to-[#0a0a0a] border-b border-[#2a2a2a];
-  z-index: 9999 !important;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-/* Force all navigation elements to be above chart */
-nav * {
-  z-index: 9999 !important;
-}
-
-/* Enhanced dropdown styles */
-.nav-dropdown {
-  @apply bg-gradient-to-br from-[#1a1a1a] via-[#0f0f0f] to-[#1a1a1a];
-  border: 1px solid rgba(42, 42, 42, 0.8);
-  backdrop-filter: blur(20px);
-  box-shadow: 
-    0 20px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-
-/* Chart specific z-index management */
-.tradingview-chart {
-  position: relative;
-  z-index: 1 !important;
-}
-
-.chart-area {
-  z-index: 1 !important;
-}
-
-/* Enhanced Trading Layout */
-.trading-layout {
-  background: linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 50%, #0a0a0a 100%);
-}
-
-.trading-panel {
-  background: linear-gradient(145deg, #1a1a1a 0%, #0f0f0f 100%);
-  border: 1px solid rgba(42, 42, 42, 0.8);
-  backdrop-filter: blur(10px);
-}
-
-.trading-card {
-  background: linear-gradient(145deg, #1a1a1a 0%, #0f0f0f 100%);
-  border: 1px solid rgba(42, 42, 42, 0.6);
-  backdrop-filter: blur(10px);
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.trading-card:hover {
-  border-color: rgba(0, 255, 136, 0.3);
-  box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(0, 255, 136, 0.1),
-    0 0 20px rgba(0, 255, 136, 0.1);
-  transform: translateY(-2px);
-}
-
-.trading-button-primary {
-  background: linear-gradient(135deg, #00ff88 0%, #00cc6a 50%, #00ff88 100%);
-  color: #000;
-  border: none;
-  font-weight: 600;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 
-    0 4px 15px rgba(0, 255, 136, 0.3),
-    0 0 0 1px rgba(0, 255, 136, 0.2);
-}
-
-.trading-button-primary:hover {
-  background: linear-gradient(135deg, #00cc6a 0%, #00ff88 50%, #00cc6a 100%);
-  transform: translateY(-1px);
-  box-shadow: 
-    0 8px 25px rgba(0, 255, 136, 0.4),
-    0 0 0 1px rgba(0, 255, 136, 0.3);
-}
-
-.trading-button-secondary {
-  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
-  color: #d1d5db;
-  border: 1px solid rgba(42, 42, 42, 0.8);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.trading-button-secondary:hover {
-  background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
-  color: #ffffff;
-  border-color: rgba(0, 255, 136, 0.3);
-  transform: translateY(-1px);
-}
-
-.trading-input {
-  background: linear-gradient(145deg, #1a1a1a 0%, #0f0f0f 100%);
-  border: 1px solid rgba(42, 42, 42, 0.8);
-  color: #ffffff;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.trading-input:focus {
-  border-color: rgba(0, 255, 136, 0.5);
-  box-shadow: 
-    0 0 0 3px rgba(0, 255, 136, 0.1),
-    0 0 20px rgba(0, 255, 136, 0.1);
-  background: linear-gradient(145deg, #0f0f0f 0%, #1a1a1a 100%);
-}
-
-.trading-badge {
-  background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-  color: #000;
-  font-weight: 600;
-  border: none;
-}
-
-/* Enhanced Badge Variants */
-.badge-gradient-primary {
-  background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-  color: #000;
-}
-
-.badge-gradient-secondary {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: #ffffff;
-}
-
-.badge-gradient-warning {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  color: #ffffff;
-}
-
-.badge-gradient-danger {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  color: #ffffff;
-}
-
-/* Enhanced Card Variants */
-.card-gradient-primary {
-  background: linear-gradient(145deg, #1a1a1a 0%, #0f0f0f 100%);
-  border: 1px solid rgba(0, 255, 136, 0.2);
-}
-
-.card-gradient-secondary {
-  background: linear-gradient(145deg, #1a1a1a 0%, #0f0f0f 100%);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-}
-
-.card-gradient-warning {
-  background: linear-gradient(145deg, #1a1a1a 0%, #0f0f0f 100%);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-}
-
-.card-gradient-danger {
-  background: linear-gradient(145deg, #1a1a1a 0%, #0f0f0f 100%);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-/* Enhanced Button Variants */
-.btn-gradient-primary {
-  background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-  color: #000;
-  border: none;
-  font-weight: 600;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.btn-gradient-primary:hover {
-  background: linear-gradient(135deg, #00cc6a 0%, #00ff88 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
-}
-
-.btn-gradient-secondary {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: #ffffff;
-  border: none;
-  font-weight: 600;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.btn-gradient-secondary:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
-}
-
-/* Enhanced Animations */
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.gradient-animate {
-  background: linear-gradient(-45deg, #00ff88, #00cc6a, #6366f1, #8b5cf6);
-  background-size: 400% 400%;
-  animation: gradient-shift 3s ease infinite;
-}
-
-/* Enhanced Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #1a1a1a;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #00cc6a 0%, #00ff88 100%);
-}
-
-/* Enhanced Focus States */
-.focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-[#00ff88] focus:ring-offset-2 focus:ring-offset-[#0a0a0a];
-}
-
-/* Enhanced Loading States */
-.loading-gradient {
-  background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-}
-
-@keyframes loading {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* Enhanced Responsive Design */
-@media (max-width: 768px) {
-  .trading-card {
-    margin: 0.5rem;
-    border-radius: 0.75rem;
+@layer components {
+  /* Trading Layout */
+  .trading-layout {
+    @apply bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))];
   }
-  
-  .trading-button-primary {
-    padding: 0.75rem 1.5rem;
-    font-size: 0.875rem;
+
+  /* Trading Panel */
+  .trading-panel {
+    @apply bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-lg;
   }
-}
 
-/* Enhanced Glassmorphism */
-.glass {
-  background: rgba(26, 26, 26, 0.8);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
+  /* Trading Button Primary */
+  .btn-gradient-primary {
+    @apply bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] text-white hover:from-[hsl(var(--trading-accent-secondary))] hover:to-[hsl(var(--trading-accent))] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105;
+  }
 
-.glass-light {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
+  /* Trading Button Secondary */
+  .btn-gradient-secondary {
+    @apply bg-gradient-to-r from-[hsl(var(--trading-bg-tertiary))] to-[hsl(var(--trading-bg-secondary))] text-[hsl(var(--trading-text))] border border-[hsl(var(--trading-border))] hover:border-[hsl(var(--trading-accent))] hover:text-[hsl(var(--trading-accent))] transition-all duration-300;
+  }
 
-/* Enhanced Text Gradients */
-.text-gradient-primary {
-  background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+  /* Trading Input */
+  .trading-input {
+    @apply bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder-[hsl(var(--trading-text-muted))] focus:border-[hsl(var(--trading-accent))] focus:ring-[hsl(var(--trading-accent))] transition-all duration-300;
+  }
 
-.text-gradient-secondary {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+  /* Trading Card */
+  .card-gradient-primary {
+    @apply bg-gradient-to-br from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg-tertiary))] border border-[hsl(var(--trading-border))] shadow-xl hover:shadow-2xl transition-all duration-300;
+  }
 
-/* Enhanced Border Gradients */
-.border-gradient-primary {
-  border: 2px solid transparent;
-  background: linear-gradient(145deg, #1a1a1a, #0f0f0f) padding-box,
-              linear-gradient(135deg, #00ff88, #00cc6a) border-box;
-}
+  /* Trading Badge */
+  .badge-gradient-primary {
+    @apply bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] text-white border-0 shadow-lg;
+  }
 
-.border-gradient-secondary {
-  border: 2px solid transparent;
-  background: linear-gradient(145deg, #1a1a1a, #0f0f0f) padding-box,
-              linear-gradient(135deg, #6366f1, #8b5cf6) border-box;
+  /* Glass Effect */
+  .glass {
+    @apply backdrop-blur-xl bg-white/10 dark:bg-black/10 border border-white/20 dark:border-white/10;
+  }
+
+  /* Text Gradients */
+  .text-gradient-primary {
+    @apply bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] bg-clip-text text-transparent;
+  }
+
+  /* Trading Font */
+  .trading-font {
+    @apply font-sans antialiased;
+  }
+
+  /* Focus Ring */
+  .focus-ring {
+    @apply focus:ring-2 focus:ring-[hsl(var(--trading-accent))] focus:ring-opacity-50 focus:outline-none;
+  }
+
+  /* Z-index utilities */
+  .z-9999 {
+    z-index: 9999 !important;
+  }
+
+  .z-1 {
+    z-index: 1 !important;
+  }
+
+  .z-10 {
+    z-index: 10 !important;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-[hsl(var(--trading-bg-secondary))];
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-[hsl(var(--trading-border))] rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-[hsl(var(--trading-accent))];
+  }
+
+  /* Chart container specific styles */
+  .chart-container {
+    @apply relative w-full h-full z-1;
+  }
+
+  .chart-canvas {
+    @apply absolute inset-0 z-10;
+  }
 }

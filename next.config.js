@@ -9,16 +9,7 @@ const nextConfig = {
       fs: false,
     };
     
-    // Exclude problematic files from build
-    config.module.rules.push({
-      test: /datafeeds/,
-      use: 'ignore-loader',
-    });
-    
     return config;
-  },
-  env: {
-    CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
 
   // Exclude problematic directories from TypeScript checking

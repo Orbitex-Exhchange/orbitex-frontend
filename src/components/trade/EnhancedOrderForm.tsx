@@ -203,8 +203,8 @@ export function EnhancedOrderForm({
           className={cn(
             "flex-1 h-8 text-sm",
             orderData.side === 'buy'
-              ? "bg-green-500 hover:bg-green-600 text-white"
-              : "bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#888]"
+              ? "bg-[hsl(var(--trading-success))] hover:bg-[hsl(var(--trading-success))]/80 text-black"
+              : "bg-[hsl(var(--trading-bg-tertiary))] hover:bg-[hsl(var(--trading-bg-secondary))] text-[hsl(var(--trading-text-muted))]"
           )}
         >
           <TrendingUp className="h-3 w-3 mr-1" />
@@ -215,8 +215,8 @@ export function EnhancedOrderForm({
           className={cn(
             "flex-1 h-8 text-sm",
             orderData.side === 'sell'
-              ? "bg-red-500 hover:bg-red-600 text-white"
-              : "bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#888]"
+              ? "bg-[hsl(var(--trading-error))] hover:bg-[hsl(var(--trading-error))]/80 text-black"
+              : "bg-[hsl(var(--trading-bg-tertiary))] hover:bg-[hsl(var(--trading-bg-secondary))] text-[hsl(var(--trading-text-muted))]"
           )}
         >
           <TrendingDown className="h-3 w-3 mr-1" />
@@ -233,7 +233,7 @@ export function EnhancedOrderForm({
             onClick={() => setQuickOrderMode(!quickOrderMode)}
             className={cn(
               "h-6 w-6 p-0",
-              quickOrderMode ? "text-[#00ff88]" : "text-[#888]"
+              quickOrderMode ? "text-[hsl(var(--trading-accent))]" : "text-[hsl(var(--trading-text-muted))]"
             )}
             title="Quick Order Mode"
           >
@@ -245,13 +245,13 @@ export function EnhancedOrderForm({
             onClick={() => setCalculatorMode(!calculatorMode)}
             className={cn(
               "h-6 w-6 p-0",
-              calculatorMode ? "text-[#00ff88]" : "text-[#888]"
+              calculatorMode ? "text-[hsl(var(--trading-accent))]" : "text-[hsl(var(--trading-text-muted))]"
             )}
             title="Calculator Mode"
           >
             <Calculator className="h-3 w-3" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-[#888] hover:text-white">
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]">
             <Settings className="h-3 w-3" />
           </Button>
         </div>
@@ -259,7 +259,7 @@ export function EnhancedOrderForm({
 
       {/* Order Type Selector */}
       <div className="mb-3">
-        <label className="block text-xs font-medium text-[#888] mb-1">Order Type</label>
+        <label className="block text-xs font-medium text-[hsl(var(--trading-text-muted))] mb-1">Order Type</label>
         <div className="grid grid-cols-2 gap-1">
           {orderTypes.slice(0, 4).map((type) => (
             <Button
@@ -270,8 +270,8 @@ export function EnhancedOrderForm({
               className={cn(
                 "h-6 text-[10px] justify-start",
                 orderData.type === type.value
-                  ? "bg-[#00ff88] text-black"
-                  : "bg-[#2a2a2a] text-[#d1d5db] hover:bg-[#3a3a3a]"
+                  ? "bg-[hsl(var(--trading-accent))] text-black"
+                  : "bg-[hsl(var(--trading-bg-tertiary))] text-[hsl(var(--trading-text-secondary))] hover:bg-[hsl(var(--trading-bg-secondary))]"
               )}
               title={type.description}
             >
@@ -284,13 +284,13 @@ export function EnhancedOrderForm({
       {/* Leverage Slider */}
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
-          <label className="text-xs font-medium text-[#888]">Leverage</label>
+          <label className="text-xs font-medium text-[hsl(var(--trading-text-muted))]">Leverage</label>
           <div className="flex items-center gap-1">
-            <span className="text-xs font-medium text-white">{orderData.leverage}x</span>
+            <span className="text-xs font-medium text-[hsl(var(--trading-text))]">{orderData.leverage}x</span>
             <Button
               variant="ghost"
               size="sm"
-              className="h-4 w-4 p-0 text-[#888] hover:text-white"
+              className="h-4 w-4 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]"
             >
               <Info className="h-2 w-2" />
             </Button>

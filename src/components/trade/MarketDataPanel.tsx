@@ -228,10 +228,10 @@ export function MarketDataPanel({
   const PositionsPanel = () => (
     <div className="h-full flex flex-col">
       {/* Positions Header */}
-      <div className="flex items-center justify-between p-2 border-b border-[#2a2a2a] bg-[#0f0f0f]">
+      <div className="flex items-center justify-between p-2 border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))]">
         <div className="flex items-center gap-2">
-          <h4 className="text-xs font-medium text-white">My Positions</h4>
-          <Badge variant="outline" className="text-[10px] bg-[#2a2a2a] border-[#3a3a3a] text-[#d1d5db]">
+          <h4 className="text-xs font-medium text-[hsl(var(--trading-text))]">My Positions</h4>
+          <Badge variant="outline" className="text-[10px] bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))]">
             {positions.length}
           </Badge>
         </div>
@@ -243,7 +243,7 @@ export function MarketDataPanel({
             onClick={() => setShowClosedPositions(!showClosedPositions)}
             className={cn(
               "h-6 px-2 text-[10px]",
-              showClosedPositions ? "bg-[#00ff88] text-black" : "text-[#888]"
+              showClosedPositions ? "bg-[hsl(var(--trading-accent))] text-black" : "text-[hsl(var(--trading-text-muted))]"
             )}
           >
             Closed
@@ -254,7 +254,7 @@ export function MarketDataPanel({
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={cn(
               "h-6 w-6 p-0",
-              autoRefresh ? "text-[#00ff88]" : "text-[#888]"
+              autoRefresh ? "text-[hsl(var(--trading-accent))]" : "text-[hsl(var(--trading-text-muted))]"
             )}
             title="Auto Refresh"
           >
@@ -264,7 +264,7 @@ export function MarketDataPanel({
       </div>
 
       {/* Positions Table Header */}
-      <div className="grid grid-cols-7 gap-2 px-2 py-1.5 text-[10px] text-[#888] bg-[#0f0f0f] border-b border-[#2a2a2a]">
+      <div className="grid grid-cols-7 gap-2 px-2 py-1.5 text-[10px] text-[hsl(var(--trading-text-muted))] bg-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))]">
         <div>Symbol</div>
         <div className="text-right">Size</div>
         <div className="text-right">Entry Price</div>
@@ -279,10 +279,10 @@ export function MarketDataPanel({
         {positions.map((position) => (
           <div
             key={position.id}
-            className="grid grid-cols-7 gap-2 px-2 py-1.5 text-xs hover:bg-[#2a2a2a]/50 border-b border-[#1a1a1a] last:border-b-0"
+            className="grid grid-cols-7 gap-2 px-2 py-1.5 text-xs hover:bg-[hsl(var(--trading-bg-tertiary))]/50 border-b border-[hsl(var(--trading-border))] last:border-b-0"
           >
             <div className="flex items-center gap-1">
-              <span className="font-medium text-white">{position.symbol}</span>
+              <span className="font-medium text-[hsl(var(--trading-text))]">{position.symbol}</span>
               <Badge
                 variant="outline"
                 className={cn(
@@ -295,13 +295,13 @@ export function MarketDataPanel({
                 {position.side.toUpperCase()}
               </Badge>
             </div>
-            <div className="text-white text-right font-mono text-xs">
+            <div className="text-[hsl(var(--trading-text))] text-right font-mono text-xs">
               {formatNumber(position.size, 4)}
             </div>
-            <div className="text-white text-right font-mono text-xs">
+            <div className="text-[hsl(var(--trading-text))] text-right font-mono text-xs">
               ${formatNumber(position.entryPrice, 2)}
             </div>
-            <div className="text-white text-right font-mono text-xs">
+            <div className="text-[hsl(var(--trading-text))] text-right font-mono text-xs">
               ${formatNumber(position.markPrice, 2)}
             </div>
             <div className={cn(
@@ -317,10 +317,10 @@ export function MarketDataPanel({
               {position.pnlPercent >= 0 ? '+' : ''}{position.pnlPercent.toFixed(2)}%
             </div>
             <div className="flex items-center justify-center gap-1">
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-[#888] hover:text-white">
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]">
                 <Eye className="h-3 w-3" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-[#888] hover:text-white">
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]">
                 <X className="h-3 w-3" />
               </Button>
             </div>
@@ -333,10 +333,10 @@ export function MarketDataPanel({
   const OrdersPanel = () => (
     <div className="h-full flex flex-col">
       {/* Orders Header */}
-      <div className="flex items-center justify-between p-2 border-b border-[#2a2a2a] bg-[#0f0f0f]">
+      <div className="flex items-center justify-between p-2 border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))]">
         <div className="flex items-center gap-2">
-          <h4 className="text-xs font-medium text-white">Open Orders</h4>
-          <Badge variant="outline" className="text-[10px] bg-[#2a2a2a] border-[#3a3a3a] text-[#d1d5db]">
+          <h4 className="text-xs font-medium text-[hsl(var(--trading-text))]">Open Orders</h4>
+          <Badge variant="outline" className="text-[10px] bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))]">
             {openOrders.length}
           </Badge>
         </div>

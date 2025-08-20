@@ -248,10 +248,10 @@ export default function WalletsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#0f0f0f] to-[#0a0a0a] trading-font">
+    <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] trading-font">
       {/* Enhanced Page Header */}
       <motion.div 
-        className="bg-gradient-to-r from-[#0a0a0a] to-[#0f0f0f] border-b border-[#2a2a2a] glass"
+        className="bg-gradient-to-r from-[hsl(var(--trading-bg))] to-[hsl(var(--trading-bg-secondary))] border-b border-[hsl(var(--trading-border))] glass"
         initial="hidden"
         animate="visible"
         variants={containerVariants}
@@ -262,7 +262,7 @@ export default function WalletsPage() {
               <h1 className="text-xl font-bold text-gradient-primary">Wallets</h1>
             </motion.div>
             <motion.div className="flex items-center space-x-4" variants={itemVariants}>
-              <Button variant="outline" size="sm" className="border-[#2a2a2a] text-[#d1d5db] hover:bg-[#1a1a1a] hover:border-[#00ff88]/50 transition-all duration-300">
+              <Button variant="outline" size="sm" className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))] hover:bg-[hsl(var(--trading-bg-tertiary))] hover:border-[hsl(var(--trading-accent))] transition-all duration-300">
                 <Plus className="h-4 w-4 mr-2" />
                 Add new address
               </Button>

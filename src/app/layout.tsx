@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/store/providers'
-import Navigation from '@/components/layout/Navigation'
 import { ConditionalNavigation } from '@/components/layout/ConditionalNavigation'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -49,17 +49,19 @@ export default function RootLayout({
         <meta name="theme-color" content="#2563eb" />
       </head>
       <body className={inter.className}>
-        <Providers>
-          <div className="min-h-screen trading-layout">
-            {/* Conditional Navigation - only show on authenticated pages */}
-            <ConditionalNavigation user={mockUser} />
-            
-            {/* Main Content */}
-            <main className="flex-1">
-              {children}
-            </main>
-          </div>
-        </Providers>
+        <ThemeProvider>
+          <Providers>
+            <div className="min-h-screen trading-layout">
+              {/* Conditional Navigation - only show on authenticated pages */}
+              <ConditionalNavigation user={mockUser} />
+              
+              {/* Main Content */}
+              <main className="flex-1">
+                {children}
+              </main>
+            </div>
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   )

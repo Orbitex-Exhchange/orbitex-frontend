@@ -99,3 +99,4 @@ config.local.json
 *.zip
 *.rar
 .vercel
+.env*.local

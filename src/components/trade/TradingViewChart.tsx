@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, ColorType } from 'lightweight-charts';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { useTheme } from '@/contexts/ThemeContext';
 import { 
   BarChart3, 
   LineChart, 
@@ -91,13 +92,16 @@ const drawingTools = [
 export function TradingViewChart({ 
   symbol, 
   interval, 
-  theme = 'dark', 
+  theme: propTheme, 
   width = '100%', 
   height = '100%',
   data = [],
   onMarketSelect,
   selectedMarket
 }: TradingViewChartProps) {
+  const { theme: contextTheme } = useTheme();
+  const theme = propTheme || contextTheme;
+  
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const candlestickSeriesRef = useRef<any>(null);
@@ -200,22 +204,22 @@ export function TradingViewChart({
     let mainSeries;
     if (chartType === 'candlestick') {
       mainSeries = chart.addCandlestickSeries({
-        upColor: '#00ff88',
-        downColor: '#ff4444',
+        upColor: theme === 'dark' ? '#00ff88' : '#10b981',
+        downColor: theme === 'dark' ? '#ff4444' : '#ef4444',
         borderVisible: false,
-        wickUpColor: '#00ff88',
-        wickDownColor: '#ff4444',
+        wickUpColor: theme === 'dark' ? '#00ff88' : '#10b981',
+        wickDownColor: theme === 'dark' ? '#ff4444' : '#ef4444',
       });
     } else if (chartType === 'line') {
       mainSeries = chart.addLineSeries({
-        color: '#00ff88',
+        color: theme === 'dark' ? '#00ff88' : '#10b981',
         lineWidth: 2,
       });
     } else {
       mainSeries = chart.addAreaSeries({
-        topColor: 'rgba(0, 255, 136, 0.3)',
-        bottomColor: 'rgba(0, 255, 136, 0.05)',
-        lineColor: '#00ff88',
+        topColor: theme === 'dark' ? 'rgba(0, 255, 136, 0.3)' : 'rgba(16, 185, 129, 0.3)',
+        bottomColor: theme === 'dark' ? 'rgba(0, 255, 136, 0.05)' : 'rgba(16, 185, 129, 0.05)',
+        lineColor: theme === 'dark' ? '#00ff88' : '#10b981',
         lineWidth: 2,
       });
     }
@@ -224,7 +228,7 @@ export function TradingViewChart({
     let volumeSeries;
     if (showVolume) {
       volumeSeries = chart.addHistogramSeries({
-        color: '#00ff88',
+        color: theme === 'dark' ? '#00ff88' : '#10b981',
         priceFormat: {
           type: 'volume',
         },
@@ -233,7 +237,7 @@ export function TradingViewChart({
     }
 
     // Generate and set mock data
-    const mockData = generateMockData(selectedTimeframe);
+    const mockData = generateMockData(selectedTimeframe, theme);
     if (chartType === 'candlestick') {
       mainSeries.setData(mockData.candlesticks);
     } else {
@@ -326,15 +330,15 @@ export function TradingViewChart({
   }, []);
 
   return (
-    <div className={`tradingview-chart ${isFullscreen ? 'fixed inset-0 z-50 bg-[#0a0a0a]' : 'relative'} shadow-lg overflow-hidden bg-gradient-to-br from-[#0f0f0f] to-[#1a1a1a] h-full`} style={{ width, height }}>
+    <div className={`tradingview-chart ${isFullscreen ? 'fixed inset-0 z-50 bg-[hsl(var(--trading-bg))]' : 'relative'} shadow-lg overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] to-[hsl(var(--trading-bg-secondary))] h-full`} style={{ width, height }}>
       {/* Left Control Panel */}
-      <div className="absolute left-0 top-12 bottom-0 z-20 w-10 bg-gradient-to-b from-[#1a1a1a]/95 to-[#0f0f0f]/95 backdrop-blur-sm border-r border-[#2a2a2a] flex flex-col items-center py-1 gap-1">
+      <div className="absolute left-0 top-12 bottom-0 z-20 w-10 bg-gradient-to-b from-[hsl(var(--trading-bg-secondary))]/95 to-[hsl(var(--trading-bg))]/95 backdrop-blur-sm border-r border-[hsl(var(--trading-border))] flex flex-col items-center py-1 gap-1">
         {/* Chart Type Control */}
         <div className="relative group">
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 text-[#00ff88] bg-[#00ff88]/10 hover:bg-[#00ff88]/20 rounded-md transition-all duration-200 hover:scale-105"
+            className="h-8 w-8 p-0 text-[hsl(var(--trading-accent))] bg-[hsl(var(--trading-accent))]/10 hover:bg-[hsl(var(--trading-accent))]/20 rounded-md transition-all duration-200 hover:scale-105"
             title="Chart Type"
           >
             {chartType === 'candlestick' && <BarChart3 className="h-4 w-4" />}
@@ -342,7 +346,7 @@ export function TradingViewChart({
             {chartType === 'area' && <Activity className="h-4 w-4" />}
           </Button>
           {/* Popup Menu */}
-          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[100px] z-50">
+          <div className="absolute left-full top-0 ml-1 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[100px] z-50">
             {chartTypes.map((type) => (
               <Button
                 key={type.value}
@@ -351,8 +355,8 @@ export function TradingViewChart({
                 onClick={() => setChartType(type.value as any)}
                 className={`w-full justify-start px-2 py-1 text-xs ${
                   chartType === type.value 
-                    ? 'bg-[#00ff88] text-black' 
-                    : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+                    ? 'bg-[hsl(var(--trading-accent))] text-black' 
+                    : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
                 }`}
               >
                 <type.icon className="h-3 w-3 mr-1" />
@@ -367,13 +371,13 @@ export function TradingViewChart({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            className="h-8 w-8 p-0 text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))] rounded-md transition-all duration-200 hover:scale-105"
             title="Drawing Tools"
           >
             <PenTool className="h-4 w-4" />
           </Button>
           {/* Popup Menu */}
-          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[120px] z-50">
+          <div className="absolute left-full top-0 ml-1 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[120px] z-50">
             {drawingTools.map((tool) => (
               <Button
                 key={tool.value}
@@ -382,8 +386,8 @@ export function TradingViewChart({
                 onClick={() => setSelectedDrawingTool(tool.value)}
                 className={`w-full justify-start px-2 py-1 text-xs ${
                   selectedDrawingTool === tool.value 
-                    ? 'bg-[#00ff88] text-black' 
-                    : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+                    ? 'bg-[hsl(var(--trading-accent))] text-black' 
+                    : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
                 }`}
               >
                 <tool.icon className="h-3 w-3 mr-1" />
@@ -398,13 +402,13 @@ export function TradingViewChart({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            className="h-8 w-8 p-0 text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))] rounded-md transition-all duration-200 hover:scale-105"
             title="Indicators"
           >
             <TrendingUp className="h-4 w-4" />
           </Button>
           {/* Popup Menu */}
-          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[140px] max-h-[250px] overflow-y-auto z-50">
+          <div className="absolute left-full top-0 ml-1 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[140px] max-h-[250px] overflow-y-auto z-50">
             {indicators.map((indicator) => (
               <Button
                 key={indicator.id}
@@ -421,8 +425,8 @@ export function TradingViewChart({
                 }}
                 className={`w-full justify-start px-2 py-1 text-xs ${
                   indicator.enabled 
-                    ? 'bg-[#00ff88] text-black' 
-                    : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+                    ? 'bg-[hsl(var(--trading-accent))] text-black' 
+                    : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
                 }`}
               >
                 <span 
@@ -440,18 +444,18 @@ export function TradingViewChart({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            className="h-8 w-8 p-0 text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))] rounded-md transition-all duration-200 hover:scale-105"
             title="Zoom Controls"
           >
             <Maximize2 className="h-4 w-4" />
           </Button>
           {/* Popup Menu */}
-          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[100px] z-50">
+          <div className="absolute left-full top-0 ml-1 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[100px] z-50">
             <Button
               variant="ghost"
               size="sm"
               onClick={zoomOut}
-              className="w-full justify-start px-2 py-1 text-xs text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]"
+              className="w-full justify-start px-2 py-1 text-xs text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
             >
               <Minus className="h-3 w-3 mr-1" />
               Zoom Out
@@ -460,7 +464,7 @@ export function TradingViewChart({
               variant="ghost"
               size="sm"
               onClick={resetChart}
-              className="w-full justify-start px-2 py-1 text-xs text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]"
+              className="w-full justify-start px-2 py-1 text-xs text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
             >
               <Target className="h-3 w-3 mr-1" />
               Reset
@@ -469,7 +473,7 @@ export function TradingViewChart({
               variant="ghost"
               size="sm"
               onClick={zoomIn}
-              className="w-full justify-start px-2 py-1 text-xs text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]"
+              className="w-full justify-start px-2 py-1 text-xs text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
             >
               <Plus className="h-3 w-3 mr-1" />
               Zoom In
@@ -482,19 +486,19 @@ export function TradingViewChart({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            className="h-8 w-8 p-0 text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))] rounded-md transition-all duration-200 hover:scale-105"
             title="Display Options"
           >
             <Settings className="h-4 w-4" />
           </Button>
           {/* Popup Menu */}
-          <div className="absolute left-full top-0 ml-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[100px] z-50">
+          <div className="absolute left-full top-0 ml-1 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 min-w-[100px] z-50">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowVolume(!showVolume)}
               className={`w-full justify-start px-2 py-1 text-xs ${
-                showVolume ? 'bg-[#00ff88] text-black' : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+                showVolume ? 'bg-[hsl(var(--trading-accent))] text-black' : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
               }`}
             >
               <Volume2 className="h-3 w-3 mr-1" />
@@ -505,7 +509,7 @@ export function TradingViewChart({
               size="sm"
               onClick={() => setShowGrid(!showGrid)}
               className={`w-full justify-start px-2 py-1 text-xs ${
-                showGrid ? 'bg-[#00ff88] text-black' : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+                showGrid ? 'bg-[hsl(var(--trading-accent))] text-black' : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
               }`}
             >
               <Layers className="h-3 w-3 mr-1" />
@@ -516,7 +520,7 @@ export function TradingViewChart({
               size="sm"
               onClick={() => setAutoScale(!autoScale)}
               className={`w-full justify-start px-2 py-1 text-xs ${
-                autoScale ? 'bg-[#00ff88] text-black' : 'text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a]'
+                autoScale ? 'bg-[hsl(var(--trading-accent))] text-black' : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
               }`}
             >
               <Target className="h-3 w-3 mr-1" />
@@ -531,7 +535,7 @@ export function TradingViewChart({
             variant="ghost"
             size="sm"
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="h-8 w-8 p-0 text-[#d1d5db] hover:text-white hover:bg-[#3a3a3a] rounded-md transition-all duration-200 hover:scale-105"
+            className="h-8 w-8 p-0 text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))] rounded-md transition-all duration-200 hover:scale-105"
             title="Fullscreen"
           >
             <Fullscreen className="h-4 w-4" />
@@ -540,7 +544,7 @@ export function TradingViewChart({
       </div>
 
       {/* Top Toolbar - Symbol, Market Stats & Timeframes */}
-      <div className="absolute top-0 left-10 right-0 z-20 flex items-center justify-between p-2 bg-gradient-to-r from-[#1a1a1a]/95 to-[#0f0f0f]/95 backdrop-blur-sm border-b border-[#2a2a2a] shadow-lg">
+      <div className="absolute top-0 left-10 right-0 z-20 flex items-center justify-between p-2 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))]/95 to-[hsl(var(--trading-bg))]/95 backdrop-blur-sm border-b border-[hsl(var(--trading-border))] shadow-lg">
         {/* Left Section - Market Selection & Market Stats */}
         <div className="flex items-center gap-3 flex-1">
           {/* Market Selection Dropdown */}
@@ -548,7 +552,7 @@ export function TradingViewChart({
             <Button
               variant="ghost"
               onClick={() => setMarketDropdownOpen(!marketDropdownOpen)}
-              className="flex items-center space-x-1 text-white hover:text-[#00ff88] transition-colors duration-200 h-8 px-2"
+              className="flex items-center space-x-1 text-[hsl(var(--trading-text))] hover:text-[hsl(var(--trading-accent))] transition-colors duration-200 h-8 px-2"
             >
               <Bitcoin className="h-4 w-4" />
               <span className="font-mono font-bold text-sm">
@@ -559,14 +563,14 @@ export function TradingViewChart({
             
             {/* Market Dropdown Popup */}
             {marketDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-[500px] bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl z-[9999] max-h-[700px] overflow-hidden">
-                <div className="p-3 border-b border-[#2a2a2a] flex items-center justify-between bg-[#0f0f0f]">
-                  <h3 className="font-bold text-white text-sm">Markets</h3>
+              <div className="absolute top-full left-0 mt-1 w-[500px] bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl z-[9999] max-h-[700px] overflow-hidden">
+                <div className="p-3 border-b border-[hsl(var(--trading-border))] flex items-center justify-between bg-[hsl(var(--trading-bg))]">
+                  <h3 className="font-bold text-[hsl(var(--trading-text))] text-sm">Markets</h3>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setMarketDropdownOpen(false)}
-                    className="text-[#888] hover:text-white h-6 w-6 p-0"
+                    className="text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] h-6 w-6 p-0"
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -584,39 +588,39 @@ export function TradingViewChart({
             )}
           </div>
           
-          <Badge variant="outline" className="bg-[#2a2a2a] text-[#00ff88] border-[#00ff88]/30 text-xs px-2 py-0.5">
+          <Badge variant="outline" className="bg-[hsl(var(--trading-bg-tertiary))] text-[hsl(var(--trading-accent))] border-[hsl(var(--trading-accent))]/30 text-xs px-2 py-0.5">
             {interval}
           </Badge>
           
           {/* Market Stats */}
           <div className="hidden md:flex items-center gap-3 text-xs">
-            <div className="bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#3a3a3a]">
-              <span className="text-[#888] text-xs">Price: </span>
-              <span className="font-mono font-bold text-white text-xs">
+            <div className="bg-[hsl(var(--trading-bg-tertiary))]/50 px-2 py-1 rounded border border-[hsl(var(--trading-border))]">
+              <span className="text-[hsl(var(--trading-text-muted))] text-xs">Price: </span>
+              <span className="font-mono font-bold text-[hsl(var(--trading-text))] text-xs">
                 ${marketData.lastPrice.toFixed(2)}
               </span>
-              <span className={`font-medium ml-1 text-xs ${marketData.change24h >= 0 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
+              <span className={`font-medium ml-1 text-xs ${marketData.change24h >= 0 ? 'text-[hsl(var(--trading-success))]' : 'text-[hsl(var(--trading-error))]'}`}>
                 {marketData.change24h >= 0 ? '+' : ''}{marketData.change24h}%
               </span>
             </div>
-            <div className="bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#3a3a3a]">
-              <span className="text-[#888] text-xs">High: </span>
-              <span className="font-mono text-white text-xs">${marketData.high24h.toFixed(2)}</span>
+            <div className="bg-[hsl(var(--trading-bg-tertiary))]/50 px-2 py-1 rounded border border-[hsl(var(--trading-border))]">
+              <span className="text-[hsl(var(--trading-text-muted))] text-xs">High: </span>
+              <span className="font-mono text-[hsl(var(--trading-text))] text-xs">${marketData.high24h.toFixed(2)}</span>
             </div>
-            <div className="bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#3a3a3a]">
-              <span className="text-[#888] text-xs">Low: </span>
-              <span className="font-mono text-white text-xs">${marketData.low24h.toFixed(2)}</span>
+            <div className="bg-[hsl(var(--trading-bg-tertiary))]/50 px-2 py-1 rounded border border-[hsl(var(--trading-border))]">
+              <span className="text-[hsl(var(--trading-text-muted))] text-xs">Low: </span>
+              <span className="font-mono text-[hsl(var(--trading-text))] text-xs">${marketData.low24h.toFixed(2)}</span>
             </div>
-            <div className="bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#3a3a3a]">
-              <span className="text-[#888] text-xs">Vol: </span>
-              <span className="font-mono text-white text-xs">{marketData.volume.toFixed(2)} BTC</span>
+            <div className="bg-[hsl(var(--trading-bg-tertiary))]/50 px-2 py-1 rounded border border-[hsl(var(--trading-border))]">
+              <span className="text-[hsl(var(--trading-text-muted))] text-xs">Vol: </span>
+              <span className="font-mono text-[hsl(var(--trading-text))] text-xs">{marketData.volume.toFixed(2)} BTC</span>
             </div>
           </div>
         </div>
 
         {/* Right Section - Timeframe Selector */}
         <div className="flex items-center gap-1">
-          <div className="flex border border-[#3a3a3a] rounded bg-[#2a2a2a] overflow-hidden shadow-lg">
+          <div className="flex border border-[hsl(var(--trading-border))] rounded bg-[hsl(var(--trading-bg-tertiary))] overflow-hidden shadow-lg">
             {timeframes.map((tf) => (
               <Button
                 key={tf.value}
@@ -627,7 +631,7 @@ export function TradingViewChart({
                   // Update the chart interval when timeframe changes
                   if (chartRef.current) {
                     // Trigger chart update with new timeframe
-                    const mockData = generateMockData(tf.value);
+                    const mockData = generateMockData(tf.value, theme);
                     if (candlestickSeriesRef.current) {
                       if (chartType === 'candlestick') {
                         candlestickSeriesRef.current.setData(mockData.candlesticks);
@@ -644,10 +648,10 @@ export function TradingViewChart({
                     }
                   }
                 }}
-                className={`h-6 px-2 text-xs font-medium border-r border-[#3a3a3a] last:border-r-0 transition-all duration-200 hover:scale-105 ${
+                className={`h-6 px-2 text-xs font-medium border-r border-[hsl(var(--trading-border))] last:border-r-0 transition-all duration-200 hover:scale-105 ${
                   selectedTimeframe === tf.value 
-                    ? 'bg-[#00ff88] text-black hover:bg-[#00cc6a] shadow-inner' 
-                    : 'text-[#d1d5db] hover:text-white hover:bg-[#1a1a1a] hover:shadow-md'
+                    ? 'bg-[hsl(var(--trading-accent))] text-black hover:bg-[hsl(var(--trading-accent-secondary))] shadow-inner' 
+                    : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-secondary))] hover:shadow-md'
                 }`}
               >
                 {tf.label}
@@ -658,13 +662,13 @@ export function TradingViewChart({
       </div>
 
       {/* Chart Area - Fixed positioning and proper sizing */}
-      <div className="absolute inset-0 left-10 top-12 bottom-0 bg-gradient-to-br from-[#0a0a0a] via-[#0f0f0f] to-[#1a1a1a] chart-area" ref={chartContainerRef} />
+      <div className="absolute inset-0 left-10 top-12 bottom-0 bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] chart-area" ref={chartContainerRef} />
     </div>
   );
 }
 
 // Mock data generation
-function generateMockData(timeframe: string = '1h') {
+function generateMockData(timeframe: string = '1h', theme: 'light' | 'dark' = 'dark') {
   const candlesticks = [];
   const volumes = [];
   const basePrice = 43250.50;
@@ -716,7 +720,7 @@ function generateMockData(timeframe: string = '1h') {
     volumes.push({
       time: time as any,
       value: volume,
-      color: close >= open ? '#00ff88' : '#ff4444',
+      color: close >= open ? (theme === 'dark' ? '#00ff88' : '#10b981') : (theme === 'dark' ? '#ff4444' : '#ef4444'),
     });
     
     currentPrice = close;

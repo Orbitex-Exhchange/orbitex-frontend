@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import { useTheme } from '@/contexts/ThemeContext';
 import { 
   Search,
   Star,
@@ -140,6 +141,7 @@ export function TickerSearchPanel({
   selectedMarket,
   compact = false 
 }: TickerSearchPanelProps) {
+  const { theme } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('volume');
@@ -252,8 +254,8 @@ export function TickerSearchPanel({
     return (
       <div
         className={cn(
-          "group cursor-pointer transition-all duration-200 hover:bg-[#2a2a2a]/50",
-          isSelected && "bg-[#00ff88]/10 border-l-2 border-[#00ff88]"
+          "group cursor-pointer transition-all duration-200 hover:bg-[hsl(var(--trading-bg-tertiary))]/50",
+          isSelected && "bg-[hsl(var(--trading-accent))]/10 border-l-2 border-[hsl(var(--trading-accent))]"
         )}
         onClick={() => onMarketSelect(market.symbol)}
       >
@@ -272,14 +274,14 @@ export function TickerSearchPanel({
               <Star 
                 className={cn(
                   "h-3 w-3",
-                  isFavorite ? "fill-yellow-400 text-yellow-400" : "text-[#888]"
+                  isFavorite ? "fill-yellow-400 text-yellow-400" : "text-[hsl(var(--trading-text-muted))]"
                 )}
               />
             </Button>
             <div className="flex flex-col">
               <div className="flex items-center gap-1">
-                <span className="font-medium text-white text-xs">{market.baseAsset}</span>
-                <span className="text-[#888] text-xs">/{market.quoteAsset}</span>
+                <span className="font-medium text-[hsl(var(--trading-text))] text-xs">{market.baseAsset}</span>
+                <span className="text-[hsl(var(--trading-text-muted))] text-xs">/{market.quoteAsset}</span>
               </div>
               <div className="flex items-center gap-1">
                 {market.category === 'futures' && (
@@ -303,7 +305,7 @@ export function TickerSearchPanel({
 
           {/* Price */}
           <div className="col-span-3 text-right">
-            <div className="font-mono font-medium text-white text-xs">
+            <div className="font-mono font-medium text-[hsl(var(--trading-text))] text-xs">
               ${formatNumber(market.lastPrice, market.lastPrice > 1 ? 2 : 6)}
             </div>
           </div>
@@ -312,21 +314,21 @@ export function TickerSearchPanel({
           <div className="col-span-3 text-right">
             <div className={cn(
               "font-medium text-xs",
-              priceChange >= 0 ? "text-[#00ff88]" : "text-[#ff4444]"
+              priceChange >= 0 ? "text-[hsl(var(--trading-success))]" : "text-[hsl(var(--trading-error))]"
             )}>
               {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
             </div>
-            <div className="text-xs text-[#888]">
+            <div className="text-xs text-[hsl(var(--trading-text-muted))]">
               {priceChange >= 0 ? '+' : ''}${formatNumber(market.priceChange24h, 2)}
             </div>
           </div>
 
           {/* Volume */}
           <div className="col-span-2 text-right">
-            <div className="text-white font-medium text-xs">
+            <div className="text-[hsl(var(--trading-text))] font-medium text-xs">
               {formatNumber(market.volume24h, 0)}
             </div>
-            <div className="text-xs text-[#888]">
+            <div className="text-xs text-[hsl(var(--trading-text-muted))]">
               {market.baseAsset}
             </div>
           </div>
@@ -337,13 +339,13 @@ export function TickerSearchPanel({
 
   return (
     <div className={cn(
-      "flex flex-col bg-[#1a1a1a]",
-      compact ? "h-full" : "h-full border border-[#2a2a2a] rounded-lg shadow-lg"
+      "flex flex-col bg-[hsl(var(--trading-bg-secondary))]",
+      compact ? "h-full" : "h-full border border-[hsl(var(--trading-border))] rounded-lg shadow-lg"
     )}>
       {/* Header */}
-      <div className="p-3 border-b border-[#2a2a2a] bg-[#0f0f0f]">
+      <div className="p-3 border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))]">
         <div className="flex items-center justify-between mb-2">
-          {!compact && <h3 className="text-sm font-semibold text-white">Markets</h3>}
+          {!compact && <h3 className="text-sm font-semibold text-[hsl(var(--trading-text))]">Markets</h3>}
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -351,13 +353,13 @@ export function TickerSearchPanel({
               onClick={() => setShowFilters(!showFilters)}
               className={cn(
                 "h-6 w-6 p-0",
-                showFilters ? "text-[#00ff88]" : "text-[#888] hover:text-white"
+                showFilters ? "text-[hsl(var(--trading-accent))]" : "text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]"
               )}
             >
               <Filter className="h-3 w-3" />
             </Button>
-            <div className="flex items-center gap-1 text-xs text-[#888]">
-              <Zap className="h-3 w-3 text-[#00ff88] animate-pulse" />
+            <div className="flex items-center gap-1 text-xs text-[hsl(var(--trading-text-muted))]">
+              <Zap className="h-3 w-3 text-[hsl(var(--trading-accent))] animate-pulse" />
               <span>Live</span>
             </div>
           </div>
@@ -365,34 +367,34 @@ export function TickerSearchPanel({
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[#888]" />
+          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[hsl(var(--trading-text-muted))]" />
           <Input
             placeholder="Search markets..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-7 h-8 text-xs bg-[#2a2a2a] border-[#3a3a3a] text-white placeholder:text-[#888] focus:border-[#00ff88] focus:ring-1 focus:ring-[#00ff88]/20"
+            className="pl-7 h-8 text-xs bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder:text-[hsl(var(--trading-text-muted))] focus:border-[hsl(var(--trading-accent))] focus:ring-1 focus:ring-[hsl(var(--trading-accent))]/20"
           />
         </div>
       </div>
 
       {/* Category Tabs */}
-      <div className="flex border-b border-[#2a2a2a] bg-[#0f0f0f] overflow-x-auto">
+      <div className="flex border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))] overflow-x-auto">
         {categories.map((category) => (
           <Button
             key={category.id}
             variant="ghost"
             onClick={() => setSelectedCategory(category.id)}
             className={cn(
-              "flex-shrink-0 h-8 px-2 rounded-none border-r border-[#2a2a2a] last:border-r-0",
+              "flex-shrink-0 h-8 px-2 rounded-none border-r border-[hsl(var(--trading-border))] last:border-r-0",
               selectedCategory === category.id
-                ? "bg-[#1a1a1a] text-white border-b-2 border-[#00ff88]"
-                : "text-[#888] hover:text-white hover:bg-[#2a2a2a]/50"
+                ? "bg-[hsl(var(--trading-bg-secondary))] text-[hsl(var(--trading-text))] border-b-2 border-[hsl(var(--trading-accent))]"
+                : "text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]/50"
             )}
           >
             <category.icon className="h-3 w-3 mr-1" />
             <span className="text-xs">{category.label}</span>
             {category.id === 'favorites' && favorites.size > 0 && (
-              <Badge variant="outline" className="ml-1 text-xs bg-[#2a2a2a] border-[#3a3a3a] px-1 py-0">
+              <Badge variant="outline" className="ml-1 text-xs bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] px-1 py-0">
                 {favorites.size}
               </Badge>
             )}
@@ -402,9 +404,9 @@ export function TickerSearchPanel({
 
       {/* Filters */}
       {showFilters && (
-        <div className="p-2 border-b border-[#2a2a2a] bg-[#0f0f0f]">
+        <div className="p-2 border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))]">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#888]">Sort by:</span>
+            <span className="text-xs text-[hsl(var(--trading-text-muted))]">Sort by:</span>
             <div className="flex gap-1">
               {sortOptions.map((option) => (
                 <Button
@@ -415,8 +417,8 @@ export function TickerSearchPanel({
                   className={cn(
                     "h-5 px-2 text-xs",
                     sortBy === option.id
-                      ? "bg-[#00ff88] text-black font-medium"
-                      : "text-[#888] hover:text-white hover:bg-[#2a2a2a]/50"
+                      ? "bg-[hsl(var(--trading-accent))] text-black font-medium"
+                      : "text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]/50"
                   )}
                 >
                   {option.label}
@@ -431,7 +433,7 @@ export function TickerSearchPanel({
       )}
 
       {/* Table Header */}
-      <div className="grid grid-cols-12 gap-2 p-2 text-xs text-[#888] bg-[#0f0f0f] border-b border-[#2a2a2a] font-medium">
+      <div className="grid grid-cols-12 gap-2 p-2 text-xs text-[hsl(var(--trading-text-muted))] bg-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))] font-medium">
         <div className="col-span-4">Market</div>
         <div className="col-span-3 text-right">Price</div>
         <div className="col-span-3 text-right">24h Change</div>
@@ -441,7 +443,7 @@ export function TickerSearchPanel({
       {/* Markets List */}
       <div className="flex-1 overflow-y-auto">
         {filteredMarkets.length === 0 ? (
-          <div className="flex items-center justify-center p-6 text-[#888]">
+          <div className="flex items-center justify-center p-6 text-[hsl(var(--trading-text-muted))]">
             <div className="text-center">
               <BarChart3 className="h-6 w-6 mx-auto mb-2 opacity-50" />
               <div className="text-xs">No markets found</div>
@@ -456,7 +458,7 @@ export function TickerSearchPanel({
       </div>
 
       {/* Footer Stats */}
-      <div className="p-3 border-t border-[#2a2a2a] bg-[#0f0f0f] text-xs text-[#888]">
+      <div className="p-3 border-t border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))] text-xs text-[hsl(var(--trading-text-muted))]">
         <div className="flex items-center justify-between">
           <span>{filteredMarkets.length} markets</span>
           <div className="flex items-center gap-2">
