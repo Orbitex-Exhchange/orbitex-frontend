@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Navigation } from '@/components/layout/Navigation';
 import { 
   ArrowRight, 
   Star,
@@ -209,61 +210,8 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] trading-font overflow-hidden">
-      {/* Enhanced Header with Glassmorphism */}
-      <motion.header 
-        className="fixed top-0 left-0 right-0 z-50 glass border-b border-[hsl(var(--trading-border))]"
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.6 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Enhanced Logo */}
-            <motion.div 
-              className="flex items-center space-x-2"
-              whileHover={{ scale: 1.05 }}
-            >
-              <div className="h-8 w-8 bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] rounded-lg flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-lg">O</span>
-              </div>
-              <span className="text-xl font-bold text-gradient-primary">Orbitex</span>
-            </motion.div>
-
-            {/* Enhanced Desktop Menu Items */}
-            <div className="hidden md:flex items-center space-x-8">
-              <Link href="/trade" className="text-[hsl(var(--trading-text-secondary))] hover:text-gradient-primary transition-all duration-300 font-medium">
-                Trade
-              </Link>
-              <Link href="/wallets" className="text-[hsl(var(--trading-text-secondary))] hover:text-gradient-primary transition-all duration-300 font-medium">
-                Wallets
-              </Link>
-              <Link href="/earn" className="text-[hsl(var(--trading-text-secondary))] hover:text-gradient-primary transition-all duration-300 font-medium">
-                Earn
-              </Link>
-              <Link href="/learn" className="text-[hsl(var(--trading-text-secondary))] hover:text-gradient-primary transition-all duration-300 font-medium">
-                Learn
-              </Link>
-              <Link href="/institutional" className="text-[hsl(var(--trading-text-secondary))] hover:text-gradient-primary transition-all duration-300 font-medium">
-                Institutional
-              </Link>
-            </div>
-
-            {/* Enhanced CTA Buttons */}
-            <div className="flex items-center space-x-4">
-              <Link href="/auth/signin">
-                <Button variant="outline" className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))] transition-all duration-300 hover:border-[hsl(var(--trading-accent))]">
-                  Sign In
-                </Button>
-              </Link>
-              <Link href="/auth/signup">
-                <Button className="btn-gradient-primary">
-                  Get Started
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </motion.header>
+      {/* Navigation */}
+      <Navigation />
 
       {/* Enhanced Hero Section */}
       <motion.section 

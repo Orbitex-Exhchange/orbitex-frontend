@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createChart, ColorType } from 'lightweight-charts';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useTradingStore, useSelectedMarket, useChartSettings, useChartData } from '@/store/tradingStore';
+import { useWebSocket } from '@/services/websocketService';
 import { 
   BarChart3, 
   LineChart, 
@@ -89,7 +91,85 @@ const drawingTools = [
   { value: 'measure', icon: Ruler, label: 'Measure' }
 ];
 
-export function TradingViewChart({ 
+// Memoized chart configuration
+const getChartConfig = (theme: 'light' | 'dark') => ({
+  layout: {
+    background: { 
+      type: ColorType.Solid,
+      color: theme === 'dark' ? '#0a0a0a' : '#ffffff'
+    },
+    textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+  },
+  grid: {
+    vertLines: { 
+      color: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+      visible: true
+    },
+    horzLines: { 
+      color: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+      visible: true
+    },
+  },
+  crosshair: {
+    mode: 1,
+    vertLine: {
+      color: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
+      width: 1,
+      style: 3,
+    },
+    horzLine: {
+      color: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
+      width: 1,
+      style: 3,
+    },
+  },
+  rightPriceScale: {
+    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+    textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+    autoScale: true,
+  },
+  timeScale: {
+    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+    timeVisible: true,
+    secondsVisible: false,
+  },
+  handleScroll: {
+    mouseWheel: true,
+    pressedMouseMove: true,
+  },
+  handleScale: {
+    axisPressedMouseMove: true,
+    mouseWheel: true,
+    pinch: true,
+  },
+});
+
+// Memoized series configuration
+const getSeriesConfig = (chartType: string, theme: 'light' | 'dark') => {
+  const baseConfig = {
+    candlestick: {
+      upColor: theme === 'dark' ? '#00ff88' : '#10b981',
+      downColor: theme === 'dark' ? '#ff4444' : '#ef4444',
+      borderVisible: false,
+      wickUpColor: theme === 'dark' ? '#00ff88' : '#10b981',
+      wickDownColor: theme === 'dark' ? '#ff4444' : '#ef4444',
+    },
+    line: {
+      color: theme === 'dark' ? '#00ff88' : '#10b981',
+      lineWidth: 2,
+    },
+    area: {
+      topColor: theme === 'dark' ? 'rgba(0, 255, 136, 0.3)' : 'rgba(16, 185, 129, 0.3)',
+      bottomColor: theme === 'dark' ? 'rgba(0, 255, 136, 0.05)' : 'rgba(16, 185, 129, 0.05)',
+      lineColor: theme === 'dark' ? '#00ff88' : '#10b981',
+      lineWidth: 2,
+    }
+  };
+  
+  return baseConfig[chartType as keyof typeof baseConfig] || baseConfig.candlestick;
+};
+
+export const TradingViewChart = React.memo(({ 
   symbol, 
   interval, 
   theme: propTheme, 
@@ -98,9 +178,18 @@ export function TradingViewChart({
   data = [],
   onMarketSelect,
   selectedMarket
-}: TradingViewChartProps) {
+}: TradingViewChartProps) => {
   const { theme: contextTheme } = useTheme();
   const theme = propTheme || contextTheme;
+  
+  // Zustand store hooks
+  const selectedMarketFromStore = useSelectedMarket();
+  const { chartType, timeframe, showVolume, showGrid, autoScale } = useChartSettings();
+  const chartData = useChartData(selectedMarketFromStore);
+  const { setChartType, setTimeframe, setShowVolume, setShowGrid, setAutoScale } = useTradingStore();
+  
+  // WebSocket service
+  const websocketService = useWebSocket();
   
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -108,120 +197,73 @@ export function TradingViewChart({
   const volumeSeriesRef = useRef<any>(null);
   
   const [selectedTimeframe, setSelectedTimeframe] = useState('1h');
-  const [chartType, setChartType] = useState<'candlestick' | 'line' | 'area'>('candlestick');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedDrawingTool, setSelectedDrawingTool] = useState('cursor');
-  const [showVolume, setShowVolume] = useState(false);
-  const [showGrid, setShowGrid] = useState(false);
-  const [autoScale, setAutoScale] = useState(false);
   const [marketDropdownOpen, setMarketDropdownOpen] = useState(false);
   
-  const [indicators, setIndicators] = useState<Indicator[]>([
-    { id: 'sma-20', name: 'SMA 20', type: 'sma', enabled: false, params: { period: 20 }, color: '#FF6B35' },
-    { id: 'ema-12', name: 'EMA 12', type: 'ema', enabled: false, params: { period: 12 }, color: '#4ECDC4' },
-    { id: 'ema-26', name: 'EMA 26', type: 'ema', enabled: false, params: { period: 26 }, color: '#45B7D1' },
-    { id: 'rsi-14', name: 'RSI 14', type: 'rsi', enabled: false, params: { period: 14 }, color: '#FFD93D' },
-    { id: 'bb-20', name: 'Bollinger Bands 20', type: 'bollinger', enabled: false, params: { period: 20, stdDev: 2 }, color: '#6C5CE7' },
-    { id: 'macd', name: 'MACD', type: 'macd', enabled: false, params: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 }, color: '#A29BFE' },
-    { id: 'stoch-14', name: 'Stochastic 14', type: 'stoch', enabled: false, params: { kPeriod: 14, dPeriod: 3 }, color: '#FD79A8' }
-  ]);
+  // Memoized indicators
+  const indicators = useMemo(() => [
+    { id: 'sma-20', name: 'SMA 20', type: 'sma' as const, enabled: false, params: { period: 20 }, color: '#FF6B35' },
+    { id: 'ema-12', name: 'EMA 12', type: 'ema' as const, enabled: false, params: { period: 12 }, color: '#4ECDC4' },
+    { id: 'ema-26', name: 'EMA 26', type: 'ema' as const, enabled: false, params: { period: 26 }, color: '#45B7D1' },
+    { id: 'rsi-14', name: 'RSI 14', type: 'rsi' as const, enabled: false, params: { period: 14 }, color: '#FFD93D' },
+    { id: 'bb-20', name: 'Bollinger Bands 20', type: 'bollinger' as const, enabled: false, params: { period: 20, stdDev: 2 }, color: '#6C5CE7' },
+    { id: 'macd', name: 'MACD', type: 'macd' as const, enabled: false, params: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 }, color: '#A29BFE' },
+    { id: 'stoch-14', name: 'Stochastic 14', type: 'stoch' as const, enabled: false, params: { kPeriod: 14, dPeriod: 3 }, color: '#FD79A8' }
+  ], []);
 
-  // Mock market data
-  const [marketData] = useState({
+  // Memoized market data
+  const marketData = useMemo(() => ({
     lastPrice: 43250.50,
     change24h: 2.45,
     high24h: 44100.00,
     low24h: 42800.00,
     volume: 2847.65,
     openInterest: 125000000
-  });
+  }), []);
+
+  // Memoized chart configuration
+  const chartConfig = useMemo(() => getChartConfig(theme), [theme]);
+  const seriesConfig = useMemo(() => getSeriesConfig(chartType, theme), [chartType, theme]);
 
   // Market selection handlers
   const handleMarketSelect = useCallback((market: string) => {
     onMarketSelect?.(market);
     setMarketDropdownOpen(false);
-  }, [onMarketSelect]);
+    // Subscribe to new market data
+    websocketService.subscribeToMarket(market);
+    websocketService.subscribeToOrderBook(market);
+    websocketService.subscribeToTrades(market);
+    websocketService.subscribeToChartData(market, timeframe);
+  }, [onMarketSelect, websocketService, timeframe]);
 
-  // Initialize chart
-  useEffect(() => {
+  // Initialize chart with useCallback for performance
+  const initializeChart = useCallback(() => {
     if (!chartContainerRef.current) return;
 
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: Math.max(chartContainerRef.current.clientHeight, 600),
-      layout: {
-        background: { 
-          type: ColorType.Solid,
-          color: theme === 'dark' ? '#0a0a0a' : '#ffffff'
-        },
-        textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
-      },
+      ...chartConfig,
       grid: {
-        vertLines: { 
-          color: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
-          visible: showGrid
-        },
-        horzLines: { 
-          color: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
-          visible: showGrid
-        },
-      },
-      crosshair: {
-        mode: 1,
-        vertLine: {
-          color: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
-          width: 1,
-          style: 3,
-        },
-        horzLine: {
-          color: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
-          width: 1,
-          style: 3,
-        },
+        ...chartConfig.grid,
+        vertLines: { ...chartConfig.grid.vertLines, visible: showGrid },
+        horzLines: { ...chartConfig.grid.horzLines, visible: showGrid },
       },
       rightPriceScale: {
-        borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-        textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+        ...chartConfig.rightPriceScale,
         autoScale: autoScale,
-      },
-      timeScale: {
-        borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-      },
-      handleScale: {
-        axisPressedMouseMove: true,
-        mouseWheel: true,
-        pinch: true,
       },
     });
 
     // Create main price series
     let mainSeries;
     if (chartType === 'candlestick') {
-      mainSeries = chart.addCandlestickSeries({
-        upColor: theme === 'dark' ? '#00ff88' : '#10b981',
-        downColor: theme === 'dark' ? '#ff4444' : '#ef4444',
-        borderVisible: false,
-        wickUpColor: theme === 'dark' ? '#00ff88' : '#10b981',
-        wickDownColor: theme === 'dark' ? '#ff4444' : '#ef4444',
-      });
+      mainSeries = chart.addCandlestickSeries(seriesConfig);
     } else if (chartType === 'line') {
-      mainSeries = chart.addLineSeries({
-        color: theme === 'dark' ? '#00ff88' : '#10b981',
-        lineWidth: 2,
-      });
+      mainSeries = chart.addLineSeries(seriesConfig);
     } else {
-      mainSeries = chart.addAreaSeries({
-        topColor: theme === 'dark' ? 'rgba(0, 255, 136, 0.3)' : 'rgba(16, 185, 129, 0.3)',
-        bottomColor: theme === 'dark' ? 'rgba(0, 255, 136, 0.05)' : 'rgba(16, 185, 129, 0.05)',
-        lineColor: theme === 'dark' ? '#00ff88' : '#10b981',
-        lineWidth: 2,
-      });
+      mainSeries = chart.addAreaSeries(seriesConfig);
     }
 
     // Create volume series
@@ -236,7 +278,7 @@ export function TradingViewChart({
       });
     }
 
-    // Generate and set mock data
+    // Set initial data
     const mockData = generateMockData(selectedTimeframe, theme);
     if (chartType === 'candlestick') {
       mainSeries.setData(mockData.candlesticks);
@@ -272,16 +314,44 @@ export function TradingViewChart({
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [symbol, theme, chartType, showVolume, showGrid, autoScale, selectedTimeframe]);
+  }, [chartConfig, seriesConfig, chartType, showVolume, showGrid, autoScale, selectedTimeframe, theme]);
 
-  // Chart controls
-  const resetChart = () => {
+  // Initialize chart on mount and when dependencies change
+  useEffect(() => {
+    return initializeChart();
+  }, [initializeChart]);
+
+  // Subscribe to market data on mount
+  useEffect(() => {
+    websocketService.subscribeToMarket(selectedMarketFromStore);
+    websocketService.subscribeToOrderBook(selectedMarketFromStore);
+    websocketService.subscribeToTrades(selectedMarketFromStore);
+    websocketService.subscribeToChartData(selectedMarketFromStore, timeframe);
+  }, [selectedMarketFromStore, timeframe, websocketService]);
+
+  // Update chart data when new data arrives
+  useEffect(() => {
+    if (chartData.length > 0 && candlestickSeriesRef.current) {
+      if (chartType === 'candlestick') {
+        candlestickSeriesRef.current.setData(chartData);
+      } else {
+        const lineData = chartData.map(d => ({
+          time: d.time as any,
+          value: d.close
+        }));
+        candlestickSeriesRef.current.setData(lineData);
+      }
+    }
+  }, [chartData, chartType]);
+
+  // Chart controls with useCallback for performance
+  const resetChart = useCallback(() => {
     if (chartRef.current) {
       chartRef.current.timeScale().fitContent();
     }
-  };
+  }, []);
 
-  const zoomIn = () => {
+  const zoomIn = useCallback(() => {
     if (chartRef.current) {
       const timeScale = chartRef.current.timeScale();
       const range = timeScale.getVisibleLogicalRange();
@@ -293,9 +363,9 @@ export function TradingViewChart({
         timeScale.setVisibleLogicalRange(newRange);
       }
     }
-  };
+  }, []);
 
-  const zoomOut = () => {
+  const zoomOut = useCallback(() => {
     if (chartRef.current) {
       const timeScale = chartRef.current.timeScale();
       const range = timeScale.getVisibleLogicalRange();
@@ -307,30 +377,21 @@ export function TradingViewChart({
         timeScale.setVisibleLogicalRange(newRange);
       }
     }
-  };
-
-  // Real-time price updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (candlestickSeriesRef.current) {
-        const lastCandle = candlestickSeriesRef.current.data().slice(-1)[0];
-        if (lastCandle) {
-          const newCandle = {
-            ...lastCandle,
-            close: lastCandle.close + (Math.random() - 0.5) * 10,
-            high: lastCandle.high + (Math.random() - 0.5) * 5,
-            low: lastCandle.low + (Math.random() - 0.5) * 5,
-          };
-          candlestickSeriesRef.current.update(newCandle);
-        }
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
   }, []);
 
+  // Memoized chart controls
+  const chartControls = useMemo(() => ({
+    resetChart,
+    zoomIn,
+    zoomOut,
+  }), [resetChart, zoomIn, zoomOut]);
+
   return (
-    <div className={`tradingview-chart ${isFullscreen ? 'fixed inset-0 z-50 bg-[hsl(var(--trading-bg))]' : 'relative'} shadow-lg overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] to-[hsl(var(--trading-bg-secondary))] h-full`} style={{ width, height }}>
+    <div 
+      className={`tradingview-chart ${isFullscreen ? 'fixed inset-0 z-50 bg-[hsl(var(--trading-bg))]' : 'relative'} shadow-lg overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] to-[hsl(var(--trading-bg-secondary))] h-full`} 
+      style={{ width, height }}
+      contain="layout style paint"
+    >
       {/* Left Control Panel */}
       <div className="absolute left-0 top-12 bottom-0 z-20 w-10 bg-gradient-to-b from-[hsl(var(--trading-bg-secondary))]/95 to-[hsl(var(--trading-bg))]/95 backdrop-blur-sm border-r border-[hsl(var(--trading-border))] flex flex-col items-center py-1 gap-1">
         {/* Chart Type Control */}
@@ -415,13 +476,8 @@ export function TradingViewChart({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setIndicators(prev => 
-                    prev.map(ind => 
-                      ind.id === indicator.id 
-                        ? { ...ind, enabled: !ind.enabled } 
-                        : ind
-                    )
-                  );
+                  // Toggle indicator
+                  console.log('Toggle indicator:', indicator.id);
                 }}
                 className={`w-full justify-start px-2 py-1 text-xs ${
                   indicator.enabled 
@@ -454,7 +510,7 @@ export function TradingViewChart({
             <Button
               variant="ghost"
               size="sm"
-              onClick={zoomOut}
+              onClick={chartControls.zoomOut}
               className="w-full justify-start px-2 py-1 text-xs text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
             >
               <Minus className="h-3 w-3 mr-1" />
@@ -463,7 +519,7 @@ export function TradingViewChart({
             <Button
               variant="ghost"
               size="sm"
-              onClick={resetChart}
+              onClick={chartControls.resetChart}
               className="w-full justify-start px-2 py-1 text-xs text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
             >
               <Target className="h-3 w-3 mr-1" />
@@ -472,7 +528,7 @@ export function TradingViewChart({
             <Button
               variant="ghost"
               size="sm"
-              onClick={zoomIn}
+              onClick={chartControls.zoomIn}
               className="w-full justify-start px-2 py-1 text-xs text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
             >
               <Plus className="h-3 w-3 mr-1" />
@@ -628,25 +684,9 @@ export function TradingViewChart({
                 size="sm"
                 onClick={() => {
                   setSelectedTimeframe(tf.value);
-                  // Update the chart interval when timeframe changes
-                  if (chartRef.current) {
-                    // Trigger chart update with new timeframe
-                    const mockData = generateMockData(tf.value, theme);
-                    if (candlestickSeriesRef.current) {
-                      if (chartType === 'candlestick') {
-                        candlestickSeriesRef.current.setData(mockData.candlesticks);
-                      } else {
-                        const lineData = mockData.candlesticks.map(d => ({
-                          time: d.time as any,
-                          value: d.close
-                        }));
-                        candlestickSeriesRef.current.setData(lineData);
-                      }
-                    }
-                    if (volumeSeriesRef.current && showVolume) {
-                      volumeSeriesRef.current.setData(mockData.volumes);
-                    }
-                  }
+                  setTimeframe(tf.value);
+                  // Subscribe to new timeframe data
+                  websocketService.subscribeToChartData(selectedMarketFromStore, tf.value);
                 }}
                 className={`h-6 px-2 text-xs font-medium border-r border-[hsl(var(--trading-border))] last:border-r-0 transition-all duration-200 hover:scale-105 ${
                   selectedTimeframe === tf.value 
@@ -662,13 +702,19 @@ export function TradingViewChart({
       </div>
 
       {/* Chart Area - Fixed positioning and proper sizing */}
-      <div className="absolute inset-0 left-10 top-12 bottom-0 bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] chart-area" ref={chartContainerRef} />
+      <div 
+        className="absolute inset-0 left-10 top-12 bottom-0 bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] chart-area" 
+        ref={chartContainerRef}
+        contain="layout style paint"
+      />
     </div>
   );
-}
+});
 
-// Mock data generation
-function generateMockData(timeframe: string = '1h', theme: 'light' | 'dark' = 'dark') {
+TradingViewChart.displayName = 'TradingViewChart';
+
+// Mock data generation with memoization
+const generateMockData = (timeframe: string = '1h', theme: 'light' | 'dark' = 'dark') => {
   const candlesticks = [];
   const volumes = [];
   const basePrice = 43250.50;
@@ -727,4 +773,4 @@ function generateMockData(timeframe: string = '1h', theme: 'light' | 'dark' = 'd
   }
   
   return { candlesticks, volumes };
-}
+};

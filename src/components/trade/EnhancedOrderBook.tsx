@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useTradingStore, useOrderBookData, useRecentTrades, useOrderBookSettings } from '@/store/tradingStore';
+import { useWebSocket } from '@/services/websocketService';
 import { 
   ChevronUp, 
   ChevronDown,
@@ -59,23 +62,40 @@ const priceGroupings = [
   { value: 100, label: '100' }
 ];
 
-export function EnhancedOrderBook({ 
+export const EnhancedOrderBook = React.memo(({ 
   market, 
   onPriceClick,
   compact = false 
-}: OrderBookProps) {
+}: OrderBookProps) => {
   const { theme } = useTheme();
+  
+  // Zustand store hooks
+  const orderBookData = useOrderBookData(market);
+  const recentTrades = useRecentTrades(market);
+  const { grouping, depth } = useOrderBookSettings();
+  const { setGrouping, setDepth } = useTradingStore();
+  
+  // WebSocket service
+  const websocketService = useWebSocket();
+  
   const [activeTab, setActiveTab] = useState<'orderbook' | 'trades'>('orderbook');
-  const [grouping, setGrouping] = useState(1);
-  const [depth, setDepth] = useState(compact ? 10 : 20);
   const [showSizePercent, setShowSizePercent] = useState(false);
   const [showDepthChart, setShowDepthChart] = useState(true);
   const [animate, setAnimate] = useState(true);
   const [lastPrice, setLastPrice] = useState(43250.50);
   const [priceChange, setPriceChange] = useState(0);
 
-  // Generate mock order book data
-  const orderBookData = useMemo(() => {
+  // Virtualization refs
+  const orderBookParentRef = React.useRef<HTMLDivElement>(null);
+  const tradesParentRef = React.useRef<HTMLDivElement>(null);
+
+  // Generate mock order book data if no real data
+  const processedOrderBookData = useMemo(() => {
+    if (orderBookData) {
+      return orderBookData;
+    }
+
+    // Fallback to mock data
     const generateOrderBook = (): OrderBookData => {
       const basePrice = lastPrice;
       const asks: OrderBookEntry[] = [];
@@ -126,10 +146,15 @@ export function EnhancedOrderBook({
     };
 
     return generateOrderBook();
-  }, [lastPrice, grouping, depth]);
+  }, [orderBookData, lastPrice, grouping, depth]);
 
-  // Generate mock recent trades data
-  const recentTrades = useMemo(() => {
+  // Generate mock recent trades data if no real data
+  const processedRecentTrades = useMemo(() => {
+    if (recentTrades.length > 0) {
+      return recentTrades;
+    }
+
+    // Fallback to mock data
     const trades: TradeEntry[] = [];
     const basePrice = lastPrice;
     
@@ -149,7 +174,23 @@ export function EnhancedOrderBook({
     }
     
     return trades.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [lastPrice]);
+  }, [recentTrades, lastPrice]);
+
+  // Virtualization for order book
+  const orderBookVirtualizer = useVirtualizer({
+    count: Math.ceil(depth / 2) * 2, // asks + bids
+    getScrollElement: () => orderBookParentRef.current,
+    estimateSize: () => 32, // Estimated row height
+    overscan: 5,
+  });
+
+  // Virtualization for trades
+  const tradesVirtualizer = useVirtualizer({
+    count: processedRecentTrades.length,
+    getScrollElement: () => tradesParentRef.current,
+    estimateSize: () => 32, // Estimated row height
+    overscan: 5,
+  });
 
   // Simulate real-time updates
   useEffect(() => {
@@ -173,11 +214,18 @@ export function EnhancedOrderBook({
     }
   }, [priceChange]);
 
-  const handlePriceClick = (price: number) => {
-    onPriceClick?.(price);
-  };
+  // Subscribe to market data
+  useEffect(() => {
+    websocketService.subscribeToOrderBook(market);
+    websocketService.subscribeToTrades(market);
+  }, [market, websocketService]);
 
-  const OrderRow = ({ 
+  const handlePriceClick = useCallback((price: number) => {
+    onPriceClick?.(price);
+  }, [onPriceClick]);
+
+  // Memoized order row component
+  const OrderRow = React.memo(({ 
     entry, 
     type, 
     index 
@@ -197,6 +245,7 @@ export function EnhancedOrderBook({
           animate && "hover:scale-[1.02]"
         )}
         onClick={() => handlePriceClick(entry.price)}
+        style={{ height: '32px' }}
       >
         {/* Depth visualization bar */}
         {showDepthChart && (
@@ -219,7 +268,7 @@ export function EnhancedOrderBook({
           </div>
           <div className="text-[hsl(var(--trading-text))] text-right font-mono">
             {showSizePercent 
-              ? `${((entry.size / orderBookData.asks[0]?.total || 1) * 100).toFixed(1)}%`
+              ? `${((entry.size / processedOrderBookData.asks[0]?.total || 1) * 100).toFixed(1)}%`
               : formatNumber(entry.size, 4)
             }
           </div>
@@ -232,9 +281,12 @@ export function EnhancedOrderBook({
         <div className="absolute inset-0 bg-[hsl(var(--trading-accent))]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
       </div>
     );
-  };
+  });
 
-  const TradeRow = ({ trade }: { trade: TradeEntry }) => {
+  OrderRow.displayName = 'OrderRow';
+
+  // Memoized trade row component
+  const TradeRow = React.memo(({ trade }: { trade: TradeEntry }) => {
     const isBuy = trade.side === 'buy';
     const priceColor = isBuy ? 'text-green-400' : 'text-red-400';
     const timeAgo = Math.floor((Date.now() - trade.timestamp.getTime()) / 1000);
@@ -252,6 +304,7 @@ export function EnhancedOrderBook({
           animate && "hover:scale-[1.02]"
         )}
         onClick={() => handlePriceClick(trade.price)}
+        style={{ height: '32px' }}
       >
         <div className="grid grid-cols-3 gap-2 py-1.5 px-3" style={{ fontSize: '12px' }}>
           <div className={cn("font-mono font-medium", priceColor)}>
@@ -269,7 +322,9 @@ export function EnhancedOrderBook({
         <div className="absolute inset-0 bg-[hsl(var(--trading-accent))]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
       </div>
     );
-  };
+  });
+
+  TradeRow.displayName = 'TradeRow';
 
   return (
     <div className={cn(
@@ -387,18 +442,47 @@ export function EnhancedOrderBook({
             <div className="text-right">Total</div>
           </div>
 
-          {/* Order Book Content */}
+          {/* Order Book Content with Virtualization */}
           <div className="overflow-hidden flex-1 flex flex-col">
             {/* Asks (Sell Orders) - Red */}
-            <div className="flex-1 overflow-y-auto bg-red-500/5 border-b border-[hsl(var(--trading-border))]">
-              {orderBookData.asks.slice(0, Math.ceil(depth / 2)).map((ask, index) => (
-                <OrderRow 
-                  key={`ask-${ask.price}`}
-                  entry={ask} 
-                  type="ask" 
-                  index={index}
-                />
-              ))}
+            <div className="flex-1 overflow-hidden bg-red-500/5 border-b border-[hsl(var(--trading-border))]">
+              <div ref={orderBookParentRef} className="h-full overflow-auto">
+                <div
+                  style={{
+                    height: `${orderBookVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {orderBookVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const isAsk = virtualRow.index < Math.ceil(depth / 2);
+                    const dataIndex = isAsk ? virtualRow.index : virtualRow.index - Math.ceil(depth / 2);
+                    const entry = isAsk ? processedOrderBookData.asks[dataIndex] : processedOrderBookData.bids[dataIndex];
+                    
+                    if (!entry) return null;
+                    
+                    return (
+                      <div
+                        key={virtualRow.index}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        <OrderRow 
+                          entry={entry} 
+                          type={isAsk ? 'ask' : 'bid'} 
+                          index={virtualRow.index}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Spread Display */}
@@ -410,10 +494,10 @@ export function EnhancedOrderBook({
                     className="font-mono font-bold text-[hsl(var(--trading-accent))] transition-colors duration-1000"
                     style={{ fontSize: '14px' }}
                   >
-                    ${orderBookData.spread.toFixed(2)}
+                    ${processedOrderBookData.spread.toFixed(2)}
                   </span>
                   <span className="text-xs text-[hsl(var(--trading-text-muted))]">
-                    ({orderBookData.spreadPercentage.toFixed(3)}%)
+                    ({processedOrderBookData.spreadPercentage.toFixed(3)}%)
                   </span>
                 </div>
                 
@@ -425,15 +509,44 @@ export function EnhancedOrderBook({
             </div>
 
             {/* Bids (Buy Orders) - Green */}
-            <div className="flex-1 overflow-y-auto bg-green-500/5">
-              {orderBookData.bids.slice(0, Math.ceil(depth / 2)).map((bid, index) => (
-                <OrderRow 
-                  key={`bid-${bid.price}`}
-                  entry={bid} 
-                  type="bid" 
-                  index={index}
-                />
-              ))}
+            <div className="flex-1 overflow-hidden bg-green-500/5">
+              <div ref={orderBookParentRef} className="h-full overflow-auto">
+                <div
+                  style={{
+                    height: `${orderBookVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {orderBookVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const isAsk = virtualRow.index < Math.ceil(depth / 2);
+                    const dataIndex = isAsk ? virtualRow.index : virtualRow.index - Math.ceil(depth / 2);
+                    const entry = isAsk ? processedOrderBookData.asks[dataIndex] : processedOrderBookData.bids[dataIndex];
+                    
+                    if (!entry) return null;
+                    
+                    return (
+                      <div
+                        key={virtualRow.index}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        <OrderRow 
+                          entry={entry} 
+                          type={isAsk ? 'ask' : 'bid'} 
+                          index={virtualRow.index}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -443,13 +556,13 @@ export function EnhancedOrderBook({
               <div className="flex items-center gap-1">
                 <span className="text-[hsl(var(--trading-text-muted))]">Ask Sum:</span>
                 <span className="text-red-400 font-medium">
-                  {formatNumber(orderBookData.asks.reduce((sum, ask) => sum + ask.size, 0), 2)}
+                  {formatNumber(processedOrderBookData.asks.reduce((sum, ask) => sum + ask.size, 0), 2)}
                 </span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-[hsl(var(--trading-text-muted))]">Bid Sum:</span>
                 <span className="text-green-400 font-medium">
-                  {formatNumber(orderBookData.bids.reduce((sum, bid) => sum + bid.size, 0), 2)}
+                  {formatNumber(processedOrderBookData.bids.reduce((sum, bid) => sum + bid.size, 0), 2)}
                 </span>
               </div>
             </div>
@@ -486,12 +599,36 @@ export function EnhancedOrderBook({
             <div className="text-right">Time</div>
           </div>
 
-          {/* Recent Trades Content */}
+          {/* Recent Trades Content with Virtualization */}
           <div className="overflow-hidden flex-1">
-            <div className="overflow-y-auto h-full">
-              {recentTrades.slice(0, 50).map((trade) => (
-                <TradeRow key={trade.id} trade={trade} />
-              ))}
+            <div ref={tradesParentRef} className="h-full overflow-auto">
+              <div
+                style={{
+                  height: `${tradesVirtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {tradesVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const trade = processedRecentTrades[virtualRow.index];
+                  
+                  return (
+                    <div
+                      key={virtualRow.index}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <TradeRow trade={trade} />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -501,7 +638,7 @@ export function EnhancedOrderBook({
               <div className="flex items-center gap-1">
                 <span className="text-[hsl(var(--trading-text-muted))]">Total Trades:</span>
                 <span className="text-[hsl(var(--trading-text))] font-medium">
-                  {recentTrades.length}
+                  {processedRecentTrades.length}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -521,4 +658,6 @@ export function EnhancedOrderBook({
       )}
     </div>
   );
-}
+});
+
+EnhancedOrderBook.displayName = 'EnhancedOrderBook';

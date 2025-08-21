@@ -4,187 +4,408 @@
 
 @layer base {
   :root {
-    /* Light theme colors */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
-    
-    /* Light theme trading colors */
+    /* Trading Theme Colors - Light Mode */
     --trading-bg: 0 0% 100%;
-    --trading-bg-secondary: 210 40% 98%;
-    --trading-bg-tertiary: 220 14% 96%;
-    --trading-border: 214 31% 91%;
-    --trading-border-secondary: 220 13% 91%;
-    --trading-text: 222 84% 5%;
-    --trading-text-secondary: 215 16% 47%;
-    --trading-text-muted: 220 9% 46%;
-    --trading-accent: 221 83% 53%;
-    --trading-accent-secondary: 217 91% 60%;
+    --trading-bg-secondary: 0 0% 98%;
+    --trading-bg-tertiary: 0 0% 96%;
+    --trading-text: 0 0% 10%;
+    --trading-text-secondary: 0 0% 30%;
+    --trading-text-muted: 0 0% 50%;
+    --trading-accent: 142 76% 36%;
+    --trading-accent-secondary: 142 76% 46%;
+    --trading-border: 0 0% 90%;
     --trading-success: 142 76% 36%;
     --trading-error: 0 84% 60%;
     --trading-warning: 38 92% 50%;
-    --trading-info: 199 89% 48%;
+    --trading-info: 217 91% 60%;
   }
 
   .dark {
-    /* Dark theme colors */
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
-    
-    /* Dark theme trading colors */
-    --trading-bg: 222 84% 5%;
-    --trading-bg-secondary: 217 33% 18%;
-    --trading-bg-tertiary: 215 28% 17%;
-    --trading-border: 217 33% 18%;
-    --trading-border-secondary: 215 28% 17%;
-    --trading-text: 210 40% 98%;
-    --trading-text-secondary: 215 20% 65%;
-    --trading-text-muted: 217 19% 27%;
-    --trading-accent: 217 91% 60%;
-    --trading-accent-secondary: 221 83% 53%;
+    /* Trading Theme Colors - Dark Mode */
+    --trading-bg: 0 0% 4%;
+    --trading-bg-secondary: 0 0% 6%;
+    --trading-bg-tertiary: 0 0% 8%;
+    --trading-text: 0 0% 95%;
+    --trading-text-secondary: 0 0% 80%;
+    --trading-text-muted: 0 0% 60%;
+    --trading-accent: 142 76% 36%;
+    --trading-accent-secondary: 142 76% 46%;
+    --trading-border: 0 0% 15%;
     --trading-success: 142 76% 36%;
     --trading-error: 0 84% 60%;
     --trading-warning: 38 92% 50%;
-    --trading-info: 199 89% 48%;
+    --trading-info: 217 91% 60%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Performance optimizations */
+  * {
+    contain: layout style paint;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Optimize animations */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
 @layer components {
-  /* Trading Layout */
-  .trading-layout {
-    @apply bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))];
-  }
-
-  /* Trading Panel */
-  .trading-panel {
-    @apply bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-lg;
-  }
-
-  /* Trading Button Primary */
-  .btn-gradient-primary {
-    @apply bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] text-white hover:from-[hsl(var(--trading-accent-secondary))] hover:to-[hsl(var(--trading-accent))] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105;
-  }
-
-  /* Trading Button Secondary */
-  .btn-gradient-secondary {
-    @apply bg-gradient-to-r from-[hsl(var(--trading-bg-tertiary))] to-[hsl(var(--trading-bg-secondary))] text-[hsl(var(--trading-text))] border border-[hsl(var(--trading-border))] hover:border-[hsl(var(--trading-accent))] hover:text-[hsl(var(--trading-accent))] transition-all duration-300;
-  }
-
-  /* Trading Input */
-  .trading-input {
-    @apply bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder-[hsl(var(--trading-text-muted))] focus:border-[hsl(var(--trading-accent))] focus:ring-[hsl(var(--trading-accent))] transition-all duration-300;
-  }
-
-  /* Trading Card */
-  .card-gradient-primary {
-    @apply bg-gradient-to-br from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg-tertiary))] border border-[hsl(var(--trading-border))] shadow-xl hover:shadow-2xl transition-all duration-300;
-  }
-
-  /* Trading Badge */
-  .badge-gradient-primary {
-    @apply bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] text-white border-0 shadow-lg;
-  }
-
-  /* Glass Effect */
-  .glass {
-    @apply backdrop-blur-xl bg-white/10 dark:bg-black/10 border border-white/20 dark:border-white/10;
-  }
-
-  /* Text Gradients */
-  .text-gradient-primary {
-    @apply bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] bg-clip-text text-transparent;
-  }
-
-  /* Trading Font */
+  /* Trading-specific components */
   .trading-font {
-    @apply font-sans antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   }
 
-  /* Focus Ring */
-  .focus-ring {
-    @apply focus:ring-2 focus:ring-[hsl(var(--trading-accent))] focus:ring-opacity-50 focus:outline-none;
+  .trading-layout {
+    contain: layout style paint;
   }
 
-  /* Z-index utilities */
-  .z-9999 {
-    z-index: 9999 !important;
+  .glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .z-1 {
-    z-index: 1 !important;
+  .dark .glass {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .z-10 {
-    z-index: 10 !important;
+  /* Gradient text */
+  .text-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--trading-accent)), hsl(var(--trading-accent-secondary)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  /* Gradient backgrounds */
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--trading-accent)), hsl(var(--trading-accent-secondary)));
   }
 
-  ::-webkit-scrollbar-track {
-    @apply bg-[hsl(var(--trading-bg-secondary))];
+  .card-gradient-primary {
+    background: linear-gradient(135deg, 
+      rgba(16, 185, 129, 0.1) 0%, 
+      rgba(16, 185, 129, 0.05) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.2);
   }
 
-  ::-webkit-scrollbar-thumb {
-    @apply bg-[hsl(var(--trading-border))] rounded-full;
+  .dark .card-gradient-primary {
+    background: linear-gradient(135deg, 
+      rgba(16, 185, 129, 0.1) 0%, 
+      rgba(16, 185, 129, 0.05) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
   }
 
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-[hsl(var(--trading-accent))];
+  /* Button gradients */
+  .btn-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--trading-accent)), hsl(var(--trading-accent-secondary)));
+    color: white;
+    border: none;
+    transition: all 0.3s ease;
   }
 
-  /* Chart container specific styles */
-  .chart-container {
-    @apply relative w-full h-full z-1;
+  .btn-gradient-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
   }
 
-  .chart-canvas {
-    @apply absolute inset-0 z-10;
+  /* Badge gradients */
+  .badge-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--trading-accent)), hsl(var(--trading-accent-secondary)));
+    color: white;
+    border: none;
+  }
+
+  /* Trading panel styles */
+  .trading-panel {
+    background: hsl(var(--trading-bg-secondary));
+    border: 1px solid hsl(var(--trading-border));
+    border-radius: 0.5rem;
+    contain: layout style paint;
+  }
+
+  /* Input styles */
+  .trading-input {
+    background: hsl(var(--trading-bg-tertiary));
+    border: 1px solid hsl(var(--trading-border));
+    color: hsl(var(--trading-text));
+    transition: all 0.2s ease;
+  }
+
+  .trading-input:focus {
+    border-color: hsl(var(--trading-accent));
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+  }
+
+  /* Focus ring */
+  .focus-ring:focus {
+    outline: none;
+    ring: 2px;
+    ring-color: hsl(var(--trading-accent));
+    ring-offset: 2px;
+  }
+
+  /* Chart area */
+  .chart-area {
+    contain: layout style paint;
+    will-change: transform;
+  }
+
+  /* Virtualized list optimizations */
+  .virtual-list {
+    contain: layout style paint;
+    will-change: transform;
+  }
+
+  .virtual-item {
+    contain: layout style paint;
+    will-change: transform;
+  }
+
+  /* Animation utilities */
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-bounce-slow {
+    animation: bounce 2s infinite;
+  }
+
+  /* Scrollbar styling */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--trading-border)) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--trading-border));
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--trading-text-muted));
+  }
+
+  /* Performance optimizations for large lists */
+  .optimized-list {
+    contain: layout style paint;
+    will-change: transform;
+  }
+
+  .optimized-list-item {
+    contain: layout style paint;
+    will-change: transform;
+  }
+
+  /* WebSocket connection indicator */
+  .connection-indicator {
+    position: relative;
+  }
+
+  .connection-indicator::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Loading states */
+  .loading-skeleton {
+    background: linear-gradient(90deg, 
+      hsl(var(--trading-bg-tertiary)) 25%, 
+      hsl(var(--trading-bg-secondary)) 50%, 
+      hsl(var(--trading-bg-tertiary)) 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+  }
+
+  @keyframes loading {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  /* High-performance animations */
+  .transform-gpu {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* Optimized hover effects */
+  .hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .dark .hover-lift:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Responsive utilities */
+  .responsive-container {
+    contain: layout style paint;
+  }
+
+  /* Print styles */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .trading-panel {
+      border-width: 2px;
+    }
+    
+    .btn-gradient-primary {
+      border: 2px solid currentColor;
+    }
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pulse-slow,
+    .animate-bounce-slow,
+    .loading-skeleton {
+      animation: none;
+    }
+    
+    .hover-lift:hover {
+      transform: none;
+    }
+  }
+}
+
+@layer utilities {
+  /* Custom utilities for trading interface */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .contain-layout {
+    contain: layout;
+  }
+
+  .contain-style {
+    contain: style;
+  }
+
+  .contain-paint {
+    contain: paint;
+  }
+
+  .contain-strict {
+    contain: strict;
+  }
+
+  /* Performance utilities */
+  .will-change-transform {
+    will-change: transform;
+  }
+
+  .will-change-opacity {
+    will-change: opacity;
+  }
+
+  .will-change-scroll {
+    will-change: scroll-position;
+  }
+
+  /* Accessibility utilities */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .focus-visible {
+    outline: 2px solid hsl(var(--trading-accent));
+    outline-offset: 2px;
+  }
+
+  /* Trading-specific utilities */
+  .price-up {
+    color: hsl(var(--trading-success));
+  }
+
+  .price-down {
+    color: hsl(var(--trading-error));
+  }
+
+  .volume-bar {
+    background: linear-gradient(to top, 
+      hsl(var(--trading-accent)) 0%, 
+      hsl(var(--trading-accent-secondary)) 100%);
+  }
+
+  .order-book-ask {
+    background: linear-gradient(to right, 
+      rgba(239, 68, 68, 0.1) 0%, 
+      transparent 100%);
+  }
+
+  .order-book-bid {
+    background: linear-gradient(to right, 
+      rgba(16, 185, 129, 0.1) 0%, 
+      transparent 100%);
   }
 }
