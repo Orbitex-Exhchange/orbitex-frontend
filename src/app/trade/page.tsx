@@ -29,7 +29,8 @@ import {
   LogOut,
   Wallet,
   History,
-  AlertTriangle
+  AlertTriangle,
+  Bitcoin
 } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
 import { TradingViewChart } from '@/components/trade/TradingViewChart';
@@ -38,6 +39,7 @@ import { EnhancedOrderForm } from '@/components/trade/EnhancedOrderForm';
 import { MarketDataPanel } from '@/components/trade/MarketDataPanel';
 import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/auth';
+import { TickerSearchPanel } from '@/components/trade/TickerSearchPanel';
 
 export default function TradingPage() {
   const router = useRouter();
@@ -48,6 +50,7 @@ export default function TradingPage() {
   const [user, setUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuthWarning, setShowAuthWarning] = useState(false);
+  const [showMarketSelector, setShowMarketSelector] = useState(false);
   
   const { toast } = useToast();
 
@@ -152,7 +155,7 @@ export default function TradingPage() {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <div className={`w-2 h-2 rounded-full animate-pulse shadow-lg ${isAuthenticated ? 'bg-gradient-to-r from-[#00ff88] to-[#00cc6a]' : 'bg-gradient-to-r from-[#ff4444] to-[#cc3333]'}`}></div>
-            <span className={`font-medium ${isAuthenticated ? 'text-gradient-primary' : 'text-[#ff4444]'}`}>
+            <span className={`font-medium ${isAuthenticated ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
               {isAuthenticated ? 'Live' : 'Unauthorized'}
             </span>
           </div>
@@ -166,6 +169,17 @@ export default function TradingPage() {
               </Badge>
             </div>
           )}
+          {/* Market Selection Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowMarketSelector(!showMarketSelector)}
+            className="text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] h-6 px-2 transition-all duration-300 border border-[hsl(var(--trading-border))]"
+          >
+            <Bitcoin className="h-3 w-3 mr-1" />
+            {selectedMarket}
+            <ChevronDown className="h-3 w-3 ml-1" />
+          </Button>
         </div>
         <div className="flex items-center space-x-4">
           <Button
@@ -180,7 +194,7 @@ export default function TradingPage() {
           </Button>
           <div className="flex items-center space-x-2">
             <span className="text-[hsl(var(--trading-text-muted))]">Ping:</span>
-            <span className="text-gradient-primary font-mono font-medium">12ms</span>
+            <span className="text-[#00ff88] font-mono font-medium">12ms</span>
           </div>
         </div>
       </div>
@@ -238,19 +252,19 @@ export default function TradingPage() {
       {/* Enhanced Bottom Status Bar */}
       <div className="h-6 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] border-t border-[hsl(var(--trading-border))] flex items-center justify-between px-4 text-xs glass">
         <div className="flex items-center space-x-4">
-          <span className="text-[hsl(var(--trading-text-muted))]">Connection: <span className="text-gradient-primary font-medium">Stable</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Connection: <span className="text-[#00ff88] font-medium">Stable</span></span>
           <span className="text-[hsl(var(--trading-text-muted))]">Orders: <span className="text-[hsl(var(--trading-text))] font-medium">0 Active</span></span>
           <span className="text-[hsl(var(--trading-text-muted))]">Balance: <span className="text-[hsl(var(--trading-text))] font-medium">$0.00</span></span>
           {user && (
             <>
-              <span className="text-[hsl(var(--trading-text-muted))]">KYC: <span className={`font-medium ${user.kyc_level >= 2 ? 'text-gradient-primary' : 'text-[#ff4444]'}`}>Level {user.kyc_level || 0}</span></span>
-              <span className="text-[hsl(var(--trading-text-muted))]">Email: <span className={`font-medium ${user.email_verified ? 'text-gradient-primary' : 'text-[#ff4444]'}`}>{user.email_verified ? 'Verified' : 'Unverified'}</span></span>
+              <span className="text-[hsl(var(--trading-text-muted))]">KYC: <span className={`font-medium ${user.kyc_level >= 2 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>Level {user.kyc_level || 0}</span></span>
+              <span className="text-[hsl(var(--trading-text-muted))]">Email: <span className={`font-medium ${user.email_verified ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>{user.email_verified ? 'Verified' : 'Unverified'}</span></span>
             </>
           )}
         </div>
         <div className="flex items-center space-x-4">
-          <span className="text-[hsl(var(--trading-text-muted))]">24h P&L: <span className="text-gradient-primary font-medium">+$0.00</span></span>
-          <span className="text-[hsl(var(--trading-text-muted))]">Total P&L: <span className="text-gradient-primary font-medium">+$0.00</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">24h P&L: <span className="text-[#00ff88] font-medium">+$0.00</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Total P&L: <span className="text-[#00ff88] font-medium">+$0.00</span></span>
           {!isAuthenticated && (
             <span className="text-[#ff4444] font-medium">⚠️ Demo Mode</span>
           )}
@@ -321,8 +335,8 @@ export default function TradingPage() {
       <div className="fixed top-20 right-4 z-40">
         <div className="glass border border-[#2a2a2a] rounded-lg p-3 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gradient-primary">Quick Stats</h3>
-            <Star className="h-4 w-4 text-[#888888] cursor-pointer hover:text-gradient-primary transition-colors duration-300" />
+            <h3 className="text-sm font-semibold text-[#00ff88]">Quick Stats</h3>
+            <Star className="h-4 w-4 text-[#888888] cursor-pointer hover:text-[#00ff88] transition-colors duration-300" />
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -331,7 +345,7 @@ export default function TradingPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-[#888888]">24h Change</span>
-              <span className={`text-xs font-mono font-medium ${priceChange24h >= 0 ? 'text-gradient-primary' : 'text-[#ff4444]'}`}>
+              <span className={`text-xs font-mono font-medium ${priceChange24h >= 0 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
                 {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
               </span>
             </div>
@@ -347,17 +361,17 @@ export default function TradingPage() {
       <div className="fixed top-20 left-4 z-40">
         <div className="glass border border-[#2a2a2a] rounded-lg p-3 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gradient-primary">Performance</h3>
+            <h3 className="text-sm font-semibold text-[#00ff88]">Performance</h3>
             <Activity className="h-4 w-4 text-[#888888]" />
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-[#888888]">Speed</span>
-              <span className="text-xs font-mono text-gradient-primary font-medium">0.12ms</span>
+              <span className="text-xs font-mono text-[#00ff88] font-medium">0.12ms</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-[#888888]">Uptime</span>
-              <span className="text-xs font-mono text-gradient-primary font-medium">99.99%</span>
+              <span className="text-xs font-mono text-[#00ff88] font-medium">99.99%</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-[#888888]">Orders/s</span>
@@ -371,34 +385,63 @@ export default function TradingPage() {
       <div className="fixed bottom-4 left-4 z-40">
         <div className="glass border border-[#2a2a2a] rounded-lg p-3 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gradient-primary">Tools</h3>
+            <h3 className="text-sm font-semibold text-[#00ff88]">Tools</h3>
             <Settings className="h-4 w-4 text-[#888888]" />
           </div>
           <div className="flex space-x-2">
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 text-[#888888] hover:text-gradient-primary transition-colors duration-300"
+              className="h-8 w-8 p-0 text-[#888888] hover:text-[#00ff88] transition-colors duration-300"
             >
               <Target className="h-4 w-4" />
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 text-[#888888] hover:text-gradient-primary transition-colors duration-300"
+              className="h-8 w-8 p-0 text-[#888888] hover:text-[#00ff88] transition-colors duration-300"
             >
               <Rocket className="h-4 w-4" />
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 text-[#888888] hover:text-gradient-primary transition-colors duration-300"
+              className="h-8 w-8 p-0 text-[#888888] hover:text-[#00ff88] transition-colors duration-300"
             >
               <Zap className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Market Selection Panel */}
+      {showMarketSelector && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-40">
+          <div className="glass border border-[#2a2a2a] rounded-lg shadow-2xl backdrop-blur-xl w-[500px] max-h-[600px] overflow-hidden">
+            <div className="p-3 border-b border-[#2a2a2a] bg-[#1a1a1a] flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[#00ff88]">Market Selection</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-[#888888] hover:text-white"
+                onClick={() => setShowMarketSelector(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="h-[500px] overflow-hidden">
+              <TickerSearchPanel
+                onMarketSelect={(market) => {
+                  handleMarketSelect(market);
+                  setShowMarketSelector(false);
+                }}
+                selectedMarket={selectedMarket}
+                compact={true}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Authentication Warning Overlay */}
       {showAuthWarning && !isAuthenticated && (

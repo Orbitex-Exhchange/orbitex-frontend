@@ -112,12 +112,12 @@ const getChartConfig = (theme: 'light' | 'dark') => ({
     mode: 1,
     vertLine: {
       color: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
-      width: 1,
+      width: 1 as any,
       style: 3,
     },
     horzLine: {
       color: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
-      width: 1,
+      width: 1 as any,
       style: 3,
     },
   },
@@ -144,27 +144,27 @@ const getChartConfig = (theme: 'light' | 'dark') => ({
 
 // Memoized series configuration
 const getSeriesConfig = (chartType: string, theme: 'light' | 'dark') => {
-  const baseConfig = {
-    candlestick: {
+  if (chartType === 'candlestick') {
+    return {
       upColor: theme === 'dark' ? '#00ff88' : '#10b981',
       downColor: theme === 'dark' ? '#ff4444' : '#ef4444',
       borderVisible: false,
       wickUpColor: theme === 'dark' ? '#00ff88' : '#10b981',
       wickDownColor: theme === 'dark' ? '#ff4444' : '#ef4444',
-    },
-    line: {
+    };
+  } else if (chartType === 'line') {
+    return {
       color: theme === 'dark' ? '#00ff88' : '#10b981',
       lineWidth: 2,
-    },
-    area: {
+    };
+  } else {
+    return {
       topColor: theme === 'dark' ? 'rgba(0, 255, 136, 0.3)' : 'rgba(16, 185, 129, 0.3)',
       bottomColor: theme === 'dark' ? 'rgba(0, 255, 136, 0.05)' : 'rgba(16, 185, 129, 0.05)',
       lineColor: theme === 'dark' ? '#00ff88' : '#10b981',
       lineWidth: 2,
-    }
-  };
-  
-  return baseConfig[chartType as keyof typeof baseConfig] || baseConfig.candlestick;
+    };
+  }
 };
 
 export const TradingViewChart = React.memo(({ 
@@ -247,11 +247,11 @@ export const TradingViewChart = React.memo(({
     // Create main price series
     let mainSeries;
     if (chartType === 'candlestick') {
-      mainSeries = chart.addCandlestickSeries(seriesConfig);
+      mainSeries = chart.addCandlestickSeries(seriesConfig as any);
     } else if (chartType === 'line') {
-      mainSeries = chart.addLineSeries(seriesConfig);
+      mainSeries = chart.addLineSeries(seriesConfig as any);
     } else {
-      mainSeries = chart.addAreaSeries(seriesConfig);
+      mainSeries = chart.addAreaSeries(seriesConfig as any);
     }
 
     // Create volume series

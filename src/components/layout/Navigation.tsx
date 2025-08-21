@@ -160,22 +160,42 @@ export function Navigation({ user }: NavigationProps) {
   const tradingToolsRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close menus when clicking outside
+  // Close menus when clicking outside with improved detection
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      
+      // Check if click is inside any of the dropdown menus
+      const isInsideUserMenu = userMenuRef.current?.contains(target);
+      const isInsideTradingTools = tradingToolsRef.current?.contains(target);
+      const isInsideMobileMenu = mobileMenuRef.current?.contains(target);
+      
+      // Only close if click is outside all menus
+      if (!isInsideUserMenu && !isInsideTradingTools && !isInsideMobileMenu) {
         setIsUserMenuOpen(false);
-      }
-      if (tradingToolsRef.current && !tradingToolsRef.current.contains(event.target as Node)) {
         setIsTradingToolsOpen(false);
-      }
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
         setIsMobileMenuOpen(false);
       }
     };
 
+    // Use mousedown instead of click for better responsiveness
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    
+    // Also close on escape key
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsUserMenuOpen(false);
+        setIsTradingToolsOpen(false);
+        setIsMobileMenuOpen(false);
+      }
+    };
+    
+    document.addEventListener('keydown', handleEscape);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, []);
 
   // Close mobile menu when route changes
@@ -260,13 +280,14 @@ export function Navigation({ user }: NavigationProps) {
 
               {/* Trading Tools Dropdown Menu */}
               {isTradingToolsOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl z-50">
+                <div className="absolute top-full left-0 mt-2 w-64 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl z-[60] backdrop-blur-sm">
                   <div className="p-2">
                     {tradingTools.map((item) => (
                       <Link
                         key={item.name}
                         href={item.href}
                         className="flex items-center space-x-3 p-3 rounded-lg text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))] transition-all duration-200 group"
+                        onClick={() => setIsTradingToolsOpen(false)}
                       >
                         <item.icon className="h-5 w-5 text-[hsl(var(--trading-accent))] group-hover:scale-110 transition-transform duration-200" />
                         <div>
@@ -321,7 +342,7 @@ export function Navigation({ user }: NavigationProps) {
 
                 {/* User Dropdown Menu */}
                 {isUserMenuOpen && (
-                  <div className="absolute top-full right-0 mt-2 w-64 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl z-50">
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl z-[60] backdrop-blur-sm">
                     <div className="p-4 border-b border-[hsl(var(--trading-border))]">
                       <div className="text-sm font-medium text-[hsl(var(--trading-text))]">{user.email}</div>
                       <div className="text-xs text-[hsl(var(--trading-text-muted))]">KYC Level {user.kyc_level || 0}</div>
@@ -332,6 +353,7 @@ export function Navigation({ user }: NavigationProps) {
                           key={item.name}
                           href={item.href}
                           className="flex items-center space-x-3 p-3 rounded-lg text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))] transition-all duration-200 group"
+                          onClick={() => setIsUserMenuOpen(false)}
                         >
                           <item.icon className="h-5 w-5 text-[hsl(var(--trading-accent))] group-hover:scale-110 transition-transform duration-200" />
                           <div>
@@ -385,7 +407,7 @@ export function Navigation({ user }: NavigationProps) {
 
       {/* Mobile Navigation Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-[hsl(var(--trading-bg-secondary))] border-t border-[hsl(var(--trading-border))]" ref={mobileMenuRef}>
+        <div className="md:hidden bg-[hsl(var(--trading-bg-secondary))] border-t border-[hsl(var(--trading-border))] z-[55]" ref={mobileMenuRef}>
           <div className="px-4 py-2 space-y-1">
             {navigationItems.map((item) => (
               <Link
