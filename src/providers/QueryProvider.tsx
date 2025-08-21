@@ -1,12 +1,7 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
-
-// Conditionally import DevTools only in development
-const ReactQueryDevtools = process.env.NODE_ENV === 'development' 
-  ? require('@tanstack/react-query-devtools').ReactQueryDevtools 
-  : () => null;
+import { useState, useEffect } from 'react';
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -27,10 +22,20 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       })
   );
 
+  // Ensure the provider is properly mounted
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
 }
