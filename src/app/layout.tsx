@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -7,12 +7,16 @@ import { Toaster } from '@/components/ui/toaster';
 
 const inter = Inter({ subsets: ['latin'] });
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
   title: 'Orbitex - Advanced Cryptocurrency Trading Platform',
   description: 'Professional-grade cryptocurrency trading platform with lightning-fast execution, advanced security, and institutional tools.',
   keywords: 'cryptocurrency, trading, bitcoin, ethereum, crypto exchange, digital assets',
   authors: [{ name: 'Orbitex Team' }],
-  viewport: 'width=device-width, initial-scale=1',
   robots: 'index, follow',
   openGraph: {
     title: 'Orbitex - Advanced Cryptocurrency Trading Platform',

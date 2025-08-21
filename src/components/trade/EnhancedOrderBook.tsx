@@ -63,7 +63,7 @@ const priceGroupings = [
 ];
 
 export const EnhancedOrderBook = React.memo(({ 
-  market, 
+  market = 'BTC-USDT', 
   onPriceClick,
   compact = false 
 }: OrderBookProps) => {
@@ -437,8 +437,8 @@ export const EnhancedOrderBook = React.memo(({
 
           {/* Column Headers */}
           <div className="grid grid-cols-3 gap-2 px-3 py-2 text-xs text-[hsl(var(--trading-text-muted))] bg-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))]">
-            <div>Price ({market.split('-')[1] || 'USDT'})</div>
-            <div className="text-right">Size ({market.split('-')[0] || 'BTC'})</div>
+            <div>Price ({market?.split('-')?.[1] || 'USDT'})</div>
+            <div className="text-right">Size ({market?.split('-')?.[0] || 'BTC'})</div>
             <div className="text-right">Total</div>
           </div>
 

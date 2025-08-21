@@ -45,7 +45,7 @@ export default function TradePage() {
                 </div>
               </div>
               <div className="chart-area h-full">
-                <TradingViewChart />
+                <TradingViewChart symbol={selectedMarket} interval="1h" />
               </div>
             </div>
           </div>
@@ -64,7 +64,7 @@ export default function TradePage() {
                 </div>
               </div>
               <div className="h-full overflow-hidden">
-                <EnhancedOrderBook />
+                <EnhancedOrderBook market={selectedMarket} />
               </div>
             </div>
           </div>

@@ -10,28 +10,39 @@ class WebSocketService {
   private subscriptions = new Set<string>();
 
   constructor() {
-    this.connect();
+    // Only attempt to connect if we have a WebSocket URL configured
+    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL;
+    if (wsUrl) {
+      this.connect();
+    } else {
+      console.log('WebSocket URL not configured, running in mock mode');
+    }
   }
 
   private connect() {
     if (this.isConnecting || this.socket?.connected) return;
 
+    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL;
+    if (!wsUrl) {
+      console.log('WebSocket URL not configured, skipping connection');
+      return;
+    }
+
     this.isConnecting = true;
-    
+    console.log('Attempting to connect to WebSocket:', wsUrl);
+
     try {
-      // Connect to your WebSocket server
-      this.socket = io(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080', {
-        transports: ['websocket'],
+      this.socket = io(wsUrl, {
+        transports: ['websocket', 'polling'],
         timeout: 10000,
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
-        reconnectionDelayMax: 5000,
       });
 
       this.setupEventHandlers();
     } catch (error) {
-      console.error('WebSocket connection failed:', error);
+      console.error('Failed to create WebSocket connection:', error);
       this.isConnecting = false;
       this.handleReconnect();
     }
