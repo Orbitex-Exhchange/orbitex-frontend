@@ -5,8 +5,6 @@ import { createChart, ColorType } from 'lightweight-charts';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useTradingStore, useSelectedMarket, useChartSettings, useChartData } from '@/store/tradingStore';
-import { useWebSocket } from '@/services/websocketService';
 import { 
   BarChart3, 
   LineChart, 
@@ -182,15 +180,6 @@ export const TradingViewChart = React.memo(({
   const { theme: contextTheme } = useTheme();
   const theme = propTheme || contextTheme;
   
-  // Zustand store hooks
-  const selectedMarketFromStore = useSelectedMarket();
-  const { chartType, timeframe, showVolume, showGrid, autoScale } = useChartSettings();
-  const chartData = useChartData(selectedMarketFromStore);
-  const { setChartType, setTimeframe, setShowVolume, setShowGrid, setAutoScale } = useTradingStore();
-  
-  // WebSocket service
-  const websocketService = useWebSocket();
-  
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const candlestickSeriesRef = useRef<any>(null);
@@ -200,6 +189,10 @@ export const TradingViewChart = React.memo(({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedDrawingTool, setSelectedDrawingTool] = useState('cursor');
   const [marketDropdownOpen, setMarketDropdownOpen] = useState(false);
+  const [chartType, setChartType] = useState('candlestick');
+  const [showVolume, setShowVolume] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
+  const [autoScale, setAutoScale] = useState(true);
   
   // Memoized indicators
   const indicators = useMemo(() => [
@@ -230,12 +223,7 @@ export const TradingViewChart = React.memo(({
   const handleMarketSelect = useCallback((market: string) => {
     onMarketSelect?.(market);
     setMarketDropdownOpen(false);
-    // Subscribe to new market data
-    websocketService.subscribeToMarket(market);
-    websocketService.subscribeToOrderBook(market);
-    websocketService.subscribeToTrades(market);
-    websocketService.subscribeToChartData(market, timeframe);
-  }, [onMarketSelect, websocketService, timeframe]);
+  }, [onMarketSelect]);
 
   // Initialize chart with useCallback for performance
   const initializeChart = useCallback(() => {
@@ -321,29 +309,6 @@ export const TradingViewChart = React.memo(({
     return initializeChart();
   }, [initializeChart]);
 
-  // Subscribe to market data on mount
-  useEffect(() => {
-    websocketService.subscribeToMarket(selectedMarketFromStore);
-    websocketService.subscribeToOrderBook(selectedMarketFromStore);
-    websocketService.subscribeToTrades(selectedMarketFromStore);
-    websocketService.subscribeToChartData(selectedMarketFromStore, timeframe);
-  }, [selectedMarketFromStore, timeframe, websocketService]);
-
-  // Update chart data when new data arrives
-  useEffect(() => {
-    if (chartData.length > 0 && candlestickSeriesRef.current) {
-      if (chartType === 'candlestick') {
-        candlestickSeriesRef.current.setData(chartData);
-      } else {
-        const lineData = chartData.map(d => ({
-          time: d.time as any,
-          value: d.close
-        }));
-        candlestickSeriesRef.current.setData(lineData);
-      }
-    }
-  }, [chartData, chartType]);
-
   // Chart controls with useCallback for performance
   const resetChart = useCallback(() => {
     if (chartRef.current) {
@@ -390,7 +355,6 @@ export const TradingViewChart = React.memo(({
     <div 
       className={`tradingview-chart ${isFullscreen ? 'fixed inset-0 z-50 bg-[hsl(var(--trading-bg))]' : 'relative'} shadow-lg overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] to-[hsl(var(--trading-bg-secondary))] h-full`} 
       style={{ width, height }}
-      contain="layout style paint"
     >
       {/* Left Control Panel */}
       <div className="absolute left-0 top-12 bottom-0 z-20 w-10 bg-gradient-to-b from-[hsl(var(--trading-bg-secondary))]/95 to-[hsl(var(--trading-bg))]/95 backdrop-blur-sm border-r border-[hsl(var(--trading-border))] flex flex-col items-center py-1 gap-1">
@@ -682,12 +646,7 @@ export const TradingViewChart = React.memo(({
                 key={tf.value}
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setSelectedTimeframe(tf.value);
-                  setTimeframe(tf.value);
-                  // Subscribe to new timeframe data
-                  websocketService.subscribeToChartData(selectedMarketFromStore, tf.value);
-                }}
+                onClick={() => setSelectedTimeframe(tf.value)}
                 className={`h-6 px-2 text-xs font-medium border-r border-[hsl(var(--trading-border))] last:border-r-0 transition-all duration-200 hover:scale-105 ${
                   selectedTimeframe === tf.value 
                     ? 'bg-[hsl(var(--trading-accent))] text-black hover:bg-[hsl(var(--trading-accent-secondary))] shadow-inner' 
@@ -705,7 +664,6 @@ export const TradingViewChart = React.memo(({
       <div 
         className="absolute inset-0 left-10 top-12 bottom-0 bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] chart-area" 
         ref={chartContainerRef}
-        contain="layout style paint"
       />
     </div>
   );
