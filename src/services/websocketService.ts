@@ -1,207 +1,197 @@
-import { io, Socket } from 'socket.io-client';
-import { useTradingStore } from '@/store/tradingStore';
+import { getApiBaseUrl } from '@/lib/api-client/config';
+
+export interface WebSocketMessage {
+  type: string;
+  data: any;
+  timestamp: number;
+}
+
+export interface WebSocketConfig {
+  url: string;
+  reconnectInterval: number;
+  maxReconnectAttempts: number;
+  heartbeatInterval: number;
+}
 
 class WebSocketService {
-  private socket: Socket | null = null;
+  private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
-  private isConnecting = false;
-  private subscriptions = new Set<string>();
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
+  private messageHandlers: Map<string, ((data: any) => void)[]> = new Map();
+  private config: WebSocketConfig;
 
-  constructor() {
-    // Only attempt to connect if we have a WebSocket URL configured
-    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL;
-    if (wsUrl) {
-      this.connect();
-    } else {
-      console.log('WebSocket URL not configured, running in mock mode');
-    }
+  constructor(config?: Partial<WebSocketConfig>) {
+    const baseUrl = getApiBaseUrl().replace('https://', 'wss://').replace('http://', 'ws://');
+    
+    this.config = {
+      url: `${baseUrl}/ws`,
+      reconnectInterval: 5000,
+      maxReconnectAttempts: 10,
+      heartbeatInterval: 30000,
+      ...config,
+    };
   }
 
-  private connect() {
-    if (this.isConnecting || this.socket?.connected) return;
+  connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(this.config.url);
 
-    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL;
-    if (!wsUrl) {
-      console.log('WebSocket URL not configured, skipping connection');
-      return;
-    }
+        this.ws.onopen = () => {
+          console.log('WebSocket connected');
+          this.reconnectAttempts = 0;
+          this.startHeartbeat();
+          resolve();
+        };
 
-    this.isConnecting = true;
-    console.log('Attempting to connect to WebSocket:', wsUrl);
+        this.ws.onmessage = (event) => {
+          try {
+            const message: WebSocketMessage = JSON.parse(event.data);
+            this.handleMessage(message);
+          } catch (error) {
+            console.error('Failed to parse WebSocket message:', error);
+          }
+        };
 
-    try {
-      this.socket = io(wsUrl, {
-        transports: ['websocket', 'polling'],
-        timeout: 10000,
-        reconnection: true,
-        reconnectionAttempts: this.maxReconnectAttempts,
-        reconnectionDelay: this.reconnectDelay,
-      });
+        this.ws.onclose = (event) => {
+          console.log('WebSocket disconnected:', event.code, event.reason);
+          this.stopHeartbeat();
+          this.scheduleReconnect();
+        };
 
-      this.setupEventHandlers();
-    } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
-      this.isConnecting = false;
-      this.handleReconnect();
-    }
-  }
-
-  private setupEventHandlers() {
-    if (!this.socket) return;
-
-    this.socket.on('connect', () => {
-      console.log('WebSocket connected');
-      this.isConnecting = false;
-      this.reconnectAttempts = 0;
-      useTradingStore.getState().setConnectionStatus(true);
-      
-      // Resubscribe to all previous subscriptions
-      this.subscriptions.forEach(symbol => {
-        this.subscribeToMarket(symbol);
-      });
-    });
-
-    this.socket.on('disconnect', (reason) => {
-      console.log('WebSocket disconnected:', reason);
-      useTradingStore.getState().setConnectionStatus(false);
-      this.isConnecting = false;
-      
-      if (reason === 'io server disconnect') {
-        // Server disconnected, try to reconnect
-        this.handleReconnect();
+        this.ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          reject(error);
+        };
+      } catch (error) {
+        reject(error);
       }
     });
+  }
 
-    this.socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
-      this.isConnecting = false;
-      useTradingStore.getState().setConnectionStatus(false);
-      this.handleReconnect();
-    });
+  disconnect(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.stopHeartbeat();
+    this.clearReconnectTimer();
+  }
 
-    // Market data events
-    this.socket.on('market_data', (data: any) => {
-      useTradingStore.getState().updateMarketData(data.symbol, {
-        price: data.price,
-        change24h: data.change24h,
-        volume: data.volume,
-        high24h: data.high24h,
-        low24h: data.low24h,
-      });
-    });
+  subscribe(channel: string, handler: (data: any) => void): void {
+    if (!this.messageHandlers.has(channel)) {
+      this.messageHandlers.set(channel, []);
+    }
+    this.messageHandlers.get(channel)!.push(handler);
 
-    this.socket.on('order_book', (data: any) => {
-      useTradingStore.getState().updateOrderBook(data.symbol, {
-        asks: data.asks,
-        bids: data.bids,
-        spread: data.spread,
-        spreadPercentage: data.spreadPercentage,
-        lastUpdate: new Date(),
-      });
-    });
-
-    this.socket.on('trade', (data: any) => {
-      useTradingStore.getState().addTrade(data.symbol, {
-        id: data.id,
-        price: data.price,
-        size: data.size,
-        side: data.side,
-        timestamp: new Date(data.timestamp),
-      });
-    });
-
-    this.socket.on('chart_data', (data: any) => {
-      useTradingStore.getState().updateChartData(data.symbol, data.candles);
-    });
-
-    // Performance metrics
-    this.socket.on('performance', (data: any) => {
-      useTradingStore.getState().updatePerformance({
-        fps: data.fps,
-        latency: data.latency,
-        orderCount: data.orderCount,
-      });
+    // Send subscription message
+    this.send({
+      type: 'subscribe',
+      channel,
+      timestamp: Date.now(),
     });
   }
 
-  private handleReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+  unsubscribe(channel: string, handler?: (data: any) => void): void {
+    if (handler) {
+      const handlers = this.messageHandlers.get(channel);
+      if (handlers) {
+        const index = handlers.indexOf(handler);
+        if (index > -1) {
+          handlers.splice(index, 1);
+        }
+      }
+    } else {
+      this.messageHandlers.delete(channel);
+    }
+
+    // Send unsubscription message
+    this.send({
+      type: 'unsubscribe',
+      channel,
+      timestamp: Date.now(),
+    });
+  }
+
+  send(message: any): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    } else {
+      console.warn('WebSocket is not connected, message not sent:', message);
+    }
+  }
+
+  private handleMessage(message: WebSocketMessage): void {
+    const handlers = this.messageHandlers.get(message.type);
+    if (handlers) {
+      handlers.forEach(handler => {
+        try {
+          handler(message.data);
+        } catch (error) {
+          console.error('Error in WebSocket message handler:', error);
+        }
+      });
+    }
+  }
+
+  private startHeartbeat(): void {
+    this.heartbeatTimer = setInterval(() => {
+      this.send({
+        type: 'ping',
+        timestamp: Date.now(),
+      });
+    }, this.config.heartbeatInterval);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectAttempts < this.config.maxReconnectAttempts) {
+      this.clearReconnectTimer();
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectAttempts++;
+        console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
+        this.connect().catch(error => {
+          console.error('Reconnection failed:', error);
+        });
+      }, this.config.reconnectInterval);
+    } else {
       console.error('Max reconnection attempts reached');
-      return;
     }
-
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    
-    setTimeout(() => {
-      console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-      this.connect();
-    }, delay);
   }
 
-  public subscribeToMarket(symbol: string) {
-    if (!this.socket?.connected) {
-      this.subscriptions.add(symbol);
-      return;
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
-
-    this.socket.emit('subscribe', { symbol });
-    this.subscriptions.add(symbol);
   }
 
-  public unsubscribeFromMarket(symbol: string) {
-    if (!this.socket?.connected) {
-      this.subscriptions.delete(symbol);
-      return;
-    }
-
-    this.socket.emit('unsubscribe', { symbol });
-    this.subscriptions.delete(symbol);
+  // Convenience methods for common trading channels
+  subscribeToTicker(market: string, handler: (data: any) => void): void {
+    this.subscribe(`ticker.${market}`, handler);
   }
 
-  public subscribeToOrderBook(symbol: string) {
-    if (!this.socket?.connected) return;
-    this.socket.emit('subscribe_orderbook', { symbol });
+  subscribeToOrderBook(market: string, handler: (data: any) => void): void {
+    this.subscribe(`orderbook.${market}`, handler);
   }
 
-  public subscribeToTrades(symbol: string) {
-    if (!this.socket?.connected) return;
-    this.socket.emit('subscribe_trades', { symbol });
+  subscribeToTrades(market: string, handler: (data: any) => void): void {
+    this.subscribe(`trades.${market}`, handler);
   }
 
-  public subscribeToChartData(symbol: string, timeframe: string) {
-    if (!this.socket?.connected) return;
-    this.socket.emit('subscribe_chart', { symbol, timeframe });
+  subscribeToOrders(handler: (data: any) => void): void {
+    this.subscribe('orders', handler);
   }
 
-  public sendOrder(order: any) {
-    if (!this.socket?.connected) {
-      throw new Error('WebSocket not connected');
-    }
-    this.socket.emit('place_order', order);
-  }
-
-  public cancelOrder(orderId: string) {
-    if (!this.socket?.connected) {
-      throw new Error('WebSocket not connected');
-    }
-    this.socket.emit('cancel_order', { orderId });
-  }
-
-  public disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
-    this.subscriptions.clear();
-    this.isConnecting = false;
-    this.reconnectAttempts = 0;
-  }
-
-  public isConnected(): boolean {
-    return this.socket?.connected || false;
+  subscribeToBalances(handler: (data: any) => void): void {
+    this.subscribe('balances', handler);
   }
 }
 

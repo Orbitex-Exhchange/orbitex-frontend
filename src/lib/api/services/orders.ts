@@ -1,6 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../client';
-import { Order, mockOrders } from '../mock-data';
+import { api } from '../../api-client';
+
+// Order interface based on the real backend response
+export interface Order {
+  id: number;
+  uuid: string;
+  side: 'buy' | 'sell';
+  ord_type: 'limit' | 'market';
+  price: string;
+  avg_price: string;
+  state: string;
+  market: string;
+  created_at: string;
+  updated_at: string;
+  origin_volume: string;
+  remaining_volume: string;
+  executed_volume: string;
+  trades_count: number;
+  trades: any[];
+}
 
 // Orders API endpoints
 const ORDERS_ENDPOINTS = {
@@ -10,19 +28,21 @@ const ORDERS_ENDPOINTS = {
   get: '/api/v2/peatio/market/orders/:id',
 } as const;
 
-// Mock API functions
-const mockApi = {
-  getOrders: async (market?: string): Promise<Order[]> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
+// Real API functions - Connected to our backend
+const realApi = {
+  getOrders: async (authToken: string, market?: string): Promise<Order[]> => {
+    let url = ORDERS_ENDPOINTS.list;
     if (market) {
-      return mockOrders.filter(order => order.market === market);
+      url += `?market=${market}`;
     }
-    return mockOrders;
+    const response = await api.get(url, { authToken });
+    return response;
   },
   
-  getOrder: async (id: number): Promise<Order | null> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return mockOrders.find(order => order.id === id) || null;
+  getOrder: async (id: number, authToken: string): Promise<Order | null> => {
+    const url = ORDERS_ENDPOINTS.get.replace(':id', id.toString());
+    const response = await api.get(url, { authToken });
+    return response;
   },
   
   createOrder: async (orderData: {
@@ -31,54 +51,35 @@ const mockApi = {
     ord_type: 'limit' | 'market';
     price?: string;
     volume: string;
-  }): Promise<Order> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const newOrder: Order = {
-      id: Date.now(),
-      uuid: `order-${Date.now()}`,
-      side: orderData.side,
-      ord_type: orderData.ord_type,
-      price: orderData.price || '0',
-      avg_price: orderData.price || '0',
-      state: 'wait',
-      market: orderData.market,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      origin_volume: orderData.volume,
-      remaining_volume: orderData.volume,
-      executed_volume: '0',
-      trades_count: 0,
-      trades: [],
-    };
-    return newOrder;
+  }, authToken: string): Promise<Order> => {
+    const response = await api.post(ORDERS_ENDPOINTS.create, orderData, { authToken });
+    return response;
   },
   
-  cancelOrder: async (id: number): Promise<Order> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const order = mockOrders.find(o => o.id === id);
-    if (!order) {
-      throw new Error('Order not found');
-    }
-    return { ...order, state: 'cancel' };
+  cancelOrder: async (id: number, authToken: string): Promise<Order> => {
+    const url = ORDERS_ENDPOINTS.cancel.replace(':id', id.toString());
+    const response = await api.post(url, {}, { authToken });
+    return response;
   },
 };
 
 // React Query hooks
-export const useOrders = (market?: string) => {
+export const useOrders = (authToken?: string, market?: string) => {
   return useQuery({
     queryKey: ['orders', market],
-    queryFn: () => mockApi.getOrders(market),
+    queryFn: () => realApi.getOrders(authToken || '', market),
     staleTime: 10 * 1000, // 10 seconds
     refetchInterval: 10 * 1000, // Refetch every 10 seconds
+    enabled: !!authToken,
   });
 };
 
-export const useOrder = (id: number) => {
+export const useOrder = (id: number, authToken?: string) => {
   return useQuery({
     queryKey: ['orders', id],
-    queryFn: () => mockApi.getOrder(id),
+    queryFn: () => realApi.getOrder(id, authToken || ''),
     staleTime: 10 * 1000, // 10 seconds
-    enabled: !!id,
+    enabled: !!id && !!authToken,
   });
 };
 
@@ -86,7 +87,8 @@ export const useCreateOrder = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: mockApi.createOrder,
+    mutationFn: ({ orderData, authToken }: { orderData: any; authToken: string }) => 
+      realApi.createOrder(orderData, authToken),
     onSuccess: (newOrder) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
@@ -99,7 +101,8 @@ export const useCancelOrder = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: mockApi.cancelOrder,
+    mutationFn: ({ id, authToken }: { id: number; authToken: string }) => 
+      realApi.cancelOrder(id, authToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['wallets'] });

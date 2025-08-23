@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../client';
-import { Market, mockMarkets } from '../mock-data';
+import { api } from '../../api-client';
 
 // Markets API endpoints - Updated to match our backend
 const MARKETS_ENDPOINTS = {
@@ -13,26 +12,26 @@ const MARKETS_ENDPOINTS = {
 // Real API functions - Connected to our backend
 const realApi = {
   getMarkets: async (): Promise<any> => {
-    const response = await apiClient.get(MARKETS_ENDPOINTS.list);
-    return response.data.markets;
+    const response = await api.get(MARKETS_ENDPOINTS.list);
+    return response;
   },
   
   getMarketTicker: async (marketId: string): Promise<any> => {
     const url = MARKETS_ENDPOINTS.ticker.replace(':id', marketId);
-    const response = await apiClient.get(url);
-    return response.data;
+    const response = await api.get(url);
+    return response;
   },
   
   getOrderBook: async (marketId: string, limit: number = 20) => {
     const url = MARKETS_ENDPOINTS.orderBook.replace(':id', marketId);
-    const response = await apiClient.get(url);
-    return response.data;
+    const response = await api.get(url);
+    return response;
   },
   
   getTrades: async (marketId: string, limit: number = 50) => {
     const url = MARKETS_ENDPOINTS.trades.replace(':id', marketId);
-    const response = await apiClient.get(url);
-    return response.data.trades;
+    const response = await api.get(url);
+    return response;
   },
 };
 

@@ -2,7 +2,11 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { QueryClientWrapper } from '@/components/QueryClientWrapper';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -38,12 +42,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <ThemeProvider>
-          <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
-            {children}
-          </div>
-          <Toaster />
-        </ThemeProvider>
+        <QueryClientWrapper>
+          <AuthProvider>
+            <ThemeProvider>
+              <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
+                {children}
+              </div>
+              <Toaster />
+            </ThemeProvider>
+          </AuthProvider>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </QueryClientWrapper>
       </body>
     </html>
   );
