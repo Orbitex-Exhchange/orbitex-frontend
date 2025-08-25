@@ -7,30 +7,96 @@ import { Toaster } from '@/components/ui/toaster';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { QueryClientWrapper } from '@/components/QueryClientWrapper';
+import { env } from '@/lib/env';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ 
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
 };
 
 export const metadata: Metadata = {
-  title: 'Orbitex - Advanced Cryptocurrency Trading Platform',
+  title: {
+    default: 'Orbitex - Advanced Cryptocurrency Trading Platform',
+    template: '%s | Orbitex',
+  },
   description: 'Professional-grade cryptocurrency trading platform with lightning-fast execution, advanced security, and institutional tools.',
-  keywords: 'cryptocurrency, trading, bitcoin, ethereum, crypto exchange, digital assets',
+  keywords: [
+    'cryptocurrency',
+    'trading',
+    'bitcoin',
+    'ethereum',
+    'crypto exchange',
+    'digital assets',
+    'trading platform',
+    'blockchain',
+    'defi',
+    'web3'
+  ],
   authors: [{ name: 'Orbitex Team' }],
-  robots: 'index, follow',
+  creator: 'Orbitex',
+  publisher: 'Orbitex',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
   openGraph: {
-    title: 'Orbitex - Advanced Cryptocurrency Trading Platform',
-    description: 'Professional-grade cryptocurrency trading platform with lightning-fast execution, advanced security, and institutional tools.',
     type: 'website',
     locale: 'en_US',
+    url: env.NEXT_PUBLIC_FRONTEND_URL,
+    title: 'Orbitex - Advanced Cryptocurrency Trading Platform',
+    description: 'Professional-grade cryptocurrency trading platform with lightning-fast execution, advanced security, and institutional tools.',
+    siteName: 'Orbitex',
+    images: [
+      {
+        url: `${env.NEXT_PUBLIC_FRONTEND_URL}/og-image.png`,
+        width: 1200,
+        height: 630,
+        alt: 'Orbitex Trading Platform',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Orbitex - Advanced Cryptocurrency Trading Platform',
     description: 'Professional-grade cryptocurrency trading platform with lightning-fast execution, advanced security, and institutional tools.',
+    images: [`${env.NEXT_PUBLIC_FRONTEND_URL}/og-image.png`],
+    creator: '@orbitex',
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      { rel: 'mask-icon', url: '/safari-pinned-tab.svg', color: '#00ff88' },
+    ],
+  },
+  manifest: '/site.webmanifest',
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
   },
 };
 
@@ -40,7 +106,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
+      <head>
+        <meta name="theme-color" content="#00ff88" />
+        <meta name="msapplication-TileColor" content="#00ff88" />
+        <meta name="msapplication-config" content="/browserconfig.xml" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="//fonts.gstatic.com" />
+      </head>
       <body className={`${inter.className} antialiased`}>
         <QueryClientWrapper>
           <AuthProvider>
@@ -51,7 +126,7 @@ export default function RootLayout({
               <Toaster />
             </ThemeProvider>
           </AuthProvider>
-          <ReactQueryDevtools initialIsOpen={false} />
+          {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
         </QueryClientWrapper>
       </body>
     </html>

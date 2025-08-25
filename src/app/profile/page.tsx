@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Navigation } from '@/components/layout/Navigation';
 import { 
   User,
   Mail,
@@ -27,6 +28,8 @@ import {
   MapPin
 } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface UserProfile {
   id: string;
@@ -47,6 +50,9 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { toast } = useToast();
+  const { authToken, isAuthenticated, user, logout } = useAuth();
+  
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -63,31 +69,27 @@ export default function ProfilePage() {
   const authServiceUrl = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL;
 
   useEffect(() => {
-    checkAuthAndLoadProfile();
-  }, []);
-
-  const checkAuthAndLoadProfile = async () => {
-    const accessToken = localStorage.getItem('access_token');
-    
-    if (!accessToken) {
+    if (!isAuthenticated) {
       router.push('/auth/signin');
       return;
     }
+    loadProfile();
+  }, [isAuthenticated, authToken, router]);
 
-    await loadProfile(accessToken);
-  };
-
-  const loadProfile = async (token: string) => {
+  const loadProfile = async () => {
+    if (!authToken) return;
+    
     try {
+      setIsLoading(true);
       const response = await fetch(`${authServiceUrl}/auth/me`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
         },
       });
 
       if (!response.ok) {
         if (response.status === 401) {
-          localStorage.removeItem('access_token');
+          await logout();
           router.push('/auth/signin');
           return;
         }
@@ -111,8 +113,7 @@ export default function ProfilePage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    logout();
     router.push('/auth/signin');
   };
 
@@ -124,7 +125,7 @@ export default function ProfilePage() {
     setSuccess('');
 
     try {
-      const accessToken = localStorage.getItem('access_token');
+      const accessToken = authToken;
       
       const response = await fetch(`${authServiceUrl}/auth/me`, {
         method: 'PUT',
@@ -192,7 +193,7 @@ export default function ProfilePage() {
         <div className="text-center">
           <AlertCircle className="h-8 w-8 mx-auto mb-4 text-red-600" />
           <p className="text-gray-600">Failed to load profile</p>
-          <Button onClick={() => checkAuthAndLoadProfile()} className="mt-4">
+          <Button onClick={loadProfile} className="mt-4">
             Try Again
           </Button>
         </div>
@@ -201,54 +202,53 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
+      <Navigation user={user} />
+      <div className="container mx-auto p-6 space-y-6">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
-              <p className="text-gray-600">Manage your account settings and preferences</p>
-            </div>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Profile</h1>
+            <p className="text-gray-300">Manage your account settings and preferences</p>
           </div>
+          <Button variant="outline" onClick={handleLogout} className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-secondary))]">
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
         </div>
 
         {error && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert variant="destructive" className="border-red-500 bg-red-900/20">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="text-red-300">{error}</AlertDescription>
           </Alert>
         )}
 
         {success && (
-          <Alert className="mb-6">
+          <Alert className="border-green-500 bg-green-900/20">
             <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{success}</AlertDescription>
+            <AlertDescription className="text-green-300">{success}</AlertDescription>
           </Alert>
         )}
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="kyc">KYC Status</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))]">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-[hsl(var(--trading-accent))] data-[state=active]:text-white">Overview</TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-[hsl(var(--trading-accent))] data-[state=active]:text-white">Security</TabsTrigger>
+            <TabsTrigger value="kyc" className="data-[state=active]:bg-[hsl(var(--trading-accent))] data-[state=active]:text-white">KYC Status</TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-[hsl(var(--trading-accent))] data-[state=active]:text-white">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <Card>
+            <Card className="border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg-secondary))]">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Personal Information</CardTitle>
-                    <CardDescription>Update your personal details</CardDescription>
+                    <CardTitle className="text-white">Personal Information</CardTitle>
+                    <CardDescription className="text-gray-300">Update your personal details</CardDescription>
                   </div>
                   {!isEditing ? (
-                    <Button variant="outline" onClick={() => setIsEditing(true)}>
+                    <Button variant="outline" onClick={() => setIsEditing(true)} className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]">
                       <Edit className="h-4 w-4 mr-2" />
                       Edit
                     </Button>
@@ -262,7 +262,7 @@ export default function ProfilePage() {
                         )}
                         Save
                       </Button>
-                      <Button variant="outline" onClick={() => setIsEditing(false)}>
+                      <Button variant="outline" onClick={() => setIsEditing(false)} className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]">
                         <X className="h-4 w-4 mr-2" />
                         Cancel
                       </Button>
@@ -273,66 +273,70 @@ export default function ProfilePage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="first_name">First Name</Label>
+                    <Label htmlFor="first_name" className="text-white">First Name</Label>
                     <Input
                       id="first_name"
                       value={editForm.first_name}
                       onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))}
                       disabled={!isEditing}
                       placeholder="Enter your first name"
+                      className="bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder:text-[hsl(var(--trading-text-muted))]"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="last_name">Last Name</Label>
+                    <Label htmlFor="last_name" className="text-white">Last Name</Label>
                     <Input
                       id="last_name"
                       value={editForm.last_name}
                       onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))}
                       disabled={!isEditing}
                       placeholder="Enter your last name"
+                      className="bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder:text-[hsl(var(--trading-text-muted))]"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email" className="text-white">Email</Label>
                     <Input
                       id="email"
                       value={profile.email}
                       disabled
-                      className="bg-gray-50"
+                      className="bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] opacity-50"
                     />
-                    <div className="flex items-center text-sm text-gray-500">
+                    <div className="flex items-center text-sm text-gray-400">
                       {profile.email_verified ? (
-                        <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                        <CheckCircle className="h-4 w-4 mr-1 text-green-400" />
                       ) : (
-                        <AlertCircle className="h-4 w-4 mr-1 text-yellow-600" />
+                        <AlertCircle className="h-4 w-4 mr-1 text-yellow-400" />
                       )}
                       {profile.email_verified ? 'Verified' : 'Not verified'}
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
+                    <Label htmlFor="phone" className="text-white">Phone</Label>
                     <Input
                       id="phone"
                       value={editForm.phone}
                       onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
                       disabled={!isEditing}
                       placeholder="Enter your phone number"
+                      className="bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder:text-[hsl(var(--trading-text-muted))]"
                     />
                     {profile.phone_verified && (
-                      <div className="flex items-center text-sm text-green-600">
+                      <div className="flex items-center text-sm text-green-400">
                         <CheckCircle className="h-4 w-4 mr-1" />
                         Verified
                       </div>
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
+                    <Label htmlFor="country" className="text-white">Country</Label>
                     <Input
                       id="country"
                       value={editForm.country}
                       onChange={(e) => setEditForm(prev => ({ ...prev, country: e.target.value }))}
                       disabled={!isEditing}
                       placeholder="Enter your country"
+                      className="bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder:text-[hsl(var(--trading-text-muted))]"
                     />
                   </div>
                 </div>

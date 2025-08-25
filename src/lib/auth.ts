@@ -48,8 +48,21 @@ class AuthService {
     if (!this.accessToken) return null;
 
     try {
-      // For now, since our auth service returns a simple token, we'll return a default user
-      // In the future, this should decode the JWT token properly
+      // Try to decode JWT token
+      const decoded = jwtDecode<DecodedToken>(this.accessToken);
+      
+      return {
+        id: decoded.sub,
+        email: decoded.email,
+        role: decoded.role,
+        kyc_level: decoded.kyc_level,
+        email_verified: decoded.email_verified,
+        phone_verified: decoded.phone_verified,
+        two_factor_enabled: decoded.two_factor_enabled,
+      };
+    } catch (error) {
+      console.error('Failed to decode token:', error);
+      // Fallback to default user if token decoding fails
       return {
         id: 'default',
         email: 'user@example.com',
@@ -59,9 +72,6 @@ class AuthService {
         phone_verified: false,
         two_factor_enabled: false,
       };
-    } catch (error) {
-      console.error('Failed to decode token:', error);
-      return null;
     }
   }
 
@@ -71,7 +81,7 @@ class AuthService {
     return false;
   }
 
-  public async login(email: string, password: string, otpCode?: string): Promise<AuthUser> {
+  public async login(email: string, password: string, otpCode?: string): Promise<{ success: boolean; user: AuthUser; token: string }> {
     const { env } = await import('./env');
     const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL;
     
@@ -127,7 +137,11 @@ class AuthService {
       localStorage.setItem('refresh_token', this.refreshToken);
     }
 
-    return this.user;
+    return {
+      success: true,
+      user: this.user,
+      token: this.accessToken || ''
+    };
   }
 
   public async register(userData: {
@@ -191,7 +205,7 @@ class AuthService {
     }
   }
 
-  public async refreshAccessToken(): Promise<string | null> {
+  public async refreshAccessToken(): Promise<{ success: boolean; user: AuthUser; token: string } | null> {
     if (!this.refreshToken) return null;
 
     const { env } = await import('./env');
@@ -231,11 +245,15 @@ class AuthService {
       this.accessToken = data.access_token;
       this.user = this.getUserFromToken();
 
-          if (typeof window !== 'undefined' && this.accessToken) {
-      localStorage.setItem('access_token', this.accessToken);
-    }
+      if (typeof window !== 'undefined' && this.accessToken) {
+        localStorage.setItem('access_token', this.accessToken);
+      }
 
-      return this.accessToken;
+      return {
+        success: true,
+        user: this.user!,
+        token: this.accessToken || ''
+      };
     } catch (error) {
       console.error('Token refresh failed:', error);
       await this.logout();
@@ -248,7 +266,8 @@ class AuthService {
 
     // Check if token is expired and refresh if needed
     if (token && this.isTokenExpired(token)) {
-      token = await this.refreshAccessToken();
+      const refreshResult = await this.refreshAccessToken();
+      token = refreshResult?.token || null;
     }
 
     if (!token) {
@@ -265,13 +284,13 @@ class AuthService {
 
     // If token is invalid, try to refresh once
     if (response.status === 401) {
-      const newToken = await this.refreshAccessToken();
-      if (newToken) {
+      const refreshResult = await this.refreshAccessToken();
+      if (refreshResult?.token) {
         return fetch(url, {
           ...options,
           headers: {
             ...options.headers,
-            'Authorization': `Bearer ${newToken}`,
+            'Authorization': `Bearer ${refreshResult.token}`,
           },
         });
       }

@@ -11,6 +11,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   updateUser: (userData: Partial<AuthUser>) => void;
+  refreshAuthState: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -84,8 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshToken = async (): Promise<void> => {
     try {
-      const result = await authService.refreshToken();
-      if (result.success && result.token) {
+      const result = await authService.refreshAccessToken();
+      if (result?.success && result.token) {
         localStorage.setItem('access_token', result.token);
         setAuthToken(result.token);
         setUser(result.user);
@@ -104,8 +105,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       const updatedUser = { ...user, ...userData };
       setUser(updatedUser);
-      // Update user in auth service
-      authService.updateUser(updatedUser);
+    }
+  };
+
+  const refreshAuthState = () => {
+    const token = localStorage.getItem('access_token');
+    const currentUser = authService.getUser();
+
+    if (token && currentUser) {
+      setAuthToken(token);
+      setUser(currentUser);
+      setIsAuthenticated(true);
+    } else {
+      localStorage.removeItem('access_token');
+      setAuthToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
     }
   };
 
@@ -117,16 +132,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     refreshToken,
     updateUser,
+    refreshAuthState,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
