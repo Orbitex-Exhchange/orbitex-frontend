@@ -22,7 +22,7 @@ export class APIError extends Error {
     super(message);
     this.name = 'APIError';
     this.status = status;
-    this.code = code;
+    this.code = code || '';
   }
 }
 
@@ -135,21 +135,21 @@ export const api = {
     makeRequest<T>(endpoint, {
       ...options,
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? JSON.stringify(data) : null,
     }),
 
   put: <T = any>(endpoint: string, data?: any, options?: RequestOptions): Promise<T> =>
     makeRequest<T>(endpoint, {
       ...options,
       method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? JSON.stringify(data) : null,
     }),
 
   patch: <T = any>(endpoint: string, data?: any, options?: RequestOptions): Promise<T> =>
     makeRequest<T>(endpoint, {
       ...options,
       method: 'PATCH',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? JSON.stringify(data) : null,
     }),
 
   delete: <T = any>(endpoint: string, options?: RequestOptions): Promise<T> =>

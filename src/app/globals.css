@@ -6,14 +6,14 @@
   :root {
     /* Trading Theme Colors - Light Mode */
     --trading-bg: 0 0% 100%;
-    --trading-bg-secondary: 0 0% 98%;
-    --trading-bg-tertiary: 0 0% 96%;
-    --trading-text: 0 0% 10%;
-    --trading-text-secondary: 0 0% 30%;
-    --trading-text-muted: 0 0% 50%;
+    --trading-bg-secondary: 0 0% 97%;
+    --trading-bg-tertiary: 0 0% 94%;
+    --trading-text: 0 0% 8%;
+    --trading-text-secondary: 0 0% 25%;
+    --trading-text-muted: 0 0% 45%;
     --trading-accent: 142 76% 36%;
     --trading-accent-secondary: 142 76% 46%;
-    --trading-border: 0 0% 90%;
+    --trading-border: 0 0% 88%;
     --trading-success: 142 76% 36%;
     --trading-error: 0 84% 60%;
     --trading-warning: 38 92% 50%;
@@ -50,14 +50,14 @@
   .dark {
     /* Trading Theme Colors - Dark Mode */
     --trading-bg: 0 0% 4%;
-    --trading-bg-secondary: 0 0% 6%;
-    --trading-bg-tertiary: 0 0% 8%;
-    --trading-text: 0 0% 95%;
-    --trading-text-secondary: 0 0% 80%;
-    --trading-text-muted: 0 0% 60%;
+    --trading-bg-secondary: 0 0% 7%;
+    --trading-bg-tertiary: 0 0% 10%;
+    --trading-text: 0 0% 98%;
+    --trading-text-secondary: 0 0% 85%;
+    --trading-text-muted: 0 0% 65%;
     --trading-accent: 142 76% 36%;
     --trading-accent-secondary: 142 76% 46%;
-    --trading-border: 0 0% 15%;
+    --trading-border: 0 0% 18%;
     --trading-success: 142 76% 36%;
     --trading-error: 0 84% 60%;
     --trading-warning: 38 92% 50%;

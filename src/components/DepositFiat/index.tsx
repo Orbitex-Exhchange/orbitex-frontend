@@ -15,7 +15,7 @@ export interface DepositFiatProps {
 }
 
 
-const bankData = uid => [
+const bankData = (uid: string) => [
     {
         key: <FormattedMessage id="page.body.wallets.tabs.deposit.fiat.bankName" />,
         value: 'Diamant Bank',
@@ -49,7 +49,7 @@ const DepositFiat: React.FunctionComponent<DepositFiatProps> = (props: DepositFi
         uid,
     } = props;
 
-    const renderDetails = (detail, index: number) => {
+    const renderDetails = (detail: any, index: number) => {
         return (
             <div className="cr-deposit-fiat-detail" key={index}>
                 <p className="cr-deposit-fiat-detail__label">{detail.key}:</p>

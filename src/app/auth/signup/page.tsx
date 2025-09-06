@@ -382,7 +382,7 @@ export default function SignUpPage() {
                   <Checkbox 
                     id="acceptTerms" 
                     checked={formData.acceptTerms}
-                    onCheckedChange={(checked) => handleInputChange('acceptTerms', checked as boolean)}
+                    onChange={(checked) => handleInputChange('acceptTerms', checked)}
                     className="mt-1 border-[hsl(var(--trading-border))] data-[state=checked]:bg-[hsl(var(--trading-accent))] data-[state=checked]:border-[hsl(var(--trading-accent))]"
                   />
                   <div className="space-y-1">
@@ -406,7 +406,7 @@ export default function SignUpPage() {
                   <Checkbox 
                     id="acceptMarketing" 
                     checked={formData.acceptMarketing}
-                    onCheckedChange={(checked) => handleInputChange('acceptMarketing', checked as boolean)}
+                    onChange={(checked) => handleInputChange('acceptMarketing', checked)}
                     className="mt-1 border-[hsl(var(--trading-border))] data-[state=checked]:bg-[hsl(var(--trading-accent))] data-[state=checked]:border-[hsl(var(--trading-accent))]"
                   />
                   <Label htmlFor="acceptMarketing" className="text-sm text-[hsl(var(--trading-text-secondary))]">

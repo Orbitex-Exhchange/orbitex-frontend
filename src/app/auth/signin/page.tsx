@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,7 +32,7 @@ interface SignInFormData {
 
 export default function SignInPage() {
   const router = useRouter();
-  const { login, refreshAuthState } = useAuth();
+  const { login, refreshAuthState, isAuthenticated, user } = useAuth();
   const [formData, setFormData] = useState<SignInFormData>({
     email: '',
     password: '',
@@ -43,6 +43,12 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState<string>('');
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Debug auth state changes
+  useEffect(() => {
+    console.log('Auth state changed:', { isAuthenticated, user });
+  }, [isAuthenticated, user]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -91,7 +97,34 @@ export default function SignInPage() {
     try {
       let loginSuccess = false;
       
-      if (showOtp && formData.otpCode) {
+      // Check if this is a development login
+      const isDevelopment = process.env.NODE_ENV === 'development' || 
+                           (typeof window !== 'undefined' && window.location.hostname === 'localhost');
+      
+      if (isDevelopment && formData.email === 'demo@orbitex.com' && formData.password === 'demo123') {
+        // Development login - create mock user
+        const mockUser = {
+          id: 'demo_user_123',
+          email: 'demo@orbitex.com',
+          role: 'member',
+          kyc_level: 2,
+          email_verified: true,
+          phone_verified: true,
+          two_factor_enabled: false,
+        };
+        
+        const mockToken = `demo_token_${Date.now()}`;
+        
+        // Store in localStorage
+        localStorage.setItem('access_token', mockToken);
+        localStorage.setItem('refresh_token', mockToken);
+        
+        // Update auth context and wait for it to complete
+        await refreshAuthState();
+        loginSuccess = true;
+        
+        console.log('Development login successful with demo user');
+      } else if (showOtp && formData.otpCode) {
         // Handle 2FA login with authService directly
         const { authService } = await import('@/lib/auth');
         const result = await authService.login(formData.email, formData.password, formData.otpCode);
@@ -107,23 +140,17 @@ export default function SignInPage() {
       } else {
         // Use the login function from AuthContext for initial login
         loginSuccess = await login(formData.email, formData.password);
-        
-        if (!loginSuccess) {
-          // Check if 2FA is required
-          setShowOtp(true);
-          setErrors({ general: 'Please enter your 2FA code' });
-          setIsLoading(false);
-          return;
-        }
       }
       
       if (loginSuccess) {
         setSuccess('Login successful! Redirecting...');
         
-        // Redirect to dashboard after successful login
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 1500);
+        console.log('Login successful, about to redirect...');
+        console.log('Current auth state:', { isAuthenticated, user });
+        
+        // Redirect to dashboard immediately after successful login
+        console.log('Executing redirect to dashboard...');
+        router.push('/dashboard');
       } else {
         setErrors({ general: 'Login failed. Please check your credentials and try again.' });
       }
@@ -131,7 +158,7 @@ export default function SignInPage() {
     } catch (error: any) {
       console.error('Login error:', error);
       
-      if (error.message?.includes('2FA')) {
+      if (error.message?.toLowerCase().includes('2fa') || error.message?.toLowerCase().includes('otp')) {
         setShowOtp(true);
         setErrors({ general: 'Please enter your 2FA code' });
       } else if (error.message?.includes('Invalid credentials')) {
@@ -245,6 +272,15 @@ export default function SignInPage() {
                 {errors.password && (
                   <p className="text-sm text-red-400">{errors.password}</p>
                 )}
+                
+                {/* Development Login Hint */}
+                {(process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.location.hostname === 'localhost')) && (
+                  <div className="mt-2 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                    <p className="text-xs text-blue-300">
+                      <strong>Development Mode:</strong> Use <code className="bg-blue-800/50 px-1 rounded">demo@orbitex.com</code> / <code className="bg-blue-800/50 px-1 rounded">demo123</code> for quick login
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* 2FA Code Field */}
@@ -274,7 +310,12 @@ export default function SignInPage() {
               {/* Remember Me & Forgot Password */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Checkbox id="remember" className="border-[hsl(var(--trading-border))] data-[state=checked]:bg-[hsl(var(--trading-accent))] data-[state=checked]:border-[hsl(var(--trading-accent))]" />
+                  <Checkbox 
+                    id="remember" 
+                    checked={rememberMe}
+                    onChange={setRememberMe}
+                    className="border-[hsl(var(--trading-border))] data-[state=checked]:bg-[hsl(var(--trading-accent))] data-[state=checked]:border-[hsl(var(--trading-accent))]" 
+                  />
                   <Label htmlFor="remember" className="text-sm text-[hsl(var(--trading-text-secondary))]">Remember me</Label>
                 </div>
                 <Link 

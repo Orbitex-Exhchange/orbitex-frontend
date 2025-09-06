@@ -136,7 +136,7 @@ export default function WalletsPage() {
       withdrawal_enabled: true,
       change24h: mockChanges[wallet.currency] || 0,
       value: value,
-      deposit_address: wallet.deposit_address
+      ...(wallet.deposit_address && { deposit_address: wallet.deposit_address })
     };
   }) : [];
 

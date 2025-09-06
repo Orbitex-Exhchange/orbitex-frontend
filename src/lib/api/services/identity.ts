@@ -70,7 +70,7 @@ const mockApi = {
     const newUser: IdentityUser = {
       id: Date.now().toString(),
       email: userData.email,
-      username: userData.email.split('@')[0],
+      username: userData.email.split('@')[0] || 'user',
       role: 'member',
       level: 1,
       otp: false,

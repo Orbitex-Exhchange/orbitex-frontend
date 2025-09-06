@@ -19,6 +19,8 @@ import {
   BarChart3
 } from 'lucide-react';
 import { cn, formatNumber, formatCurrency } from '../../lib/utils';
+import { env } from '@/lib/env';
+import { authService } from '@/lib/auth';
 
 interface EnhancedOrderFormProps {
   market: string;
@@ -90,6 +92,7 @@ export function EnhancedOrderForm({
   const [calculatorMode, setCalculatorMode] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [balances, setBalances] = useState<Record<string, number>>({});
 
   // Mock portfolio data
   const [portfolio] = useState<Portfolio>({
@@ -111,6 +114,27 @@ export function EnhancedOrderForm({
 
   // Update price when current price changes
   useEffect(() => {
+    // Fetch balances from orbitex-clean when authenticated
+    (async () => {
+      try {
+        const token = authService.getAccessToken();
+        if (!token) return;
+        const apiBase = env.NEXT_PUBLIC_API_URL;
+        const res = await fetch(`${apiBase}/api/v2/account/balances`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        // data: { uid, balances: [{currency, balance, locked}] }
+        const map: Record<string, number> = {};
+        (data.balances || []).forEach((b: any) => {
+          map[(b.currency || '').toUpperCase()] = parseFloat(b.balance || '0');
+        });
+        setBalances(map);
+      } catch (_e) {
+        // ignore
+      }
+    })();
     if (orderData.type === 'market') {
       setOrderData(prev => ({ ...prev, price: currentPrice.toString() }));
     }
@@ -164,13 +188,35 @@ export function EnhancedOrderForm({
       }
     }
 
-    const requiredMargin = parseFloat(orderData.total || '0') / orderData.leverage;
-    if (requiredMargin > portfolio.marginAvailable) {
-      newErrors.margin = 'Insufficient margin available';
+    // Balance check
+    try {
+      const [base, quote] = market.split('-');
+      const needBase = orderData.side === 'sell';
+      const needQuote = orderData.side === 'buy';
+      if (needSellOrBuyInsufficient(needBase, needQuote, base, quote)) {
+        newErrors.margin = 'Insufficient balance';
+      }
+    } catch (_e) {
+      // ignore
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const needSellOrBuyInsufficient = (needBase: boolean, needQuote: boolean, base: string, quote: string): boolean => {
+    const size = parseFloat(orderData.size || '0');
+    const price = parseFloat(orderData.price || String(currentPrice) || '0');
+    if (needBase) {
+      const have = balances[(base || '').toUpperCase()] || 0;
+      return size > have;
+    }
+    if (needQuote) {
+      const have = balances[(quote || '').toUpperCase()] || 0;
+      const cost = size * price;
+      return cost > have;
+    }
+    return false;
   };
 
   const handleSubmitOrder = () => {
@@ -571,7 +617,7 @@ export function EnhancedOrderForm({
             <div className="flex justify-between">
               <span className="text-[#888]">Position:</span>
               <span className="text-white">
-                {formatNumber(portfolio.positions[0].size, 4)} BTC
+                {formatNumber(portfolio.positions[0]?.size || 0, 4)} BTC
               </span>
             </div>
           )}

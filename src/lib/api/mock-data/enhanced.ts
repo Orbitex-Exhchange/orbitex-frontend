@@ -278,7 +278,6 @@ export interface PublicCurrency {
   withdrawal_enabled: boolean;
   deposit_fee: string;
   min_confirmations: number;
-  code: string;
   blockchain_key: string;
   min_collection_amount: string;
   has_memo: boolean;

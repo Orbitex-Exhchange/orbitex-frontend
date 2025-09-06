@@ -32,21 +32,21 @@ export const API: ApiWrapper = {
     post: (config: RequestOptions) => async (url: string, body?: JsonBody) =>
         makeRequest({
             method: 'post',
-            body,
+            ...(body && { body }),
             url,
         }, config),
 
     patch: (config: RequestOptions) => async (url: string, body?: JsonBody) =>
         makeRequest({
             method: 'patch',
-            body,
+            ...(body && { body }),
             url,
         }, config),
 
     put: (config: RequestOptions) => async (url: string, body?: JsonBody) =>
         makeRequest({
             method: 'put',
-            body,
+            ...(body && { body }),
             url,
         }, config),
 
@@ -61,4 +61,4 @@ const conf: RequestOptions = {
     apiVersion: 'barong',
 };
 
-export const changePassword = async body => API.post(conf)('/identity/users/password/confirm_code', body);
+export const changePassword = async (body: JsonBody) => API.post(conf)('/identity/users/password/confirm_code', body);

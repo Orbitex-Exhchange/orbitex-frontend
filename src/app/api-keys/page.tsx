@@ -104,7 +104,6 @@ export default function ApiKeysPage() {
       toast({
         title: "Name Required",
         description: "Please enter a name for your API key.",
-        variant: "destructive"
       });
       return;
     }
@@ -113,7 +112,6 @@ export default function ApiKeysPage() {
       toast({
         title: "Permissions Required",
         description: "Please select at least one permission.",
-        variant: "destructive"
       });
       return;
     }
@@ -128,7 +126,7 @@ export default function ApiKeysPage() {
         name: newKeyName,
         key: `sk_test_${Math.random().toString(36).substring(2, 15)}`,
         permissions: selectedPermissions,
-        created: new Date().toISOString().split('T')[0],
+        created: new Date().toISOString().split('T')[0] || new Date().toISOString().slice(0, 10),
         lastUsed: 'Never',
         status: 'active'
       };
@@ -146,7 +144,6 @@ export default function ApiKeysPage() {
       toast({
         title: "Error",
         description: "Failed to create API key. Please try again.",
-        variant: "destructive"
       });
       setIsCreating(false);
     }
@@ -168,7 +165,6 @@ export default function ApiKeysPage() {
       toast({
         title: "Error",
         description: "Failed to delete API key. Please try again.",
-        variant: "destructive"
       });
     } finally {
       setIsLoading(false);

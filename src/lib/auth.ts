@@ -83,9 +83,9 @@ class AuthService {
 
   public async login(email: string, password: string, otpCode?: string): Promise<{ success: boolean; user: AuthUser; token: string }> {
     const { env } = await import('./env');
-    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL;
-    
-    const response = await fetch(`${authServiceUrl}/auth/login`, {
+    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // now Orbisigner v2 identity base
+    // Orbisigner sessions endpoint: POST /api/v2/identity/sessions
+    const response = await fetch(`${authServiceUrl}/sessions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -93,7 +93,7 @@ class AuthService {
       body: JSON.stringify({
         email,
         password,
-        two_factor_code: otpCode,
+        otp: otpCode,
       }),
     });
 
@@ -117,18 +117,17 @@ class AuthService {
       throw new Error('Invalid response from server');
     }
     
+    // Orbisigner returns { token, user: { uid, email, role, level } }
     this.accessToken = data.token;
-    this.refreshToken = data.token; // Using same token for now since our auth service doesn't have refresh tokens yet
-    
-    // Create user object from response data
+    this.refreshToken = data.token;
     this.user = {
-      id: data.user.id,
+      id: data.user.uid || data.user.id,
       email: data.user.email,
-      role: 'member', // Default role for now
-      kyc_level: 0, // Default KYC level
-      email_verified: data.user.email_verified || false,
-      phone_verified: false, // Default to false
-      two_factor_enabled: false, // Default to false
+      role: data.user.role || 'member',
+      kyc_level: data.user.level || 0,
+      email_verified: true,
+      phone_verified: false,
+      two_factor_enabled: false,
     };
 
     // Store tokens in localStorage
@@ -155,9 +154,9 @@ class AuthService {
     terms_accepted: boolean;
   }): Promise<void> {
     const { env } = await import('./env');
-    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL;
-    
-    const response = await fetch(`${authServiceUrl}/auth/register`, {
+    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // Orbisigner v2 identity base
+    // Orbisigner users endpoint: POST /api/v2/identity/users
+    const response = await fetch(`${authServiceUrl}/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -180,11 +179,12 @@ class AuthService {
 
   public async logout(): Promise<void> {
     const { env } = await import('./env');
-    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL;
+    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // Orbisigner v2 identity base
     
     if (this.accessToken) {
       try {
-        await fetch(`${authServiceUrl}/auth/logout`, {
+        // Orbisigner may not implement logout; clear client-side token only
+        await fetch(`${authServiceUrl}/sessions`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${this.accessToken}`,
@@ -212,14 +212,13 @@ class AuthService {
     const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL;
     
     try {
-      const response = await fetch(`${authServiceUrl}/auth/refresh`, {
+      // No refresh endpoint in Orbisigner v2 today; return current token if present
+      const response = await fetch(`${authServiceUrl}/sessions/health`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          refresh_token: this.refreshToken,
-        }),
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) {
@@ -242,7 +241,7 @@ class AuthService {
         throw new Error('Invalid response from token refresh');
       }
       
-      this.accessToken = data.access_token;
+      this.accessToken = this.accessToken || null;
       this.user = this.getUserFromToken();
 
       if (typeof window !== 'undefined' && this.accessToken) {
@@ -300,10 +299,35 @@ class AuthService {
   }
 
   public getUser(): AuthUser | null {
+    // Check if we have a demo token
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('access_token');
+      if (token && token.startsWith('demo_token_')) {
+        // Return demo user
+        return {
+          id: 'demo_user_123',
+          email: 'demo@orbitex.com',
+          role: 'member',
+          kyc_level: 2,
+          email_verified: true,
+          phone_verified: true,
+          two_factor_enabled: false,
+        };
+      }
+    }
+    
     return this.user;
   }
 
   public isAuthenticated(): boolean {
+    // Check if we have a demo token
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('access_token');
+      if (token && token.startsWith('demo_token_')) {
+        return true;
+      }
+    }
+    
     return !!this.accessToken && !this.isTokenExpired(this.accessToken);
   }
 

@@ -49,12 +49,15 @@ export default function DashboardPage() {
   const [showBalances, setShowBalances] = useState(true);
 
   useEffect(() => {
+    console.log('Dashboard auth check:', { isAuthenticated, user, isLoading });
     if (!isAuthenticated) {
+      console.log('Not authenticated, redirecting to signin...');
       router.push('/auth/signin');
       return;
     }
+    console.log('Authenticated, setting loading to false');
     setIsLoading(false);
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, user, isLoading]);
 
   const handleLogout = async () => {
     try {

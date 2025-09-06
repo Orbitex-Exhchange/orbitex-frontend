@@ -90,7 +90,6 @@ export default function SettingsPage() {
       toast({
         title: "Error",
         description: "Failed to save settings. Please try again.",
-        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
@@ -102,7 +101,6 @@ export default function SettingsPage() {
       toast({
         title: "Password Mismatch",
         description: "New password and confirm password do not match.",
-        variant: "destructive"
       });
       return;
     }
@@ -124,7 +122,6 @@ export default function SettingsPage() {
       toast({
         title: "Error",
         description: "Failed to change password. Please try again.",
-        variant: "destructive"
       });
     } finally {
       setIsLoading(false);

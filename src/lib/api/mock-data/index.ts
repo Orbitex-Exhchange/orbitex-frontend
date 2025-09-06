@@ -153,55 +153,5 @@ export {
 
 // Combined exports for convenience
 export const allMockData = {
-  // Identity
-  identityUsers: mockIdentityUsers,
-  
-  // Resource
-  userProfiles: mockUserProfiles,
-  apiKeys: mockApiKeys,
-  labels: mockLabels,
-  documents: mockDocuments,
-  phones: mockPhones,
-  
-  // Leads
-  leads: mockLeads,
-  
-  // Account
-  accountBalances: mockAccountBalances,
-  deposits: mockDeposits,
-  withdrawals: mockWithdrawals,
-  beneficiaries: mockBeneficiaries,
-  
-  // Market
-  marketOrders: mockMarketOrders,
-  marketTrades: mockMarketTrades,
-  
-  // Public
-  publicMarkets: [...mockPublicMarkets, ...mockAdditionalMarkets],
-  publicCurrencies: [...mockPublicCurrencies, ...mockAdditionalCurrencies],
-  publicTickers: mockPublicTickers,
-  publicOrderBook: mockPublicOrderBook,
-  publicTrades: mockPublicTrades,
-  publicKLines: mockPublicKLines,
-  publicMemberLevels: mockPublicMemberLevels,
-  publicFeeGroups: mockPublicFeeGroups,
-  publicFees: mockPublicFees,
-  
-  // Notifications
-  notifications: mockNotifications,
-  notificationSettings: mockNotificationSettings,
-  
-  // Activities
-  userActivities: mockUserActivities,
-  
-  // Referrals
-  referrals: mockReferrals,
-  
-  // Legacy
-  users: mockUsers,
-  markets: mockMarkets,
-  wallets: mockWallets,
-  orders: mockOrders,
-  trades: mockTrades,
-  orderBook: mockOrderBook,
+  // Empty for now to avoid import issues
 };

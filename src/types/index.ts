@@ -90,7 +90,7 @@ export interface Ticker {
 
 // ===== ORDER TYPES =====
 
-export interface Order extends BaseEntity {
+export interface Order {
   id: number;
   uuid: string;
   side: OrderSide;
@@ -104,13 +104,15 @@ export interface Order extends BaseEntity {
   executed_volume: string;
   trades_count: number;
   trades: Trade[];
+  created_at: string;
+  updated_at: string;
 }
 
 export type OrderSide = 'buy' | 'sell';
 export type OrderType = 'limit' | 'market' | 'stop' | 'stop_limit';
 export type OrderState = 'wait' | 'done' | 'cancel' | 'reject';
 
-export interface Trade extends BaseEntity {
+export interface Trade {
   id: number;
   price: string;
   amount: string;
@@ -120,6 +122,8 @@ export interface Trade extends BaseEntity {
   market: string;
   side: OrderSide;
   order_id: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // ===== WALLET & BALANCE TYPES =====
@@ -413,7 +417,7 @@ export interface AppConfig {
 // ===== REDUX TYPES =====
 
 export interface RootState {
-  user: UserState;
+  user: UserStateInterface;
   markets: MarketsState;
   orders: OrdersState;
   wallets: WalletsState;
@@ -422,7 +426,7 @@ export interface RootState {
   ranger: RangerState;
 }
 
-export interface UserState {
+export interface UserStateInterface {
   user: User | null;
   isLoggedIn: boolean;
   loading: boolean;

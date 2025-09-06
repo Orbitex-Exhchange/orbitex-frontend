@@ -29,12 +29,41 @@ const RESOURCE_ENDPOINTS = {
 const mockApi = {
   getUserProfile: async (): Promise<UserProfile> => {
     await new Promise(resolve => setTimeout(resolve, 500));
-    return mockUserProfiles[0];
+    const profile = mockUserProfiles[0];
+    if (!profile) {
+      throw new Error('User profile not found');
+    }
+    return profile;
   },
 
   updateUserProfile: async (data: Partial<UserProfile>): Promise<UserProfile> => {
     await new Promise(resolve => setTimeout(resolve, 500));
-    return { ...mockUserProfiles[0], ...data };
+    
+    const currentProfile = mockUserProfiles[0];
+    if (!currentProfile) {
+      throw new Error('User profile not found');
+    }
+
+    const updatedProfile = { ...currentProfile, ...data, updated_at: new Date().toISOString() };
+    
+    // Ensure all required properties are present
+    return {
+      id: updatedProfile.id || currentProfile.id,
+      email: updatedProfile.email || currentProfile.email,
+      username: updatedProfile.username || currentProfile.username,
+      profile: updatedProfile.profile || currentProfile.profile,
+      documents: updatedProfile.documents || currentProfile.documents,
+      labels: updatedProfile.labels || currentProfile.labels,
+      phones: updatedProfile.phones || currentProfile.phones,
+      created_at: updatedProfile.created_at || currentProfile.created_at,
+      updated_at: updatedProfile.updated_at,
+      state: updatedProfile.state || currentProfile.state,
+      referral_id: updatedProfile.referral_id || currentProfile.referral_id,
+      level: updatedProfile.level || currentProfile.level,
+      otp: updatedProfile.otp ?? currentProfile.otp,
+      role: updatedProfile.role || currentProfile.role,
+      data: updatedProfile.data || currentProfile.data,
+    };
   },
 
   getApiKeys: async (): Promise<ApiKey[]> => {
@@ -164,7 +193,17 @@ const mockApi = {
     phone?: string;
   }): Promise<UserProfile> => {
     await new Promise(resolve => setTimeout(resolve, 500));
-    return { ...mockUserProfiles[0], profile: { ...mockUserProfiles[0].profile, ...data } };
+    
+    const currentProfile = mockUserProfiles[0];
+    if (!currentProfile) {
+      throw new Error('User profile not found');
+    }
+
+    return {
+      ...currentProfile,
+      profile: { ...currentProfile.profile, ...data },
+      updated_at: new Date().toISOString(),
+    };
   },
 
   changePassword: async (data: {

@@ -144,7 +144,7 @@ const mockApi = {
       id: Date.now().toString(),
       currency: data.currency,
       name: data.name,
-      description: data.description,
+      description: data.description || '',
       data: data.data,
       state: 'pending',
       created_at: new Date().toISOString(),

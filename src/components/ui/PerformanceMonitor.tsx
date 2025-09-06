@@ -23,7 +23,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     enableMemoryTracking: true,
   });
 
-  const { performance: tradingPerformance } = useTradingStore();
+  // const { performance: tradingPerformance } = useTradingStore();
 
   const positionClasses = {
     'top-left': 'top-4 left-4',
@@ -115,15 +115,14 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
                 <span className="text-sm font-mono">{metrics.updateCount}</span>
               </div>
 
-              {/* Trading Performance */}
-              <div className="flex items-center justify-between">
+              {/* Trading Performance - Disabled for now */}
+              {/* <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Trading FPS</span>
                 <span className="text-sm font-mono">
                   {tradingPerformance.fps}
                 </span>
               </div>
 
-              {/* Trading Latency */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Trading Latency</span>
                 <span className="text-sm font-mono">
@@ -131,13 +130,12 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
                 </span>
               </div>
 
-              {/* Order Count */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Orders</span>
                 <span className="text-sm font-mono">
                   {tradingPerformance.orderCount}
                 </span>
-              </div>
+              </div> */}
 
               {/* Last Update */}
               <div className="flex items-center justify-between">

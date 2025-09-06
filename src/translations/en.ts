@@ -1,4 +1,3 @@
-import { en as customTranslations } from '../custom/translations/en';
 import { nationalitiesNames } from './nationalities';
 
 export const en = {
@@ -642,5 +641,4 @@ export const en = {
     'server.internal_error': 'Internal Server Error',
 
     ...nationalitiesNames,
-    ...customTranslations,
 };

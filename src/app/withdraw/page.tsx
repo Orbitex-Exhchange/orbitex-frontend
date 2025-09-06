@@ -93,7 +93,6 @@ export default function WithdrawPage() {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
-        variant: "destructive"
       });
       return;
     }
@@ -103,7 +102,6 @@ export default function WithdrawPage() {
       toast({
         title: "Amount Too Low",
         description: `Minimum withdrawal amount is ${minWithdraw} ${form.currency}`,
-        variant: "destructive"
       });
       return;
     }
@@ -112,7 +110,6 @@ export default function WithdrawPage() {
       toast({
         title: "Amount Too High",
         description: `Maximum withdrawal amount is ${maxWithdraw} ${form.currency}`,
-        variant: "destructive"
       });
       return;
     }
@@ -138,7 +135,6 @@ export default function WithdrawPage() {
       toast({
         title: "Withdrawal Failed",
         description: "Failed to submit withdrawal. Please try again.",
-        variant: "destructive"
       });
     } finally {
       setIsLoading(false);

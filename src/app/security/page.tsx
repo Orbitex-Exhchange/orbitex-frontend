@@ -111,7 +111,6 @@ export default function SecurityPage() {
       toast({
         title: "Password Mismatch",
         description: "New password and confirm password do not match.",
-        variant: "destructive"
       });
       return;
     }
@@ -120,7 +119,6 @@ export default function SecurityPage() {
       toast({
         title: "Weak Password",
         description: "Password must be at least 8 characters long.",
-        variant: "destructive"
       });
       return;
     }
@@ -140,7 +138,6 @@ export default function SecurityPage() {
       toast({
         title: "Error",
         description: "Failed to change password. Please try again.",
-        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
@@ -161,7 +158,6 @@ export default function SecurityPage() {
       toast({
         title: "Error",
         description: "Failed to enable two-factor authentication.",
-        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
@@ -173,7 +169,6 @@ export default function SecurityPage() {
       toast({
         title: "Phone Number Required",
         description: "Please enter your phone number.",
-        variant: "destructive"
       });
       return;
     }
@@ -190,7 +185,6 @@ export default function SecurityPage() {
       toast({
         title: "Error",
         description: "Failed to send verification code.",
-        variant: "destructive"
       });
     } finally {
       setIsVerifying(false);

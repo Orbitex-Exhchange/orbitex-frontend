@@ -77,6 +77,7 @@ class AuthAPI {
   private baseURL: string;
 
   constructor() {
+    // Orbisigner v2 identity base
     this.baseURL = env.NEXT_PUBLIC_AUTH_SERVICE_URL;
   }
 
@@ -111,7 +112,8 @@ class AuthAPI {
 
   // Register a new user
   async register(data: RegisterRequest): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/register', {
+    // POST /api/v2/identity/users
+    return this.request<AuthResponse>('/users', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -119,7 +121,8 @@ class AuthAPI {
 
   // Login user
   async login(data: LoginRequest): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/login', {
+    // POST /api/v2/identity/sessions
+    return this.request<AuthResponse>('/sessions', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -127,7 +130,8 @@ class AuthAPI {
 
   // Verify email
   async verifyEmail(data: VerifyEmailRequest): Promise<{ message: string; success: boolean }> {
-    return this.request<{ message: string; success: boolean }>('/auth/verify-email', {
+    // Not implemented in Orbisigner; placeholder path if added later
+    return this.request<{ message: string; success: boolean }>('/users/verify-email', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -135,7 +139,7 @@ class AuthAPI {
 
   // Resend verification email
   async resendVerification(data: ResendVerificationRequest): Promise<{ message: string; success: boolean }> {
-    return this.request<{ message: string; success: boolean }>('/auth/resend-verification', {
+    return this.request<{ message: string; success: boolean }>('/users/resend-verification', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -143,7 +147,7 @@ class AuthAPI {
 
   // Forgot password
   async forgotPassword(data: ForgotPasswordRequest): Promise<{ message: string; success: boolean }> {
-    return this.request<{ message: string; success: boolean }>('/auth/forgot-password', {
+    return this.request<{ message: string; success: boolean }>('/passwords/forgot', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -151,7 +155,7 @@ class AuthAPI {
 
   // Reset password
   async resetPassword(data: ResetPasswordRequest): Promise<{ message: string; success: boolean }> {
-    return this.request<{ message: string; success: boolean }>('/auth/reset-password', {
+    return this.request<{ message: string; success: boolean }>('/passwords/reset', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -159,7 +163,7 @@ class AuthAPI {
 
   // Change password (requires authentication)
   async changePassword(data: ChangePasswordRequest, token: string): Promise<{ message: string; success: boolean }> {
-    return this.request<{ message: string; success: boolean }>('/auth/change-password', {
+    return this.request<{ message: string; success: boolean }>('/passwords/change', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -170,7 +174,7 @@ class AuthAPI {
 
   // Setup two-factor authentication
   async setupTwoFactor(data: TwoFactorSetupRequest, token: string): Promise<{ message: string; success: boolean }> {
-    return this.request<{ message: string; success: boolean }>('/auth/2fa/setup', {
+    return this.request<{ message: string; success: boolean }>('/otp/enable', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -181,7 +185,7 @@ class AuthAPI {
 
   // Verify two-factor authentication
   async verifyTwoFactor(data: TwoFactorVerifyRequest, token: string): Promise<{ message: string; success: boolean }> {
-    return this.request<{ message: string; success: boolean }>('/auth/2fa/verify', {
+    return this.request<{ message: string; success: boolean }>('/otp/verify', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -192,7 +196,7 @@ class AuthAPI {
 
   // Get user profile (requires authentication)
   async getProfile(token: string): Promise<User> {
-    return this.request<User>('/auth/profile', {
+    return this.request<User>('/users/me', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -202,7 +206,7 @@ class AuthAPI {
 
   // Update user profile (requires authentication)
   async updateProfile(data: Partial<User>, token: string): Promise<User> {
-    return this.request<User>('/auth/profile', {
+    return this.request<User>('/users/me', {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -213,7 +217,8 @@ class AuthAPI {
 
   // Refresh token
   async refreshToken(refreshToken: string): Promise<AuthTokens> {
-    return this.request<AuthTokens>('/auth/refresh', {
+    // Not implemented; keep interface
+    return this.request<AuthTokens>('/sessions/refresh', {
       method: 'POST',
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
@@ -221,7 +226,7 @@ class AuthAPI {
 
   // Logout (requires authentication)
   async logout(token: string): Promise<{ message: string; success: boolean }> {
-    return this.request<{ message: string; success: boolean }>('/auth/logout', {
+    return this.request<{ message: string; success: boolean }>('/sessions/logout', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -240,18 +245,4 @@ class AuthAPI {
 // Export singleton instance
 export const authAPI = new AuthAPI();
 
-// Export types
-export type {
-  User,
-  AuthTokens,
-  RegisterRequest,
-  LoginRequest,
-  AuthResponse,
-  VerifyEmailRequest,
-  ResendVerificationRequest,
-  ForgotPasswordRequest,
-  ResetPasswordRequest,
-  ChangePasswordRequest,
-  TwoFactorSetupRequest,
-  TwoFactorVerifyRequest,
-};
+// All types are already exported as interfaces above

@@ -16,12 +16,20 @@ const mockApi = {
   getProfile: async (): Promise<User> => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500));
-    return mockUsers[0];
+    const user = mockUsers[0];
+    if (!user) {
+      throw new Error('User not found');
+    }
+    return user;
   },
   
   updateProfile: async (data: Partial<User>): Promise<User> => {
     await new Promise(resolve => setTimeout(resolve, 500));
-    return { ...mockUsers[0], ...data };
+    const currentUser = mockUsers[0];
+    if (!currentUser) {
+      throw new Error('User not found');
+    }
+    return { ...currentUser, ...data };
   },
   
   uploadDocument: async (file: File, label: string): Promise<{ upload: string }> => {

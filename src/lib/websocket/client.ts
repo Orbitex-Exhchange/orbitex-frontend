@@ -6,9 +6,6 @@ export interface WebSocketConfig {
   url: string;
   reconnectInterval: number;
   maxReconnectAttempts: number;
-  heartbeatInterval: number;
-  heartbeatTimeout: number;
-  messageQueueSize: number;
   enableLogging: boolean;
 }
 
@@ -16,140 +13,7 @@ export interface WebSocketConnection {
   connected: boolean;
   connecting: boolean;
   reconnectAttempts: number;
-  lastHeartbeat: number;
   subscriptions: string[];
-}
-
-export interface WebSocketMessage {
-  event: string;
-  data: any;
-  timestamp: number;
-}
-
-// ===== MESSAGE QUEUE FOR HIGH-FREQUENCY TRADING =====
-
-interface QueuedMessage {
-  id: string;
-  message: any;
-  priority: number;
-  timestamp: number;
-  retries: number;
-  maxRetries: number;
-}
-
-class MessageQueue {
-  private queue: QueuedMessage[] = [];
-  private processing = false;
-  private readonly maxSize: number;
-  private readonly maxRetries: number;
-
-  constructor(maxSize: number = 1000, maxRetries: number = 3) {
-    this.maxSize = maxSize;
-    this.maxRetries = maxRetries;
-  }
-
-  add(message: any, priority: number = 1, maxRetries?: number): string {
-    const id = this.generateId();
-    
-    if (this.queue.length >= this.maxSize) {
-      // Remove lowest priority message
-      this.queue.sort((a, b) => b.priority - a.priority);
-      this.queue.pop();
-    }
-
-    this.queue.push({
-      id,
-      message,
-      priority,
-      timestamp: Date.now(),
-      retries: 0,
-      maxRetries: maxRetries || this.maxRetries,
-    });
-
-    this.queue.sort((a, b) => b.priority - a.priority);
-    return id;
-  }
-
-  getNext(): QueuedMessage | null {
-    return this.queue.shift() || null;
-  }
-
-  remove(id: string): void {
-    const index = this.queue.findIndex(item => item.id === id);
-    if (index !== -1) {
-      this.queue.splice(index, 1);
-    }
-  }
-
-  clear(): void {
-    this.queue = [];
-  }
-
-  size(): number {
-    return this.queue.length;
-  }
-
-  private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-}
-
-// ===== HEARTBEAT MANAGER =====
-
-class HeartbeatManager {
-  private heartbeatInterval: number;
-  private heartbeatTimeout: number;
-  private lastHeartbeat: number = 0;
-  private heartbeatTimer?: NodeJS.Timeout;
-  private timeoutTimer?: NodeJS.Timeout;
-  private onHeartbeat?: () => void;
-  private onTimeout?: () => void;
-
-  constructor(interval: number = 30000, timeout: number = 10000) {
-    this.heartbeatInterval = interval;
-    this.heartbeatTimeout = timeout;
-  }
-
-  start(onHeartbeat: () => void, onTimeout: () => void): void {
-    this.onHeartbeat = onHeartbeat;
-    this.onTimeout = onTimeout;
-    this.scheduleHeartbeat();
-  }
-
-  stop(): void {
-    if (this.heartbeatTimer) {
-      clearTimeout(this.heartbeatTimer);
-      this.heartbeatTimer = undefined;
-    }
-    if (this.timeoutTimer) {
-      clearTimeout(this.timeoutTimer);
-      this.timeoutTimer = undefined;
-    }
-  }
-
-  received(): void {
-    this.lastHeartbeat = Date.now();
-    if (this.timeoutTimer) {
-      clearTimeout(this.timeoutTimer);
-      this.timeoutTimer = undefined;
-    }
-  }
-
-  private scheduleHeartbeat(): void {
-    this.heartbeatTimer = setTimeout(() => {
-      this.sendHeartbeat();
-      this.scheduleHeartbeat();
-    }, this.heartbeatInterval);
-  }
-
-  private sendHeartbeat(): void {
-    this.onHeartbeat?.();
-    
-    // Set timeout for heartbeat response
-    this.timeoutTimer = setTimeout(() => {
-      this.onTimeout?.();
-    }, this.heartbeatTimeout);
-  }
 }
 
 // ===== MAIN WEBSOCKET CLIENT =====
@@ -158,9 +22,7 @@ export class WebSocketClient {
   private ws: WebSocket | null = null;
   private config: WebSocketConfig;
   private connection: WebSocketConnection;
-  private messageQueue: MessageQueue;
-  private heartbeatManager: HeartbeatManager;
-  private reconnectTimer?: NodeJS.Timeout;
+  private reconnectTimer: NodeJS.Timeout | null = null;
   private eventListeners = new Map<string, Set<(data: any) => void>>();
   private messageListeners = new Set<(message: WebSocketMessage) => void>();
   private connectionListeners = new Set<(connected: boolean) => void>();
@@ -170,9 +32,6 @@ export class WebSocketClient {
       url: 'ws://localhost:3001/ws',
       reconnectInterval: 5000,
       maxReconnectAttempts: 10,
-      heartbeatInterval: 30000,
-      heartbeatTimeout: 10000,
-      messageQueueSize: 1000,
       enableLogging: process.env.NODE_ENV === 'development',
       ...config,
     };
@@ -181,15 +40,8 @@ export class WebSocketClient {
       connected: false,
       connecting: false,
       reconnectAttempts: 0,
-      lastHeartbeat: 0,
       subscriptions: [],
     };
-
-    this.messageQueue = new MessageQueue(this.config.messageQueueSize);
-    this.heartbeatManager = new HeartbeatManager(
-      this.config.heartbeatInterval,
-      this.config.heartbeatTimeout
-    );
   }
 
   // ===== CONNECTION MANAGEMENT =====
@@ -217,137 +69,24 @@ export class WebSocketClient {
   disconnect(): void {
     this.log('Disconnecting from WebSocket');
     
-    this.heartbeatManager.stop();
-    this.messageQueue.clear();
-    
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = undefined;
+      this.reconnectTimer = null;
     }
 
     if (this.ws) {
-      this.ws.close(1000, 'Client disconnect');
+      this.ws.close();
       this.ws = null;
     }
 
     this.connection.connected = false;
     this.connection.connecting = false;
-    this.connection.reconnectAttempts = 0;
-    
-    this.notifyConnectionChange(false);
+    this.notifyConnectionListeners(false);
   }
 
-  // ===== MESSAGE SENDING =====
+  // ===== EVENT HANDLERS =====
 
-  send(message: any, priority: number = 1): string {
-    if (!this.connection.connected) {
-      return this.messageQueue.add(message, priority);
-    }
-
-    try {
-      const messageStr = JSON.stringify(message);
-      this.ws!.send(messageStr);
-      this.log('Message sent', { message, priority });
-      return 'sent';
-    } catch (error) {
-      this.log('Failed to send message', { error, message });
-      return this.messageQueue.add(message, priority);
-    }
-  }
-
-  subscribe(channel: string, params?: any): void {
-    const message = {
-      event: 'subscribe',
-      channel,
-      ...params,
-    };
-
-    this.send(message, 2); // High priority for subscriptions
-    this.connection.subscriptions.push(channel);
-  }
-
-  unsubscribe(channel: string): void {
-    const message = {
-      event: 'unsubscribe',
-      channel,
-    };
-
-    this.send(message, 2);
-    this.connection.subscriptions = this.connection.subscriptions.filter(
-      sub => sub !== channel
-    );
-  }
-
-  // ===== EVENT LISTENERS =====
-
-  on(event: string, callback: (data: any) => void): void {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, new Set());
-    }
-    this.eventListeners.get(event)!.add(callback);
-  }
-
-  off(event: string, callback: (data: any) => void): void {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      listeners.delete(callback);
-    }
-  }
-
-  onMessage(callback: (message: WebSocketMessage) => void): void {
-    this.messageListeners.add(callback);
-  }
-
-  onConnection(callback: (connected: boolean) => void): void {
-    this.connectionListeners.add(callback);
-  }
-
-  // ===== TRADING-SPECIFIC METHODS =====
-
-  subscribeToTicker(market: string): void {
-    this.subscribe('ticker', { market });
-  }
-
-  subscribeToOrderBook(market: string): void {
-    this.subscribe('orderbook', { market });
-  }
-
-  subscribeToTrades(market: string): void {
-    this.subscribe('trades', { market });
-  }
-
-  subscribeToKlines(market: string, interval: string): void {
-    this.subscribe('klines', { market, interval });
-  }
-
-  subscribeToOrders(): void {
-    this.subscribe('orders');
-  }
-
-  subscribeToWallets(): void {
-    this.subscribe('wallets');
-  }
-
-  // ===== UTILITY METHODS =====
-
-  isConnected(): boolean {
-    return this.connection.connected;
-  }
-
-  getConnectionState(): WebSocketConnection {
-    return { ...this.connection };
-  }
-
-  getQueueSize(): number {
-    return this.messageQueue.size();
-  }
-
-  // ===== PRIVATE METHODS =====
-
-  private setupEventHandlers(
-    resolve: () => void,
-    reject: (error: any) => void
-  ): void {
+  private setupEventHandlers(resolve: () => void, reject: (error: any) => void): void {
     if (!this.ws) return;
 
     this.ws.onopen = () => {
@@ -355,17 +94,7 @@ export class WebSocketClient {
       this.connection.connected = true;
       this.connection.connecting = false;
       this.connection.reconnectAttempts = 0;
-      this.connection.lastHeartbeat = Date.now();
-      
-      this.heartbeatManager.start(
-        () => this.sendHeartbeat(),
-        () => this.handleHeartbeatTimeout()
-      );
-
-      this.processQueuedMessages();
-      this.resubscribe();
-      
-      this.notifyConnectionChange(true);
+      this.notifyConnectionListeners(true);
       resolve();
     };
 
@@ -373,121 +102,131 @@ export class WebSocketClient {
       this.log('WebSocket disconnected', { code: event.code, reason: event.reason });
       this.connection.connected = false;
       this.connection.connecting = false;
+      this.notifyConnectionListeners(false);
       
-      this.heartbeatManager.stop();
-      this.notifyConnectionChange(false);
-
-      if (event.code !== 1000) { // Not a normal closure
+      if (event.code !== 1000) {
         this.scheduleReconnect();
       }
     };
 
     this.ws.onerror = (error) => {
       this.log('WebSocket error', { error });
+      this.connection.connecting = false;
       reject(error);
     };
 
     this.ws.onmessage = (event) => {
-      this.handleMessage(event.data);
+      try {
+        const message = JSON.parse(event.data);
+        this.handleMessage(message);
+      } catch (error) {
+        this.log('Failed to parse message', { error, data: event.data });
+      }
     };
   }
 
-  private handleMessage(data: string): void {
-    try {
-      const message: WebSocketMessage = JSON.parse(data);
-      message.timestamp = Date.now();
+  // ===== MESSAGE HANDLING =====
 
-      this.log('Message received', { message });
+  private handleMessage(message: any): void {
+    this.log('Received message', { message });
 
-      // Handle heartbeat
-      if (message.event === 'pong') {
-        this.heartbeatManager.received();
-        return;
+    // Notify message listeners
+    this.messageListeners.forEach(listener => {
+      try {
+        listener(message);
+      } catch (error) {
+        this.log('Error in message listener', { error });
       }
+    });
 
-      // Notify message listeners
-      this.messageListeners.forEach(callback => {
-        try {
-          callback(message);
-        } catch (error) {
-          this.log('Error in message listener', { error, message });
-        }
-      });
-
-      // Notify event listeners
+    // Handle specific event types
+    if (message.event) {
       const listeners = this.eventListeners.get(message.event);
       if (listeners) {
-        listeners.forEach(callback => {
+        listeners.forEach(listener => {
           try {
-            callback(message.data);
+            listener(message.data);
           } catch (error) {
-            this.log('Error in event listener', { error, message });
+            this.log('Error in event listener', { error, event: message.event });
           }
         });
       }
+    }
+  }
 
-      // Handle specific trading events
-      this.handleTradingEvent(message);
+  // ===== MESSAGE SENDING =====
 
+  send(message: any): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.log('WebSocket not connected, cannot send message');
+      return;
+    }
+
+    try {
+      const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+      this.ws.send(messageStr);
+      this.log('Sent message', { message });
     } catch (error) {
-      this.log('Failed to parse message', { error, data });
+      this.log('Failed to send message', { error, message });
     }
   }
 
-  private handleTradingEvent(message: WebSocketMessage): void {
-    switch (message.event) {
-      case 'ticker':
-        this.handleTickerEvent(message.data as TickerEvent);
-        break;
-      case 'order':
-        this.handleOrderEvent(message.data as OrderEvent);
-        break;
-      case 'trade':
-        this.handleTradeEvent(message.data as TradeEvent);
-        break;
-      case 'orderbook':
-        this.handleOrderBookUpdate(message.data);
-        break;
-      case 'klines':
-        this.handleKlinesUpdate(message.data);
-        break;
+  // ===== SUBSCRIPTION MANAGEMENT =====
+
+  subscribe(channel: string, params?: any): void {
+    const message = {
+      event: 'subscribe',
+      stream: channel,
+      ...params,
+    };
+
+    this.send(message);
+    this.connection.subscriptions.push(channel);
+  }
+
+  unsubscribe(channel: string): void {
+    const message = {
+      event: 'unsubscribe',
+      stream: channel,
+    };
+
+    this.send(message);
+    this.connection.subscriptions = this.connection.subscriptions.filter(s => s !== channel);
+  }
+
+  // ===== EVENT LISTENERS =====
+
+  on(event: string, listener: (data: any) => void): void {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, new Set());
+    }
+    this.eventListeners.get(event)!.add(listener);
+  }
+
+  off(event: string, listener: (data: any) => void): void {
+    const listeners = this.eventListeners.get(event);
+    if (listeners) {
+      listeners.delete(listener);
     }
   }
 
-  private handleTickerEvent(data: TickerEvent): void {
-    // Handle ticker updates
-    this.log('Ticker update', { data });
+  onMessage(listener: (message: WebSocketMessage) => void): void {
+    this.messageListeners.add(listener);
   }
 
-  private handleOrderEvent(data: OrderEvent): void {
-    // Handle order updates
-    this.log('Order update', { data });
+  offMessage(listener: (message: WebSocketMessage) => void): void {
+    this.messageListeners.delete(listener);
   }
 
-  private handleTradeEvent(data: TradeEvent): void {
-    // Handle trade updates
-    this.log('Trade update', { data });
+  onConnection(listener: (connected: boolean) => void): void {
+    this.connectionListeners.add(listener);
   }
 
-  private handleOrderBookUpdate(data: any): void {
-    // Handle order book updates
-    this.log('Order book update', { data });
+  offConnection(listener: (connected: boolean) => void): void {
+    this.connectionListeners.delete(listener);
   }
 
-  private handleKlinesUpdate(data: any): void {
-    // Handle k-lines updates
-    this.log('K-lines update', { data });
-  }
-
-  private sendHeartbeat(): void {
-    this.send({ event: 'ping' }, 3); // Highest priority
-  }
-
-  private handleHeartbeatTimeout(): void {
-    this.log('Heartbeat timeout, reconnecting');
-    this.disconnect();
-    this.scheduleReconnect();
-  }
+  // ===== RECONNECTION =====
 
   private scheduleReconnect(): void {
     if (this.connection.reconnectAttempts >= this.config.maxReconnectAttempts) {
@@ -511,32 +250,12 @@ export class WebSocketClient {
     }, delay);
   }
 
-  private processQueuedMessages(): void {
-    while (this.messageQueue.size() > 0) {
-      const queuedMessage = this.messageQueue.getNext();
-      if (!queuedMessage) break;
+  // ===== UTILITY METHODS =====
 
+  private notifyConnectionListeners(connected: boolean): void {
+    this.connectionListeners.forEach(listener => {
       try {
-        this.send(queuedMessage.message, queuedMessage.priority);
-      } catch (error) {
-        if (queuedMessage.retries < queuedMessage.maxRetries) {
-          queuedMessage.retries++;
-          this.messageQueue.add(queuedMessage.message, queuedMessage.priority, queuedMessage.maxRetries);
-        }
-      }
-    }
-  }
-
-  private resubscribe(): void {
-    this.connection.subscriptions.forEach(channel => {
-      this.subscribe(channel);
-    });
-  }
-
-  private notifyConnectionChange(connected: boolean): void {
-    this.connectionListeners.forEach(callback => {
-      try {
-        callback(connected);
+        listener(connected);
       } catch (error) {
         this.log('Error in connection listener', { error });
       }
@@ -548,50 +267,46 @@ export class WebSocketClient {
       console.log(`[WebSocket] ${message}`, data);
     }
   }
-}
 
-// ===== SPECIALIZED TRADING WEBSOCKET CLIENT =====
+  // ===== STATUS =====
 
-export class TradingWebSocketClient extends WebSocketClient {
-  constructor() {
-    super({
-      url: 'ws://localhost:3001/ws/trading',
-      reconnectInterval: 1000, // Faster reconnection for trading
-      maxReconnectAttempts: 20, // More attempts for trading
-      heartbeatInterval: 15000, // More frequent heartbeat for trading
-      heartbeatTimeout: 5000, // Shorter timeout for trading
-      messageQueueSize: 5000, // Larger queue for high-frequency trading
-    });
+  isConnected(): boolean {
+    return this.connection.connected;
   }
 
-  // Trading-specific methods
-  subscribeToMarketData(market: string): void {
-    this.subscribeToTicker(market);
-    this.subscribeToOrderBook(market);
-    this.subscribeToTrades(market);
+  isConnecting(): boolean {
+    return this.connection.connecting;
   }
 
-  subscribeToUserData(): void {
-    this.subscribeToOrders();
-    this.subscribeToWallets();
+  getSubscriptions(): string[] {
+    return [...this.connection.subscriptions];
   }
 
-  sendOrder(orderData: any): void {
-    this.send({
-      event: 'order',
-      data: orderData,
-    }, 3); // Highest priority for orders
-  }
-
-  cancelOrder(orderId: number): void {
-    this.send({
-      event: 'cancel_order',
-      data: { order_id: orderId },
-    }, 3); // Highest priority for cancellations
+  getConnectionStatus(): WebSocketConnection {
+    return { ...this.connection };
   }
 }
 
-// ===== SINGLETON INSTANCES =====
+// ===== SINGLETON INSTANCE =====
 
-export const wsClient = new WebSocketClient();
-export const tradingWsClient = new TradingWebSocketClient();
+export const websocketClient = new WebSocketClient();
+
+// ===== CONVENIENCE EXPORTS =====
+
+export const ws = {
+  connect: () => websocketClient.connect(),
+  disconnect: () => websocketClient.disconnect(),
+  send: (message: any) => websocketClient.send(message),
+  subscribe: (channel: string, params?: any) => websocketClient.subscribe(channel, params),
+  unsubscribe: (channel: string) => websocketClient.unsubscribe(channel),
+  on: (event: string, listener: (data: any) => void) => websocketClient.on(event, listener),
+  off: (event: string, listener: (data: any) => void) => websocketClient.off(event, listener),
+  onMessage: (listener: (message: WebSocketMessage) => void) => websocketClient.onMessage(listener),
+  offMessage: (listener: (message: WebSocketMessage) => void) => websocketClient.offMessage(listener),
+  onConnection: (listener: (connected: boolean) => void) => websocketClient.onConnection(listener),
+  offConnection: (listener: (connected: boolean) => void) => websocketClient.offConnection(listener),
+  isConnected: () => websocketClient.isConnected(),
+  isConnecting: () => websocketClient.isConnecting(),
+  getSubscriptions: () => websocketClient.getSubscriptions(),
+  getConnectionStatus: () => websocketClient.getConnectionStatus(),
+};
