@@ -23,6 +23,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { cn, formatNumber } from '../../lib/utils';
+import { env } from '@/lib/env';
 
 interface OrderBookProps {
   market: string;
@@ -91,7 +92,9 @@ export const EnhancedOrderBook = React.memo(({
 
   // Generate mock order book data if no real data
   const processedOrderBookData = useMemo(() => {
-    if (orderBookData) {
+    console.log('Processing order book data:', { orderBookData, hasData: !!orderBookData });
+    if (orderBookData && (orderBookData.bids.length > 0 || orderBookData.asks.length > 0)) {
+      console.log('Using real order book data:', orderBookData);
       return orderBookData;
     }
 
@@ -176,19 +179,19 @@ export const EnhancedOrderBook = React.memo(({
     return trades.sort((a, b) => b.timestamp - a.timestamp);
   }, [recentTrades, lastPrice]);
 
-  // Virtualization for asks (sell orders)
-  const asksVirtualizer = useVirtualizer({
-    count: Math.min(processedOrderBookData.asks.length, Math.ceil(orderBookSettings.depth / 2)),
-    getScrollElement: () => orderBookParentRef.current,
-    estimateSize: () => 32, // Estimated row height
-    overscan: 5,
-  });
-
-  // Virtualization for bids (buy orders)
+  // Virtualization for bids (buy orders) - TOP of panel
   const bidsVirtualizer = useVirtualizer({
     count: Math.min(processedOrderBookData.bids.length, Math.ceil(orderBookSettings.depth / 2)),
     getScrollElement: () => orderBookParentRef.current,
-    estimateSize: () => 32, // Estimated row height
+    estimateSize: () => 32,
+    overscan: 5,
+  });
+
+  // Virtualization for asks (sell orders) - BOTTOM of panel
+  const asksVirtualizer = useVirtualizer({
+    count: Math.min(processedOrderBookData.asks.length, Math.ceil(orderBookSettings.depth / 2)),
+    getScrollElement: () => orderBookParentRef.current,
+    estimateSize: () => 32,
     overscan: 5,
   });
 
@@ -228,6 +231,103 @@ export const EnhancedOrderBook = React.memo(({
     websocketService.subscribeToOrderBook(market, () => {});
     websocketService.subscribeToTrades(market, () => {});
   }, [market, websocketService]);
+
+  // Fetch order book from Orbitex v2 REST (public)
+  useEffect(() => {
+    const apiBase = env.NEXT_PUBLIC_API_URL;
+    const symbol = (market || '').replace('-', '').toLowerCase();
+    console.log('Order book effect triggered:', { market, symbol, apiBase });
+    if (!symbol) return;
+
+    const fetchOrderBook = async () => {
+      try {
+        const limit = Math.max(orderBookSettings.depth, 20);
+        const url = `${apiBase}/api/v2/public/markets/${symbol}/order-book?limit=${limit}`;
+        console.log('Fetching order book from:', url);
+        
+        const res = await fetch(url);
+        if (!res.ok) {
+          console.error('Order book request failed:', res.status, res.statusText);
+          throw new Error('order-book request failed');
+        }
+        
+        const data = await res.json();
+        console.log('Order book data received:', data);
+        
+        // Check if data is inverted (bids higher than asks)
+        const rawAsks = data.asks || [];
+        const rawBids = data.bids || [];
+        
+        // If bids are higher than asks, they might be swapped
+        const firstBidPrice = rawBids[0] ? parseFloat(rawBids[0][0]) : 0;
+        const firstAskPrice = rawAsks[0] ? parseFloat(rawAsks[0][0]) : 0;
+        
+        let asksRaw: [string, string][];
+        let bidsRaw: [string, string][];
+        
+        if (firstBidPrice > firstAskPrice && firstBidPrice > 0 && firstAskPrice > 0) {
+          console.log('Data appears inverted, swapping bids and asks');
+          asksRaw = rawBids;
+          bidsRaw = rawAsks;
+        } else {
+          asksRaw = rawAsks;
+          bidsRaw = rawBids;
+        }
+
+        let runningAsks = 0;
+        let runningBids = 0;
+        let asks = asksRaw.map(([p, a]) => {
+          const price = parseFloat(p);
+          const size = parseFloat(a);
+          runningAsks += size;
+          return { price, size, total: runningAsks, percentage: 0 } as OrderBookEntry;
+        });
+        let bids = bidsRaw.map(([p, a]) => {
+          const price = parseFloat(p);
+          const size = parseFloat(a);
+          runningBids += size;
+          return { price, size, total: runningBids, percentage: 0 } as OrderBookEntry;
+        });
+
+        // Sort: bids descending by price (highest first); asks ascending by price (lowest first)
+        bids = bids.sort((a, b) => b.price - a.price);
+        asks = asks.sort((a, b) => a.price - b.price);
+        
+        console.log('Sorted bids (highest first):', bids.slice(0, 3));
+        console.log('Sorted asks (lowest first):', asks.slice(0, 3));
+
+        const maxTotal = Math.max(runningAsks, runningBids, 1);
+        asks.forEach(x => (x.percentage = (x.total / maxTotal) * 100));
+        bids.forEach(x => (x.percentage = (x.total / maxTotal) * 100));
+
+        const bestBid = bids[0]?.price || 0;
+        const bestAsk = asks[0]?.price || 0;
+        const spread = bestAsk && bestBid ? Math.max(0, bestAsk - bestBid) : 0;
+        const mid = bestAsk && bestBid ? (bestAsk + bestBid) / 2 : (bids[0]?.price || asks[0]?.price || lastPrice);
+        const spreadPercentage = mid ? (spread / mid) * 100 : 0;
+        setLastPrice(mid || lastPrice);
+
+        const orderBookData = {
+          // For top list we want bids (buy orders)
+          bids,
+          // For bottom list we want asks (sell orders)
+          asks,
+          spread,
+          spreadPercentage,
+        };
+
+        console.log('Setting order book data:', orderBookData);
+        useTradingStore.getState().setOrderBookData(orderBookData);
+      } catch (e) {
+        console.error('Failed to fetch order book:', e);
+        // keep mock fallback silently
+      }
+    };
+
+    fetchOrderBook();
+    const id = setInterval(fetchOrderBook, 3000);
+    return () => clearInterval(id);
+  }, [market, orderBookSettings.depth, lastPrice]);
 
   const handlePriceClick = useCallback((price: number) => {
     onPriceClick?.(price);
@@ -454,18 +554,18 @@ export const EnhancedOrderBook = React.memo(({
 
           {/* Order Book Content with Virtualization */}
           <div className="overflow-hidden flex-1 flex flex-col">
-            {/* Asks (Sell Orders) - Red - ABOVE SPREAD */}
+            {/* Bids (Buy Orders) - Green - ABOVE SPREAD */}
             <div className="flex-1 overflow-hidden border-b border-[hsl(var(--trading-border))]">
               <div className="h-full overflow-auto">
                 <div
                   style={{
-                    height: `${asksVirtualizer.getTotalSize()}px`,
+                    height: `${bidsVirtualizer.getTotalSize()}px`,
                     width: '100%',
                     position: 'relative',
                   }}
                 >
-                  {asksVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const entry = processedOrderBookData.asks[virtualRow.index];
+                  {bidsVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const entry = processedOrderBookData.bids[virtualRow.index];
                     
                     if (!entry) return null;
                     
@@ -483,7 +583,7 @@ export const EnhancedOrderBook = React.memo(({
                       >
                         <OrderRow 
                           entry={entry} 
-                          type="ask" 
+                          type="bid" 
                           index={virtualRow.index}
                         />
                       </div>
@@ -516,18 +616,18 @@ export const EnhancedOrderBook = React.memo(({
               </div>
             </div>
 
-            {/* Bids (Buy Orders) - Green - BELOW SPREAD */}
+            {/* Asks (Sell Orders) - Red - BELOW SPREAD */}
             <div className="flex-1 overflow-hidden">
               <div className="h-full overflow-auto">
                 <div
                   style={{
-                    height: `${bidsVirtualizer.getTotalSize()}px`,
+                    height: `${asksVirtualizer.getTotalSize()}px`,
                     width: '100%',
                     position: 'relative',
                   }}
                 >
-                  {bidsVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const entry = processedOrderBookData.bids[virtualRow.index];
+                  {asksVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const entry = processedOrderBookData.asks[virtualRow.index];
                     
                     if (!entry) return null;
                     
@@ -545,7 +645,7 @@ export const EnhancedOrderBook = React.memo(({
                       >
                         <OrderRow 
                           entry={entry} 
-                          type="bid" 
+                          type="ask" 
                           index={virtualRow.index}
                         />
                       </div>

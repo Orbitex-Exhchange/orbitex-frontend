@@ -26,9 +26,9 @@ export const env = createEnv({
   },
   client: {
     // API URLs
-    NEXT_PUBLIC_API_URL: z.string().url().default('https://orbitex-976099405307.us-central1.run.app'),
+    NEXT_PUBLIC_API_URL: z.string().url().default('https://orbitex-ih6wdmcn3q-uc.a.run.app'),
     // Point directly to Orbisigner v2 identity base for clean endpoint usage
-    NEXT_PUBLIC_AUTH_SERVICE_URL: z.string().url().default('https://orbisigner-976099405307.us-central1.run.app/api/v2/identity'),
+    NEXT_PUBLIC_AUTH_SERVICE_URL: z.string().url().default('https://orbisigner-ih6wdmcn3q-uc.a.run.app/api/v2/identity'),
     
     // Frontend URLs
     NEXT_PUBLIC_FRONTEND_URL: z.string().url().default('https://orbitex-frontend.vercel.app'),
