@@ -83,8 +83,8 @@ class AuthService {
 
   public async login(email: string, password: string, otpCode?: string): Promise<{ success: boolean; user: AuthUser; token: string }> {
     const { env } = await import('./env');
-    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // now Orbisigner v2 identity base
-    // Orbisigner sessions endpoint: POST /api/v2/identity/sessions
+    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // V2 identity base
+    // V2 identity sessions endpoint: POST /api/v2/identity/sessions
     const response = await fetch(`${authServiceUrl}/sessions`, {
       method: 'POST',
       headers: {
@@ -93,7 +93,7 @@ class AuthService {
       body: JSON.stringify({
         email,
         password,
-        otp: otpCode,
+        otp_code: otpCode,
       }),
     });
 
@@ -117,17 +117,17 @@ class AuthService {
       throw new Error('Invalid response from server');
     }
     
-    // Orbisigner returns { token, user: { uid, email, role, level } }
-    this.accessToken = data.token;
-    this.refreshToken = data.token;
+    // V2 identity returns { access_token, refresh_token, token_type, expires_in, user: { id, email, role, level, state } }
+    this.accessToken = data.access_token;
+    this.refreshToken = data.refresh_token;
     this.user = {
-      id: data.user.uid || data.user.id,
+      id: data.user.id,
       email: data.user.email,
       role: data.user.role || 'member',
       kyc_level: data.user.level || 0,
-      email_verified: true,
-      phone_verified: false,
-      two_factor_enabled: false,
+      email_verified: data.user.state === 'active',
+      phone_verified: false, // Would need additional API call to check
+      two_factor_enabled: data.user.otp || false,
     };
 
     // Store tokens in localStorage
@@ -144,18 +144,15 @@ class AuthService {
   }
 
   public async register(userData: {
-    first_name: string;
-    last_name: string;
     email: string;
-    phone: string;
     password: string;
-    country: string;
-    marketing_consent: boolean;
-    terms_accepted: boolean;
+    password_confirmation: string;
+    recaptcha_response?: string;
+    refid?: string;
   }): Promise<void> {
     const { env } = await import('./env');
-    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // Orbisigner v2 identity base
-    // Orbisigner users endpoint: POST /api/v2/identity/users
+    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // V2 identity base
+    // V2 identity users endpoint: POST /api/v2/identity/users
     const response = await fetch(`${authServiceUrl}/users`, {
       method: 'POST',
       headers: {
@@ -179,15 +176,16 @@ class AuthService {
 
   public async logout(): Promise<void> {
     const { env } = await import('./env');
-    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // Orbisigner v2 identity base
+    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // V2 identity base
     
     if (this.accessToken) {
       try {
-        // Orbisigner may not implement logout; clear client-side token only
+        // V2 identity sessions endpoint: DELETE /api/v2/identity/sessions
         await fetch(`${authServiceUrl}/sessions`, {
-          method: 'POST',
+          method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
           },
         });
       } catch (error) {
@@ -212,13 +210,13 @@ class AuthService {
     const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL;
     
     try {
-      // No refresh endpoint in Orbisigner v2 today; return current token if present
-      const response = await fetch(`${authServiceUrl}/sessions/health`, {
-        method: 'POST',
+      // V2 identity may not have refresh endpoint; validate current token
+      const response = await fetch(`${authServiceUrl}/ping`, {
+        method: 'GET',
         headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({}),
       });
 
       if (!response.ok) {

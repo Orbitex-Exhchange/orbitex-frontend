@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api-client';
+import { apiClient } from '../client';
+import { V2Account, ApiResponse } from '../types/v2';
 
-// Wallet interface based on the real backend response
+// Wallet interface based on the V2 API response
 export interface Wallet {
   currency: string;
   balance: string;
@@ -10,100 +11,74 @@ export interface Wallet {
   updated_at: string;
 }
 
-// Wallets API endpoints
+// Wallets API endpoints - Updated to match V2 API structure
 const WALLETS_ENDPOINTS = {
-  list: '/api/v2/peatio/account/balances',
-  deposit: '/api/v2/peatio/account/deposits',
-  withdraw: '/api/v2/peatio/account/withdraws',
-  depositAddress: '/api/v2/peatio/account/deposit_address/:currency',
+  list: '/api/v2/account/balances',
+  balance: '/api/v2/account/balances/:currency',
+  depositAddress: '/api/v2/account/deposit_address/:currency',
 } as const;
 
-// Real API functions - Connected to our backend
-const realApi = {
-  getWallets: async (authToken: string): Promise<Wallet[]> => {
-    const response = await api.get(WALLETS_ENDPOINTS.list, { authToken });
-    return response;
+// Real V2 API functions
+const v2Api = {
+  getWallets: async (): Promise<Wallet[]> => {
+    const response = await apiClient.get<ApiResponse<V2Account[]>>(WALLETS_ENDPOINTS.list);
+    return response.data.data.map(account => ({
+      currency: account.currency,
+      balance: account.balance,
+      locked: account.locked,
+      updated_at: account.updated_at,
+    }));
   },
   
-  getWallet: async (currency: string, authToken: string): Promise<Wallet | null> => {
-    const response = await api.get(WALLETS_ENDPOINTS.list, { authToken });
-    const wallets = response;
-    return wallets.find((w: Wallet) => w.currency === currency) || null;
+  getWallet: async (currency: string): Promise<Wallet | null> => {
+    try {
+      const url = WALLETS_ENDPOINTS.balance.replace(':currency', currency);
+      const response = await apiClient.get<{ data: V2Account }>(url);
+      const account = response.data.data;
+      return {
+        currency: account.currency,
+        balance: account.balance,
+        locked: account.locked,
+        updated_at: account.updated_at,
+      };
+    } catch (error) {
+      return null;
+    }
   },
   
-  createDeposit: async (currency: string, amount: string, authToken: string): Promise<{ id: string }> => {
-    const response = await api.post(WALLETS_ENDPOINTS.deposit, {
-      currency,
-      amount,
-    }, { authToken });
-    return response;
-  },
-  
-  createWithdraw: async (currency: string, amount: string, address: string, authToken: string): Promise<{ id: string }> => {
-    const response = await api.post(WALLETS_ENDPOINTS.withdraw, {
-      currency,
-      amount,
-      address,
-    }, { authToken });
-    return response;
-  },
-  
-  getDepositAddress: async (currency: string, authToken: string): Promise<{ address: string }> => {
+  getDepositAddress: async (currency: string): Promise<{ currency: string; address: string; state: string }> => {
     const url = WALLETS_ENDPOINTS.depositAddress.replace(':currency', currency);
-    const response = await api.get(url, { authToken });
-    return response;
+    const response = await apiClient.post<{ data: { currency: string; address: string; state: string } }>(url);
+    return response.data.data;
   },
 };
 
 // React Query hooks
-export const useWallets = (authToken?: string) => {
+export const useWallets = () => {
   return useQuery({
     queryKey: ['wallets'],
-    queryFn: () => realApi.getWallets(authToken || ''),
+    queryFn: v2Api.getWallets,
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 30 * 1000, // Refetch every 30 seconds
-    enabled: !!authToken,
   });
 };
 
-export const useWallet = (currency: string, authToken?: string) => {
+export const useWallet = (currency: string) => {
   return useQuery({
     queryKey: ['wallets', currency],
-    queryFn: () => realApi.getWallet(currency, authToken || ''),
+    queryFn: () => v2Api.getWallet(currency),
     staleTime: 30 * 1000, // 30 seconds
-    enabled: !!currency && !!authToken,
+    enabled: !!currency,
   });
 };
 
-export const useCreateDeposit = () => {
+export const useDepositAddress = (currency: string) => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ currency, amount, authToken }: { currency: string; amount: string; authToken: string }) =>
-      realApi.createDeposit(currency, amount, authToken),
+    mutationFn: () => v2Api.getDepositAddress(currency),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
     },
-  });
-};
-
-export const useCreateWithdraw = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ currency, amount, address, authToken }: { currency: string; amount: string; address: string; authToken: string }) =>
-      realApi.createWithdraw(currency, amount, address, authToken),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['wallets'] });
-    },
-  });
-};
-
-export const useDepositAddress = (currency: string, authToken?: string) => {
-  return useQuery({
-    queryKey: ['wallets', currency, 'deposit-address'],
-    queryFn: () => realApi.getDepositAddress(currency, authToken || ''),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!currency && !!authToken,
   });
 };

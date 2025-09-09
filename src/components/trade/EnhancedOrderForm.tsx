@@ -191,10 +191,12 @@ export function EnhancedOrderForm({
     // Balance check
     try {
       const [base, quote] = market.split('-');
-      const needBase = orderData.side === 'sell';
-      const needQuote = orderData.side === 'buy';
-      if (needSellOrBuyInsufficient(needBase, needQuote, base, quote)) {
-        newErrors.margin = 'Insufficient balance';
+      if (base && quote) {
+        const needBase = orderData.side === 'sell';
+        const needQuote = orderData.side === 'buy';
+        if (needSellOrBuyInsufficient(needBase, needQuote, base, quote)) {
+          newErrors.margin = 'Insufficient balance';
+        }
       }
     } catch (_e) {
       // ignore

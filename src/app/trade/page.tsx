@@ -39,7 +39,7 @@ import { EnhancedOrderForm } from '@/components/trade/EnhancedOrderForm';
 import { MarketDataPanel } from '@/components/trade/MarketDataPanel';
 import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/auth';
-import { TickerSearchPanel } from '@/components/trade/TickerSearchPanel';
+import TickerSearchPanel from '@/components/trade/TickerSearchPanel';
 
 export default function TradingPage() {
   const router = useRouter();

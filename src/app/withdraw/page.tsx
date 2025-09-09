@@ -50,8 +50,8 @@ export default function WithdrawPage() {
   const [minWithdraw, setMinWithdraw] = useState(0);
   const [maxWithdraw, setMaxWithdraw] = useState(0);
 
-  // Use real API hooks with auth token from context
-  const { data: wallets, isLoading: walletsLoading, error: walletsError } = useWallets(authToken || '');
+  // Use real API hooks
+  const { data: wallets, isLoading: walletsLoading, error: walletsError } = useWallets();
 
   useEffect(() => {
     if (!isAuthenticated) {

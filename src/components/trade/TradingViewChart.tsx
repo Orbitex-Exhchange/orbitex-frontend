@@ -39,7 +39,7 @@ import {
   Bitcoin,
   DollarSign
 } from 'lucide-react';
-import { TickerSearchPanel } from './TickerSearchPanel';
+import TickerSearchPanel from './TickerSearchPanel';
 
 interface TradingViewChartProps {
   symbol: string;

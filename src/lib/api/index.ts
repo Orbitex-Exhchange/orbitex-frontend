@@ -1,23 +1,26 @@
 // Export all API services with specific exports to avoid conflicts
 export { useMarkets, useMarketTicker, useOrderBook, useTrades } from './services/markets';
-export { useWallets, useWallet, useCreateDeposit, useCreateWithdraw, useDepositAddress } from './services/wallets';
+export { useWallets, useWallet, useDepositAddress } from './services/wallets';
 export { useOrders, useOrder, useCreateOrder, useCancelOrder } from './services/orders';
 export { 
   useAccountBalances, 
   useAccountBalance, 
   useAccountDeposits, 
   useAccountDeposit,
-  useCreateDeposit as useCreateAccountDeposit,
-  useAccountWithdrawals,
-  useAccountWithdrawal,
-  useCreateWithdrawal,
+  useAccountWithdraws,
+  useAccountWithdraw,
+  useCreateWithdraw,
   useBeneficiaries,
   useBeneficiary,
   useCreateBeneficiary,
-  useUpdateBeneficiary,
   useDeleteBeneficiary,
-  useDepositAddress as useAccountDepositAddress,
-  useAccountHistory
+  useCreateDepositAddress,
+  useAccountTransactions,
+  useAccountTransaction,
+  useAccountStats,
+  useCreateInternalTransfer,
+  useInternalTransfers,
+  useInternalTransfer
 } from './services/account';
 export { 
   useIdentityPing, 
@@ -51,9 +54,12 @@ export {
   usePublicKLines,
   usePublicDepth,
   usePublicMemberLevels,
-  usePublicFeeGroups,
-  usePublicFees,
-  usePublicTimestamp
+  usePublicTradingFees,
+  usePublicTimestamp,
+  usePublicTime,
+  usePublicWebhooks,
+  usePublicWithdrawLimits,
+  usePublicKWithPendingTrades
 } from './services/public';
 export { 
   useUserProfile as useResourceUserProfile,

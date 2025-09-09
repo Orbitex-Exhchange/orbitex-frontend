@@ -14,6 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import Link from 'next/link';
+import { useBeneficiaries } from '@/lib/api/services/account';
 
 interface AddressBookEntry {
   id: string;
@@ -24,28 +25,19 @@ interface AddressBookEntry {
   hasRecipientInfo: boolean;
 }
 
-const mockAddressBook: AddressBookEntry[] = [
-  {
-    id: '1',
-    name: 'AC',
-    currency: 'Ethereum (ERC-20)',
-    address: '0x4D8612BeA189a2DC33A84E341a14BD462b8F45Ac',
-    network: 'Ethereum',
-    hasRecipientInfo: false
-  },
-  {
-    id: '2',
-    name: 'EthG1',
-    currency: 'Ethereum (ERC-20)',
-    address: '0x8A98368B2113fc9dC3ec02Fbad7D64985dB02E75',
-    network: 'Ethereum',
-    hasRecipientInfo: true
-  }
-];
-
 export default function AddressBookPage() {
-  const [addresses, setAddresses] = useState<AddressBookEntry[]>(mockAddressBook);
+  const { data: beneficiaries, isLoading } = useBeneficiaries();
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Transform beneficiaries data to match AddressBookEntry interface
+  const addresses: AddressBookEntry[] = beneficiaries ? beneficiaries.map(beneficiary => ({
+    id: beneficiary.id.toString(),
+    name: beneficiary.name,
+    currency: beneficiary.currency,
+    address: beneficiary.data?.address || '',
+    network: beneficiary.currency, // Could be enhanced to show actual network
+    hasRecipientInfo: beneficiary.state === 'active'
+  })) : [];
 
   const filteredAddresses = addresses.filter(address => 
     address.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -66,7 +58,8 @@ export default function AddressBookPage() {
   };
 
   const handleDelete = (id: string) => {
-    setAddresses(addresses.filter(addr => addr.id !== id));
+    // TODO: Implement delete functionality using the API
+    console.log('Delete', id);
   };
 
   return (

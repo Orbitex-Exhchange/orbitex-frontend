@@ -10,8 +10,8 @@ const getBaseUrl = () => {
     return envApiUrl;
   }
 
-  // Fallback to production backend URL if no env var
-  const productionUrl = 'https://orbitex-backend-976099405307.us-central1.run.app';
+  // Updated to use the correct Cloud Run URL
+  const productionUrl = 'https://orbitex-976099405307.us-central1.run.app';
 
   if (isDevelopment) {
     // In development, use production backend for real data

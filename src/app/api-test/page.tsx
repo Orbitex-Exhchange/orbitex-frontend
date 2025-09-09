@@ -33,40 +33,69 @@ export default function ApiTestPage() {
   // Check system status based on real API responses
   useEffect(() => {
     const checkSystemStatus = async () => {
-      const baseUrl = 'https://orbitex-backend-976099405307.us-central1.run.app';
+      const baseUrl = 'https://orbitex-976099405307.us-central1.run.app';
       
       // Check backend health
       try {
         const response = await fetch(`${baseUrl}/health`);
         if (response.ok) {
+          const data = await response.json();
+          console.log('Backend health check - response:', response.status, data);
           setSystemStatus(prev => ({ ...prev, backend: 'online' }));
         } else {
+          console.log('Backend health check failed - status:', response.status);
           setSystemStatus(prev => ({ ...prev, backend: 'offline' }));
         }
       } catch (error) {
+        console.log('Backend health check error:', error);
         setSystemStatus(prev => ({ ...prev, backend: 'offline' }));
       }
 
-      // Check database health
+      // Check database health by testing a database-dependent endpoint
       try {
-        const response = await fetch(`${baseUrl}/db-health`);
+        const response = await fetch(`${baseUrl}/api/v2/public/markets`);
         if (response.ok) {
+          const data = await response.json();
+          // If we get a response (even empty array), database connection is working
+          console.log('Database health check - response:', response.status, data);
           setSystemStatus(prev => ({ ...prev, database: 'online' }));
         } else {
+          console.log('Database health check failed - status:', response.status);
           setSystemStatus(prev => ({ ...prev, database: 'offline' }));
         }
       } catch (error) {
+        console.log('Database health check error:', error);
         setSystemStatus(prev => ({ ...prev, database: 'offline' }));
       }
 
-      // Check WebSocket (simulated for now)
-      setTimeout(() => {
-        setSystemStatus(prev => ({ ...prev, websocket: 'online' }));
-      }, 2000);
+      // Check WebSocket connection
+      try {
+        // Test WebSocket connection to the backend
+        const wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+        const ws = new WebSocket(`${wsUrl}/ws`);
+        
+        const wsTimeout = setTimeout(() => {
+          ws.close();
+          setSystemStatus(prev => ({ ...prev, websocket: 'offline' }));
+        }, 5000);
+        
+        ws.onopen = () => {
+          clearTimeout(wsTimeout);
+          setSystemStatus(prev => ({ ...prev, websocket: 'online' }));
+          ws.close();
+        };
+        
+        ws.onerror = () => {
+          clearTimeout(wsTimeout);
+          setSystemStatus(prev => ({ ...prev, websocket: 'offline' }));
+        };
+      } catch (error) {
+        setSystemStatus(prev => ({ ...prev, websocket: 'offline' }));
+      }
 
       // Load markets data
       try {
-        const response = await fetch(`${baseUrl}/api/v2/markets`);
+        const response = await fetch(`${baseUrl}/api/v2/public/markets`);
         if (response.ok) {
           const data = await response.json();
           setMarkets(data.markets || []);
@@ -82,10 +111,10 @@ export default function ApiTestPage() {
   // Load ticker and orderbook data when market changes
   useEffect(() => {
     const loadMarketData = async () => {
-      const baseUrl = 'https://orbitex-backend-976099405307.us-central1.run.app';
+      const baseUrl = 'https://orbitex-976099405307.us-central1.run.app';
       
       try {
-        const response = await fetch(`${baseUrl}/api/v2/markets/${selectedMarket}/ticker`);
+        const response = await fetch(`${baseUrl}/api/v2/public/tickers/${selectedMarket}`);
         if (response.ok) {
           const data = await response.json();
           setTicker(data);
@@ -95,7 +124,7 @@ export default function ApiTestPage() {
       }
 
       try {
-        const response = await fetch(`${baseUrl}/api/v2/markets/${selectedMarket}/orderbook`);
+        const response = await fetch(`${baseUrl}/api/v2/public/order_book/${selectedMarket}`);
         if (response.ok) {
           const data = await response.json();
           setOrderBook(data);
@@ -114,7 +143,7 @@ export default function ApiTestPage() {
     setIsRunningTests(true);
     setTestResults([]);
 
-    const baseUrl = 'https://orbitex-backend-976099405307.us-central1.run.app';
+    const baseUrl = 'https://orbitex-ih6wdmcn3q-uc.a.run.app';
 
     const tests = [
       {
@@ -133,7 +162,7 @@ export default function ApiTestPage() {
         name: 'Markets Data Fetch',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/v2/markets`);
+            const response = await fetch(`${baseUrl}/api/v2/public/markets`);
             const data = await response.json();
             return { success: response.ok, data };
           } catch (error) {
@@ -145,7 +174,7 @@ export default function ApiTestPage() {
         name: 'Market Ticker Data',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/v2/markets/${selectedMarket}/ticker`);
+            const response = await fetch(`${baseUrl}/api/v2/public/tickers/${selectedMarket}`);
             const data = await response.json();
             return { success: response.ok, data };
           } catch (error) {
@@ -157,7 +186,19 @@ export default function ApiTestPage() {
         name: 'OrderBook Data',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/v2/markets/${selectedMarket}/orderbook`);
+            const response = await fetch(`${baseUrl}/api/v2/public/order_book/${selectedMarket}`);
+            const data = await response.json();
+            return { success: response.ok, data };
+          } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+          }
+        }
+      },
+      {
+        name: 'Currencies Data',
+        test: async () => {
+          try {
+            const response = await fetch(`${baseUrl}/api/v2/public/currencies`);
             const data = await response.json();
             return { success: response.ok, data };
           } catch (error) {
@@ -169,9 +210,26 @@ export default function ApiTestPage() {
         name: 'WebSocket Connection',
         test: async () => {
           try {
-            // Simulate WebSocket test
-            await new Promise(resolve => setTimeout(resolve, 500));
-            return { success: true, data: { connected: true } };
+            return new Promise((resolve) => {
+              const wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+              const ws = new WebSocket(`${wsUrl}/ws`);
+              
+              const timeout = setTimeout(() => {
+                ws.close();
+                resolve({ success: false, error: 'WebSocket connection timeout' });
+              }, 5000);
+              
+              ws.onopen = () => {
+                clearTimeout(timeout);
+                ws.close();
+                resolve({ success: true, data: { connected: true } });
+              };
+              
+              ws.onerror = () => {
+                clearTimeout(timeout);
+                resolve({ success: false, error: 'WebSocket connection failed' });
+              };
+            });
           } catch (error) {
             return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
           }
@@ -180,7 +238,7 @@ export default function ApiTestPage() {
     ];
 
     for (const test of tests) {
-      const result = await test.test();
+      const result = await test.test() as { success: boolean; data?: any; error?: string };
       const testResult: TestResult = {
         success: result.success,
         message: result.success ? `${test.name} passed` : `${test.name} failed: ${result.error}`,
@@ -285,10 +343,8 @@ export default function ApiTestPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Wifi className="h-4 w-4 text-purple-400" />
-                  <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-yellow-600 text-white border-yellow-500">
-                    Testing...
-                  </div>
+                  {getStatusIcon(systemStatus.websocket)}
+                  {getStatusBadge(systemStatus.websocket)}
                 </div>
               </div>
             </div>
@@ -422,18 +478,36 @@ export default function ApiTestPage() {
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Health Check</h4>
                       <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /health</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300 mt-1">GET /api/v2/health</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Markets</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/markets</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
-                      <h4 className="font-medium mb-2 text-white">Orderbook</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/markets/{'{market}'}/orderbook</code>
+                      <h4 className="font-medium mb-2 text-white">Tickers</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/tickers</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300 mt-1">GET /api/v2/public/tickers/{'{market}'}</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
-                      <h4 className="font-medium mb-2 text-white">Ticker</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/markets/{'{market}'}/ticker</code>
+                      <h4 className="font-medium mb-2 text-white">Order Book</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/order_book/{'{market}'}</code>
+                    </div>
+                    <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
+                      <h4 className="font-medium mb-2 text-white">Market Depth</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/depth/{'{market}'}</code>
+                    </div>
+                    <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
+                      <h4 className="font-medium mb-2 text-white">Recent Trades</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/trades/{'{market}'}</code>
+                    </div>
+                    <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
+                      <h4 className="font-medium mb-2 text-white">Currencies</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/currencies</code>
+                    </div>
+                    <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
+                      <h4 className="font-medium mb-2 text-white">Trading Fees</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/trading_fees</code>
                     </div>
                   </div>
                 </div>

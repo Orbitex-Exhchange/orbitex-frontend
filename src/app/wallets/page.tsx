@@ -46,6 +46,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallets } from '@/lib/api';
+import { usePublicTickers } from '@/lib/api/services/public';
 import { useToast } from '@/hooks/use-toast';
 
 interface Wallet {
@@ -73,8 +74,9 @@ export default function WalletsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showBalances, setShowBalances] = useState(true);
 
-  // Use real API hooks with auth token from context
-  const { data: apiWallets, isLoading, error, refetch } = useWallets(authToken || '');
+  // Use real API hooks
+  const { data: apiWallets, isLoading, error, refetch } = useWallets();
+  const { data: tickersData } = usePublicTickers();
 
   // Transform API data to match our interface
   const wallets: Wallet[] = apiWallets ? apiWallets.map(wallet => {
@@ -82,48 +84,33 @@ export default function WalletsPage() {
     const locked = parseFloat(wallet.locked);
     const available = balance + locked;
     
-    // Mock values for demonstration (in real app, these would come from price API)
-      const mockPrices: { [key: string]: number } = {
-        'BTC': 45000,
-        'ETH': 3000,
-        'USDT': 1,
-        'USDC': 1,
-        'SOL': 100,
-        'ADA': 0.5,
-        'DOT': 7,
-        'LINK': 15,
-        'UNI': 8,
-        'MATIC': 0.8,
-      'ZAR': 0.055, // USD to ZAR rate
-      'TRX': 0.06,
-      'ONDO': 18.9,
-      'BONK': 0.000025,
-      'BNB': 300,
-      'OP': 2.5,
-    };
+    // Get real price data from tickers
+    let price = 1;
+    let change24h = 0;
     
-      const price = mockPrices[wallet.currency] || 1;
+    if (tickersData) {
+      // Find ticker for this currency (look for markets like BTCUSDT, ETHUSDT, etc.)
+      const ticker = tickersData.find(t => 
+        t.market.endsWith('USDT') && 
+        t.market.startsWith(wallet.currency.toUpperCase())
+      );
+      
+      if (ticker) {
+        price = parseFloat(ticker.ticker.last);
+        change24h = parseFloat(ticker.ticker.price_change_percent);
+      } else {
+        // Fallback to USD pairs or other quote currencies
+        const fallbackTicker = tickersData.find(t => 
+          t.market.includes(wallet.currency.toUpperCase())
+        );
+        if (fallbackTicker) {
+          price = parseFloat(fallbackTicker.ticker.last);
+          change24h = parseFloat(fallbackTicker.ticker.price_change_percent);
+        }
+      }
+    }
+    
     const value = available * price;
-    
-    // Mock 24h change (in real app, this would come from price API)
-    const mockChanges: { [key: string]: number } = {
-      'BTC': 2.45,
-      'ETH': 2.83,
-      'USDT': 0.01,
-      'USDC': 0.01,
-      'SOL': 3.8,
-      'ADA': 1.2,
-      'DOT': 0.8,
-      'LINK': 1.5,
-      'UNI': 2.1,
-      'MATIC': 1.8,
-      'ZAR': 0.1,
-      'TRX': 2.24,
-      'ONDO': 2.05,
-      'BONK': 6.14,
-      'BNB': 0.2,
-      'OP': 7.02,
-    };
     
     return {
       currency: wallet.currency,
@@ -134,7 +121,7 @@ export default function WalletsPage() {
       type: wallet.currency === 'ZAR' ? 'fiat' : 'crypto',
       deposit_enabled: true,
       withdrawal_enabled: true,
-      change24h: mockChanges[wallet.currency] || 0,
+      change24h: change24h,
       value: value,
       ...(wallet.deposit_address && { deposit_address: wallet.deposit_address })
     };

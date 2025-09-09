@@ -1,34 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { 
-  IdentityUser, 
-  IdentitySession, 
-  IdentityConfig,
-  mockIdentityUsers 
-} from '../mock-data/enhanced';
+import {
+  V2IdentityConfig,
+  V2IdentityUser,
+  V2IdentitySession,
+  ApiResponse
+} from '../types/v2';
 
-// Identity API endpoints
+// Identity API endpoints - Updated to match V2 API structure
 const IDENTITY_ENDPOINTS = {
-  ping: '/api/v2/barong/identity/ping',
-  configs: '/api/v2/barong/identity/configs',
-  sessions: '/api/v2/barong/identity/sessions',
-  users: '/api/v2/barong/identity/users',
+  ping: '/api/v2/identity/ping',
+  configs: '/api/v2/identity/configs',
+  sessions: '/api/v2/identity/sessions',
+  users: '/api/v2/identity/users',
 } as const;
 
-// Mock API functions
-const mockApi = {
+// Real V2 API functions
+const v2Api = {
   ping: async (): Promise<{ message: string }> => {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    return { message: 'pong' };
+    const response = await apiClient.get<{ message: string }>(IDENTITY_ENDPOINTS.ping);
+    return response.data;
   },
 
-  getConfigs: async (): Promise<IdentityConfig> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return {
-      captcha_type: 'none',
-      session_timeout: 3600,
-      password_min_entropy: 14,
-    };
+  getConfigs: async (): Promise<V2IdentityConfig> => {
+    const response = await apiClient.get<V2IdentityConfig>(IDENTITY_ENDPOINTS.configs);
+    return response.data;
   },
 
   createSession: async (credentials: {
@@ -36,26 +32,13 @@ const mockApi = {
     password: string;
     otp_code?: string;
     recaptcha_response?: string;
-  }): Promise<IdentitySession> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const user = mockIdentityUsers.find(u => u.email === credentials.email);
-    if (!user) {
-      throw new Error('Invalid credentials');
-    }
-
-    return {
-      access_token: `access_token_${Date.now()}`,
-      refresh_token: `refresh_token_${Date.now()}`,
-      token_type: 'Bearer',
-      expires_in: 3600,
-      user,
-    };
+  }): Promise<V2IdentitySession> => {
+    const response = await apiClient.post<V2IdentitySession>(IDENTITY_ENDPOINTS.sessions, credentials);
+    return response.data;
   },
 
   deleteSession: async (): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    // In a real app, this would invalidate the token
+    await apiClient.delete(IDENTITY_ENDPOINTS.sessions);
   },
 
   createUser: async (userData: {
@@ -64,40 +47,27 @@ const mockApi = {
     password_confirmation: string;
     recaptcha_response?: string;
     refid?: string;
-  }): Promise<IdentityUser> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newUser: IdentityUser = {
-      id: Date.now().toString(),
-      email: userData.email,
-      username: userData.email.split('@')[0] || 'user',
-      role: 'member',
-      level: 1,
-      otp: false,
-      state: 'pending',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    return newUser;
+  }): Promise<V2IdentityUser> => {
+    const response = await apiClient.post<V2IdentityUser>(IDENTITY_ENDPOINTS.users, userData);
+    return response.data;
   },
 
   generateEmailCode: async (email: string): Promise<{ message: string }> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { message: 'Email code sent successfully' };
+    const response = await apiClient.post<{ message: string }>(`${IDENTITY_ENDPOINTS.users}/email_code`, { email });
+    return response.data;
   },
 
   generatePasswordCode: async (email: string): Promise<{ message: string }> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { message: 'Password reset code sent successfully' };
+    const response = await apiClient.post<{ message: string }>(`${IDENTITY_ENDPOINTS.users}/password_code`, { email });
+    return response.data;
   },
 
   confirmPasswordCode: async (data: {
     email: string;
     code: string;
   }): Promise<{ message: string }> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { message: 'Password reset code confirmed successfully' };
+    const response = await apiClient.post<{ message: string }>(`${IDENTITY_ENDPOINTS.users}/confirm_password_code`, data);
+    return response.data;
   },
 };
 
@@ -105,7 +75,7 @@ const mockApi = {
 export const useIdentityPing = () => {
   return useQuery({
     queryKey: ['identity', 'ping'],
-    queryFn: mockApi.ping,
+    queryFn: v2Api.ping,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -113,7 +83,7 @@ export const useIdentityPing = () => {
 export const useIdentityConfigs = () => {
   return useQuery({
     queryKey: ['identity', 'configs'],
-    queryFn: mockApi.getConfigs,
+    queryFn: v2Api.getConfigs,
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 };
@@ -122,7 +92,7 @@ export const useCreateSession = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: mockApi.createSession,
+    mutationFn: v2Api.createSession,
     onSuccess: (session) => {
       // Store tokens in localStorage
       if (typeof window !== 'undefined') {
@@ -143,7 +113,7 @@ export const useDeleteSession = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: mockApi.deleteSession,
+    mutationFn: v2Api.deleteSession,
     onSuccess: () => {
       // Clear tokens from localStorage
       if (typeof window !== 'undefined') {
@@ -160,24 +130,24 @@ export const useDeleteSession = () => {
 
 export const useCreateUser = () => {
   return useMutation({
-    mutationFn: mockApi.createUser,
+    mutationFn: v2Api.createUser,
   });
 };
 
 export const useGenerateEmailCode = () => {
   return useMutation({
-    mutationFn: mockApi.generateEmailCode,
+    mutationFn: v2Api.generateEmailCode,
   });
 };
 
 export const useGeneratePasswordCode = () => {
   return useMutation({
-    mutationFn: mockApi.generatePasswordCode,
+    mutationFn: v2Api.generatePasswordCode,
   });
 };
 
 export const useConfirmPasswordCode = () => {
   return useMutation({
-    mutationFn: mockApi.confirmPasswordCode,
+    mutationFn: v2Api.confirmPasswordCode,
   });
 };

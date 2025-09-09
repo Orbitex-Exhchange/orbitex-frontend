@@ -1,216 +1,230 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { 
-  AccountBalance, 
-  AccountDeposit, 
-  AccountWithdraw, 
-  Beneficiary,
-  mockAccountBalances,
-  mockDeposits,
-  mockWithdrawals,
-  mockBeneficiaries
-} from '../mock-data/enhanced';
+import {
+  V2Account,
+  V2Deposit,
+  V2Withdraw,
+  V2Transaction,
+  V2Beneficiary,
+  V2InternalTransfer,
+  V2Stats,
+  ApiResponse
+} from '../types/v2';
 
-// Account API endpoints
+// Account API endpoints - Updated to match V2 API structure
 const ACCOUNT_ENDPOINTS = {
-  balances: '/api/v2/peatio/account/balances',
-  deposits: '/api/v2/peatio/account/deposits',
-  withdrawals: '/api/v2/peatio/account/withdraws',
-  beneficiaries: '/api/v2/peatio/account/beneficiaries',
-  depositAddress: '/api/v2/peatio/account/deposit_address',
-  history: '/api/v2/peatio/account/history',
+  balances: '/api/v2/account/balances',
+  balance: '/api/v2/account/balances/:currency',
+  deposits: '/api/v2/account/deposits',
+  deposit: '/api/v2/account/deposits/:txid',
+  depositAddress: '/api/v2/account/deposit_address/:currency',
+  withdraws: '/api/v2/account/withdraws',
+  withdraw: '/api/v2/account/withdraws/:txid',
+  transactions: '/api/v2/account/transactions',
+  transaction: '/api/v2/account/transactions/:txid',
+  beneficiaries: '/api/v2/account/beneficiaries',
+  beneficiary: '/api/v2/account/beneficiaries/:id',
+  internalTransfers: '/api/v2/account/internal_transfers',
+  internalTransfer: '/api/v2/account/internal_transfers/:id',
+  stats: '/api/v2/account/stats',
 } as const;
 
-// Mock API functions
-const mockApi = {
-  getBalances: async (): Promise<AccountBalance[]> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return mockAccountBalances;
+// Real V2 API functions
+const v2Api = {
+  getBalances: async (): Promise<V2Account[]> => {
+    const response = await apiClient.get<ApiResponse<V2Account[]>>(ACCOUNT_ENDPOINTS.balances);
+    return response.data.data;
   },
 
-  getBalance: async (currency: string): Promise<AccountBalance | null> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return mockAccountBalances.find(b => b.currency === currency) || null;
+  getBalance: async (currency: string): Promise<V2Account | null> => {
+    try {
+      const url = ACCOUNT_ENDPOINTS.balance.replace(':currency', currency);
+      const response = await apiClient.get<{ data: V2Account }>(url);
+      return response.data.data;
+    } catch (error) {
+      return null;
+    }
   },
 
   getDeposits: async (params?: {
     currency?: string;
+    state?: string;
     limit?: number;
     page?: number;
-  }): Promise<AccountDeposit[]> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    let deposits = mockDeposits;
-    
-    if (params?.currency) {
-      deposits = deposits.filter(d => d.currency === params.currency);
+  }): Promise<V2Deposit[]> => {
+    const response = await apiClient.get<ApiResponse<V2Deposit[]>>(ACCOUNT_ENDPOINTS.deposits, {
+      params
+    });
+    return response.data.data;
+  },
+
+  getDeposit: async (txid: string): Promise<V2Deposit | null> => {
+    try {
+      const url = ACCOUNT_ENDPOINTS.deposit.replace(':txid', txid);
+      const response = await apiClient.get<{ data: V2Deposit }>(url);
+      return response.data.data;
+    } catch (error) {
+      return null;
     }
-    
-    return deposits;
   },
 
-  getDeposit: async (id: string): Promise<AccountDeposit | null> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return mockDeposits.find(d => d.id === id) || null;
-  },
-
-  createDeposit: async (data: {
+  createDepositAddress: async (currency: string): Promise<{
     currency: string;
-    amount: string;
-  }): Promise<AccountDeposit> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newDeposit: AccountDeposit = {
-      id: Date.now().toString(),
-      currency: data.currency,
-      amount: data.amount,
-      fee: "0",
-      txid: `tx_${Date.now()}`,
-      state: 'submitted',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    return newDeposit;
+    address: string;
+    state: string;
+  }> => {
+    const url = ACCOUNT_ENDPOINTS.depositAddress.replace(':currency', currency);
+    const response = await apiClient.post<{ data: { currency: string; address: string; state: string } }>(url);
+    return response.data.data;
   },
 
-  getWithdrawals: async (params?: {
+  getWithdraws: async (params?: {
     currency?: string;
+    state?: string;
     limit?: number;
     page?: number;
-  }): Promise<AccountWithdraw[]> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    let withdrawals = mockWithdrawals;
-    
-    if (params?.currency) {
-      withdrawals = withdrawals.filter(w => w.currency === params.currency);
+  }): Promise<V2Withdraw[]> => {
+    const response = await apiClient.get<ApiResponse<V2Withdraw[]>>(ACCOUNT_ENDPOINTS.withdraws, {
+      params
+    });
+    return response.data.data;
+  },
+
+  getWithdraw: async (txid: string): Promise<V2Withdraw | null> => {
+    try {
+      const url = ACCOUNT_ENDPOINTS.withdraw.replace(':txid', txid);
+      const response = await apiClient.get<{ data: V2Withdraw }>(url);
+      return response.data.data;
+    } catch (error) {
+      return null;
     }
-    
-    return withdrawals;
   },
 
-  getWithdrawal: async (id: string): Promise<AccountWithdraw | null> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return mockWithdrawals.find(w => w.id === id) || null;
-  },
-
-  createWithdrawal: async (data: {
+  createWithdraw: async (data: {
     currency: string;
     amount: string;
-    beneficiary_id: string;
-    otp_code?: string;
-  }): Promise<AccountWithdraw> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newWithdrawal: AccountWithdraw = {
-      id: Date.now().toString(),
-      currency: data.currency,
-      amount: data.amount,
-      fee: "1",
-      txid: `tx_${Date.now()}`,
-      state: 'submitted',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    return newWithdrawal;
+    rid: string;
+    otp?: string;
+  }): Promise<{
+    id: string;
+    currency: string;
+    amount: string;
+    fee: string;
+    rid: string;
+    state: string;
+    created_at: number;
+  }> => {
+    const response = await apiClient.post<{ data: {
+      id: string;
+      currency: string;
+      amount: string;
+      fee: string;
+      rid: string;
+      state: string;
+      created_at: number;
+    } }>(ACCOUNT_ENDPOINTS.withdraws, data);
+    return response.data.data;
   },
 
-  getBeneficiaries: async (): Promise<Beneficiary[]> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return mockBeneficiaries;
+  getTransactions: async (params?: {
+    currency?: string;
+    state?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<V2Transaction[]> => {
+    const response = await apiClient.get<ApiResponse<V2Transaction[]>>(ACCOUNT_ENDPOINTS.transactions, {
+      params
+    });
+    return response.data.data;
   },
 
-  getBeneficiary: async (id: string): Promise<Beneficiary | null> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return mockBeneficiaries.find(b => b.id === id) || null;
+  getTransaction: async (txid: string): Promise<V2Transaction | null> => {
+    try {
+      const url = ACCOUNT_ENDPOINTS.transaction.replace(':txid', txid);
+      const response = await apiClient.get<{ data: V2Transaction }>(url);
+      return response.data.data;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  getBeneficiaries: async (): Promise<V2Beneficiary[]> => {
+    const response = await apiClient.get<ApiResponse<V2Beneficiary[]>>(ACCOUNT_ENDPOINTS.beneficiaries);
+    return response.data.data;
+  },
+
+  getBeneficiary: async (id: number): Promise<V2Beneficiary | null> => {
+    try {
+      const url = ACCOUNT_ENDPOINTS.beneficiary.replace(':id', id.toString());
+      const response = await apiClient.get<{ data: V2Beneficiary }>(url);
+      return response.data.data;
+    } catch (error) {
+      return null;
+    }
   },
 
   createBeneficiary: async (data: {
     currency: string;
     name: string;
-    description?: string;
-    data: {
-      address?: string;
-      account_number?: string;
-      bank_name?: string;
-      bank_swift_code?: string;
-      intermediary_bank_name?: string;
-      intermediary_bank_swift_code?: string;
-    };
-  }): Promise<Beneficiary> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newBeneficiary: Beneficiary = {
-      id: Date.now().toString(),
-      currency: data.currency,
-      name: data.name,
-      description: data.description || '',
-      data: data.data,
-      state: 'pending',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    return newBeneficiary;
+    data: any;
+  }): Promise<V2Beneficiary> => {
+    const response = await apiClient.post<{ data: V2Beneficiary }>(ACCOUNT_ENDPOINTS.beneficiaries, data);
+    return response.data.data;
   },
 
-  updateBeneficiary: async (id: string, data: Partial<Beneficiary>): Promise<Beneficiary> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const beneficiary = mockBeneficiaries.find(b => b.id === id);
-    if (!beneficiary) {
-      throw new Error('Beneficiary not found');
-    }
-
-    return { ...beneficiary, ...data, updated_at: new Date().toISOString() };
+  deleteBeneficiary: async (id: number): Promise<{ message: string }> => {
+    const url = ACCOUNT_ENDPOINTS.beneficiary.replace(':id', id.toString());
+    const response = await apiClient.delete<{ message: string }>(url);
+    return response.data;
   },
 
-  deleteBeneficiary: async (id: string): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    // In a real app, this would delete the beneficiary
-  },
-
-  getDepositAddress: async (currency: string): Promise<{
-    currency: string;
-    address: string;
-  }> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const balance = mockAccountBalances.find(b => b.currency === currency);
-    if (!balance?.deposit_address) {
-      throw new Error('Deposit address not found');
-    }
-
-    return {
-      currency,
-      address: balance.deposit_address,
-    };
-  },
-
-  getHistory: async (params?: {
+  getInternalTransfers: async (params?: {
     currency?: string;
+    state?: string;
     limit?: number;
     page?: number;
-    sort?: string;
-    order?: 'asc' | 'desc';
-    start_date?: string;
-    end_date?: string;
-    filter?: string;
-  }): Promise<{
-    deposits: AccountDeposit[];
-    withdrawals: AccountWithdraw[];
-  }> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    let deposits = mockDeposits;
-    let withdrawals = mockWithdrawals;
-    
-    if (params?.currency) {
-      deposits = deposits.filter(d => d.currency === params.currency);
-      withdrawals = withdrawals.filter(w => w.currency === params.currency);
+  }): Promise<V2InternalTransfer[]> => {
+    const response = await apiClient.get<ApiResponse<V2InternalTransfer[]>>(ACCOUNT_ENDPOINTS.internalTransfers, {
+      params
+    });
+    return response.data.data;
+  },
+
+  getInternalTransfer: async (id: number): Promise<V2InternalTransfer | null> => {
+    try {
+      const url = ACCOUNT_ENDPOINTS.internalTransfer.replace(':id', id.toString());
+      const response = await apiClient.get<{ data: V2InternalTransfer }>(url);
+      return response.data.data;
+    } catch (error) {
+      return null;
     }
-    
-    return { deposits, withdrawals };
+  },
+
+  createInternalTransfer: async (data: {
+    currency: string;
+    amount: string;
+    username: string;
+    otp?: string;
+  }): Promise<{
+    id: string;
+    currency: string;
+    amount: string;
+    state: string;
+    created_at: number;
+  }> => {
+    const response = await apiClient.post<{ data: {
+      id: string;
+      currency: string;
+      amount: string;
+      state: string;
+      created_at: number;
+    } }>(ACCOUNT_ENDPOINTS.internalTransfers, data);
+    return response.data.data;
+  },
+
+  getStats: async (): Promise<V2Stats> => {
+    const response = await apiClient.get<{ data: V2Stats }>(ACCOUNT_ENDPOINTS.stats);
+    return response.data.data;
   },
 };
 
@@ -218,7 +232,7 @@ const mockApi = {
 export const useAccountBalances = () => {
   return useQuery({
     queryKey: ['account', 'balances'],
-    queryFn: mockApi.getBalances,
+    queryFn: v2Api.getBalances,
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 30 * 1000, // Refetch every 30 seconds
   });
@@ -227,7 +241,7 @@ export const useAccountBalances = () => {
 export const useAccountBalance = (currency: string) => {
   return useQuery({
     queryKey: ['account', 'balance', currency],
-    queryFn: () => mockApi.getBalance(currency),
+    queryFn: () => v2Api.getBalance(currency),
     enabled: !!currency,
     staleTime: 30 * 1000, // 30 seconds
   });
@@ -235,82 +249,105 @@ export const useAccountBalance = (currency: string) => {
 
 export const useAccountDeposits = (params?: {
   currency?: string;
+  state?: string;
   limit?: number;
   page?: number;
 }) => {
   return useQuery({
     queryKey: ['account', 'deposits', params],
-    queryFn: () => mockApi.getDeposits(params),
+    queryFn: () => v2Api.getDeposits(params),
     staleTime: 60 * 1000, // 1 minute
   });
 };
 
-export const useAccountDeposit = (id: string) => {
+export const useAccountDeposit = (txid: string) => {
   return useQuery({
-    queryKey: ['account', 'deposit', id],
-    queryFn: () => mockApi.getDeposit(id),
-    enabled: !!id,
+    queryKey: ['account', 'deposit', txid],
+    queryFn: () => v2Api.getDeposit(txid),
+    enabled: !!txid,
     staleTime: 60 * 1000, // 1 minute
   });
 };
 
-export const useCreateDeposit = () => {
+export const useCreateDepositAddress = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: mockApi.createDeposit,
+    mutationFn: v2Api.createDepositAddress,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account', 'deposits'] });
       queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
     },
   });
 };
 
-export const useAccountWithdrawals = (params?: {
+export const useAccountWithdraws = (params?: {
   currency?: string;
+  state?: string;
   limit?: number;
   page?: number;
 }) => {
   return useQuery({
-    queryKey: ['account', 'withdrawals', params],
-    queryFn: () => mockApi.getWithdrawals(params),
+    queryKey: ['account', 'withdraws', params],
+    queryFn: () => v2Api.getWithdraws(params),
     staleTime: 60 * 1000, // 1 minute
   });
 };
 
-export const useAccountWithdrawal = (id: string) => {
+export const useAccountWithdraw = (txid: string) => {
   return useQuery({
-    queryKey: ['account', 'withdrawal', id],
-    queryFn: () => mockApi.getWithdrawal(id),
-    enabled: !!id,
+    queryKey: ['account', 'withdraw', txid],
+    queryFn: () => v2Api.getWithdraw(txid),
+    enabled: !!txid,
     staleTime: 60 * 1000, // 1 minute
   });
 };
 
-export const useCreateWithdrawal = () => {
+export const useCreateWithdraw = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: mockApi.createWithdrawal,
+    mutationFn: v2Api.createWithdraw,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account', 'withdrawals'] });
+      queryClient.invalidateQueries({ queryKey: ['account', 'withdraws'] });
       queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
     },
+  });
+};
+
+export const useAccountTransactions = (params?: {
+  currency?: string;
+  state?: string;
+  limit?: number;
+  page?: number;
+}) => {
+  return useQuery({
+    queryKey: ['account', 'transactions', params],
+    queryFn: () => v2Api.getTransactions(params),
+    staleTime: 60 * 1000, // 1 minute
+  });
+};
+
+export const useAccountTransaction = (txid: string) => {
+  return useQuery({
+    queryKey: ['account', 'transaction', txid],
+    queryFn: () => v2Api.getTransaction(txid),
+    enabled: !!txid,
+    staleTime: 60 * 1000, // 1 minute
   });
 };
 
 export const useBeneficiaries = () => {
   return useQuery({
     queryKey: ['account', 'beneficiaries'],
-    queryFn: mockApi.getBeneficiaries,
+    queryFn: v2Api.getBeneficiaries,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
-export const useBeneficiary = (id: string) => {
+export const useBeneficiary = (id: number) => {
   return useQuery({
     queryKey: ['account', 'beneficiary', id],
-    queryFn: () => mockApi.getBeneficiary(id),
+    queryFn: () => v2Api.getBeneficiary(id),
     enabled: !!id,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -320,18 +357,7 @@ export const useCreateBeneficiary = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: mockApi.createBeneficiary,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account', 'beneficiaries'] });
-    },
-  });
-};
-
-export const useUpdateBeneficiary = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Beneficiary> }) => mockApi.updateBeneficiary(id, data),
+    mutationFn: v2Api.createBeneficiary,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['account', 'beneficiaries'] });
     },
@@ -342,35 +368,51 @@ export const useDeleteBeneficiary = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: mockApi.deleteBeneficiary,
+    mutationFn: v2Api.deleteBeneficiary,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['account', 'beneficiaries'] });
     },
   });
 };
 
-export const useDepositAddress = (currency: string) => {
+export const useInternalTransfers = (params?: {
+  currency?: string;
+  state?: string;
+  limit?: number;
+  page?: number;
+}) => {
   return useQuery({
-    queryKey: ['account', 'deposit_address', currency],
-    queryFn: () => mockApi.getDepositAddress(currency),
-    enabled: !!currency,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    queryKey: ['account', 'internal_transfers', params],
+    queryFn: () => v2Api.getInternalTransfers(params),
+    staleTime: 60 * 1000, // 1 minute
   });
 };
 
-export const useAccountHistory = (params?: {
-  currency?: string;
-  limit?: number;
-  page?: number;
-  sort?: string;
-  order?: 'asc' | 'desc';
-  start_date?: string;
-  end_date?: string;
-  filter?: string;
-}) => {
+export const useInternalTransfer = (id: number) => {
   return useQuery({
-    queryKey: ['account', 'history', params],
-    queryFn: () => mockApi.getHistory(params),
+    queryKey: ['account', 'internal_transfer', id],
+    queryFn: () => v2Api.getInternalTransfer(id),
+    enabled: !!id,
     staleTime: 60 * 1000, // 1 minute
+  });
+};
+
+export const useCreateInternalTransfer = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: v2Api.createInternalTransfer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['account', 'internal_transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
+    },
+  });
+};
+
+export const useAccountStats = () => {
+  return useQuery({
+    queryKey: ['account', 'stats'],
+    queryFn: v2Api.getStats,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };

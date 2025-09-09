@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Navigation } from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAccountBalances, useAccountStats } from '@/lib/api/services/account';
+import { usePublicTickers } from '@/lib/api/services/public';
 import { 
   User,
   Mail,
@@ -80,18 +82,60 @@ export default function DashboardPage() {
     return <Badge className={levelInfo.color}>{levelInfo.label}</Badge>;
   };
 
-  // Mock data for dashboard
-  const portfolioData = {
-    totalValue: 125430.50,
-    change24h: 2.45,
-    change7d: 5.67,
-    assets: [
-      { currency: 'BTC', balance: 2.5, value: 112500, change24h: 2.1 },
-      { currency: 'ETH', balance: 15.8, value: 47340, change24h: 1.8 },
-      { currency: 'USDT', balance: 5000, value: 5000, change24h: 0.01 },
-    ]
-  };
+  // Get real data from V2 API
+  const { data: balances } = useAccountBalances();
+  const { data: stats } = useAccountStats();
+  const { data: tickersData } = usePublicTickers();
 
+  // Calculate portfolio data from real balances and tickers
+  const portfolioData = React.useMemo(() => {
+    if (!balances || !tickersData) {
+      return {
+        totalValue: 0,
+        change24h: 0,
+        change7d: 0,
+        assets: []
+      };
+    }
+
+    let totalValue = 0;
+    const assets = balances.map(balance => {
+      const balanceAmount = parseFloat(balance.balance) + parseFloat(balance.locked);
+      
+      // Find ticker for this currency
+      let price = 1;
+      let change24h = 0;
+      
+      const ticker = tickersData.find(t => 
+        t.market.endsWith('USDT') && 
+        t.market.startsWith(balance.currency.toUpperCase())
+      );
+      
+      if (ticker) {
+        price = parseFloat(ticker.ticker.last);
+        change24h = parseFloat(ticker.ticker.price_change_percent);
+      }
+      
+      const value = balanceAmount * price;
+      totalValue += value;
+      
+      return {
+        currency: balance.currency,
+        balance: balanceAmount,
+        value: value,
+        change24h: change24h
+      };
+    });
+
+    return {
+      totalValue,
+      change24h: 0, // Would need historical data to calculate
+      change7d: 0, // Would need historical data to calculate
+      assets
+    };
+  }, [balances, tickersData]);
+
+  // Mock recent activity (would come from transactions API in real implementation)
   const recentActivity = [
     { type: 'trade', description: 'Bought 0.5 BTC', amount: '+0.5 BTC', time: '2 hours ago', status: 'completed' },
     { type: 'withdrawal', description: 'Withdrew 1000 USDT', amount: '-1000 USDT', time: '1 day ago', status: 'completed' },

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { useTheme } from '@/contexts/ThemeContext';
+import { usePublicMarkets, usePublicTickers } from '@/lib/api/services/public';
 import { 
   Search,
   Star,
@@ -43,102 +44,9 @@ interface MarketData {
   tags: string[];
 }
 
-const mockMarkets: MarketData[] = [
-  {
-    symbol: 'BTCUSDT',
-    baseAsset: 'BTC',
-    quoteAsset: 'USDT',
-    lastPrice: 43250.50,
-    priceChange24h: 1250.75,
-    priceChangePercent24h: 2.97,
-    volume24h: 28576.48,
-    quoteVolume24h: 1234567890,
-    high24h: 44100.00,
-    low24h: 42100.00,
-    isFavorite: true,
-    category: 'spot',
-    tags: ['hot', 'trending']
-  },
-  {
-    symbol: 'ETHUSDT',
-    baseAsset: 'ETH',
-    quoteAsset: 'USDT',
-    lastPrice: 2547.85,
-    priceChange24h: -45.32,
-    priceChangePercent24h: -1.75,
-    volume24h: 156847.32,
-    quoteVolume24h: 987654321,
-    high24h: 2595.00,
-    low24h: 2480.00,
-    isFavorite: true,
-    category: 'spot',
-    tags: ['defi']
-  },
-  {
-    symbol: 'SOLUSDT',
-    baseAsset: 'SOL',
-    quoteAsset: 'USDT',
-    lastPrice: 98.45,
-    priceChange24h: 5.67,
-    priceChangePercent24h: 6.12,
-    volume24h: 89456.78,
-    quoteVolume24h: 456789012,
-    high24h: 102.50,
-    low24h: 95.20,
-    isFavorite: false,
-    category: 'spot',
-    tags: ['trending']
-  },
-  {
-    symbol: 'ADAUSDT',
-    baseAsset: 'ADA',
-    quoteAsset: 'USDT',
-    lastPrice: 0.4825,
-    priceChange24h: 0.0145,
-    priceChangePercent24h: 3.09,
-    volume24h: 234567.89,
-    quoteVolume24h: 123456789,
-    high24h: 0.4950,
-    low24h: 0.4680,
-    isFavorite: false,
-    category: 'spot',
-    tags: []
-  },
-  {
-    symbol: 'BTC-PERP',
-    baseAsset: 'BTC',
-    quoteAsset: 'USD',
-    lastPrice: 43275.80,
-    priceChange24h: 1275.90,
-    priceChangePercent24h: 3.04,
-    volume24h: 45678.90,
-    quoteVolume24h: 1976543210,
-    high24h: 44150.00,
-    low24h: 42050.00,
-    isFavorite: true,
-    category: 'futures',
-    tags: ['hot', 'perp']
-  }
-];
-
-const categories = [
-  { id: 'all', label: 'All', icon: Globe },
-  { id: 'favorites', label: 'Favorites', icon: Star },
-  { id: 'spot', label: 'Spot', icon: BarChart3 },
-  { id: 'futures', label: 'Futures', icon: TrendingUp },
-  { id: 'options', label: 'Options', icon: Volume2 }
-];
-
-const sortOptions = [
-  { id: 'symbol', label: 'Symbol' },
-  { id: 'price', label: 'Price' },
-  { id: 'change', label: '24h Change' },
-  { id: 'volume', label: '24h Volume' }
-];
-
-export function TickerSearchPanel({ 
+export default function TickerSearchPanel({ 
   onMarketSelect, 
-  selectedMarket,
+  selectedMarket, 
   compact = false 
 }: TickerSearchPanelProps) {
   const { theme } = useTheme();
@@ -148,39 +56,74 @@ export function TickerSearchPanel({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [favorites, setFavorites] = useState<Set<string>>(new Set(['BTCUSDT', 'ETHUSDT', 'BTC-PERP']));
   const [showFilters, setShowFilters] = useState(false);
-  const [markets, setMarkets] = useState(mockMarkets);
+
+  // Get real data from V2 API
+  const { data: marketsData, isLoading: marketsLoading } = usePublicMarkets();
+  const { data: tickersData, isLoading: tickersLoading } = usePublicTickers();
+
+  const markets: MarketData[] = useMemo(() => {
+    if (!marketsData || !tickersData) return [];
+
+    return marketsData.map(market => {
+      const ticker = tickersData.find(t => t.market === market.id);
+      
+      if (!ticker) {
+        return {
+          symbol: market.id,
+          baseAsset: market.base_unit,
+          quoteAsset: market.quote_unit,
+          lastPrice: 0,
+          priceChange24h: 0,
+          priceChangePercent24h: 0,
+          volume24h: 0,
+          quoteVolume24h: 0,
+          high24h: 0,
+          low24h: 0,
+          isFavorite: favorites.has(market.id),
+          category: 'spot',
+          tags: []
+        };
+      }
+
+      return {
+        symbol: market.id,
+        baseAsset: market.base_unit,
+        quoteAsset: market.quote_unit,
+        lastPrice: parseFloat(ticker.ticker.last),
+        priceChange24h: parseFloat(ticker.ticker.last) - parseFloat(ticker.ticker.open),
+        priceChangePercent24h: parseFloat(ticker.ticker.price_change_percent),
+        volume24h: parseFloat(ticker.ticker.volume),
+        quoteVolume24h: parseFloat(ticker.ticker.amount),
+        high24h: parseFloat(ticker.ticker.high),
+        low24h: parseFloat(ticker.ticker.low),
+        isFavorite: favorites.has(market.id),
+        category: 'spot',
+        tags: []
+      };
+    });
+  }, [marketsData, tickersData, favorites]);
+
+  const loading = marketsLoading || tickersLoading;
+  const error = null; // Could be enhanced to handle API errors
 
   // Filter and sort markets
   const filteredMarkets = useMemo(() => {
-    let filtered = markets;
-
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(market => 
-        market.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        market.baseAsset.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        market.quoteAsset.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Filter by category
-    if (selectedCategory !== 'all') {
-      if (selectedCategory === 'favorites') {
-        filtered = filtered.filter(market => favorites.has(market.symbol));
-      } else {
-        filtered = filtered.filter(market => market.category === selectedCategory);
-      }
-    }
+    let filtered = markets.filter(market => {
+      const matchesSearch = market.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           market.baseAsset.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           market.quoteAsset.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesCategory = selectedCategory === 'all' || market.category === selectedCategory;
+      
+      return matchesSearch && matchesCategory;
+    });
 
     // Sort markets
-    filtered = filtered.sort((a, b) => {
-      let aValue: any, bValue: any;
+    filtered.sort((a, b) => {
+      let aValue: number;
+      let bValue: number;
 
       switch (sortBy) {
-        case 'symbol':
-          aValue = a.symbol;
-          bValue = b.symbol;
-          break;
         case 'price':
           aValue = a.lastPrice;
           bValue = b.lastPrice;
@@ -190,40 +133,19 @@ export function TickerSearchPanel({
           bValue = b.priceChangePercent24h;
           break;
         case 'volume':
+        default:
           aValue = a.volume24h;
           bValue = b.volume24h;
           break;
-        default:
-          return 0;
       }
 
-      if (typeof aValue === 'string') {
-        return sortDirection === 'asc' 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      } else {
-        return sortDirection === 'asc' 
-          ? aValue - bValue
-          : bValue - aValue;
-      }
+      return sortDirection === 'asc' 
+        ? aValue - bValue
+        : bValue - aValue;
     });
 
     return filtered;
   }, [markets, searchTerm, selectedCategory, sortBy, sortDirection, favorites]);
-
-  // Simulate real-time price updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMarkets(prev => prev.map(market => ({
-        ...market,
-        lastPrice: market.lastPrice + (Math.random() - 0.5) * market.lastPrice * 0.001,
-        priceChange24h: market.priceChange24h + (Math.random() - 0.5) * 10,
-        volume24h: market.volume24h + (Math.random() - 0.5) * market.volume24h * 0.01
-      })));
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const toggleFavorite = (symbol: string) => {
     setFavorites(prev => {
@@ -237,234 +159,307 @@ export function TickerSearchPanel({
     });
   };
 
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortDirection('desc');
-    }
+  const handleMarketClick = (market: MarketData) => {
+    onMarketSelect(market.symbol);
   };
 
-  const MarketRow = ({ market }: { market: MarketData }) => {
-    const isSelected = selectedMarket === market.symbol;
-    const isFavorite = favorites.has(market.symbol);
-    const priceChange = market.priceChangePercent24h;
-    
+  const categories = [
+    { id: 'all', label: 'All', count: markets.length },
+    { id: 'spot', label: 'Spot', count: markets.filter(m => m.category === 'spot').length },
+    { id: 'futures', label: 'Futures', count: markets.filter(m => m.category === 'futures').length },
+    { id: 'favorites', label: 'Favorites', count: markets.filter(m => m.isFavorite).length },
+  ];
+
+  const sortOptions = [
+    { id: 'volume', label: 'Volume' },
+    { id: 'price', label: 'Price' },
+    { id: 'change', label: 'Change' },
+  ];
+
+  if (compact) {
     return (
-      <div
-        className={cn(
-          "group cursor-pointer transition-all duration-200 hover:bg-[hsl(var(--trading-bg-tertiary))]/50",
-          isSelected && "bg-[hsl(var(--trading-accent))]/10 border-l-2 border-[hsl(var(--trading-accent))]"
-        )}
-        onClick={() => onMarketSelect(market.symbol)}
-      >
-        <div className="p-2 grid grid-cols-12 gap-2 items-center text-xs">
-          {/* Symbol & Favorite */}
-          <div className="col-span-4 flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavorite(market.symbol);
-              }}
-              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Star 
-                className={cn(
-                  "h-3 w-3",
-                  isFavorite ? "fill-yellow-400 text-yellow-400" : "text-[hsl(var(--trading-text-muted))]"
-                )}
-              />
-            </Button>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1">
-                <span className="font-medium text-[hsl(var(--trading-text))] text-xs">{market.baseAsset}</span>
-                <span className="text-[hsl(var(--trading-text-muted))] text-xs">/{market.quoteAsset}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                {market.category === 'futures' && (
-                  <Badge variant="outline" className="text-xs px-1 py-0 bg-orange-500/20 border-orange-500/30 text-orange-400">
-                    PERP
-                  </Badge>
-                )}
-                {market.tags.includes('hot') && (
-                  <Badge variant="outline" className="text-xs px-1 py-0 bg-red-500/20 border-red-500/30 text-red-400">
-                    HOT
-                  </Badge>
-                )}
-                {market.tags.includes('trending') && (
-                  <Badge variant="outline" className="text-xs px-1 py-0 bg-blue-500/20 border-blue-500/30 text-blue-400">
-                    📈
-                  </Badge>
-                )}
+      <div className="bg-[hsl(var(--trading-background))] border border-[hsl(var(--trading-border))] rounded-lg">
+        <div className="p-3 border-b border-[hsl(var(--trading-border))]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[hsl(var(--trading-text-muted))]" />
+            <Input
+              placeholder="Search markets..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 h-8 text-xs"
+            />
+          </div>
+        </div>
+        
+        <div className="max-h-64 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center p-4 text-[hsl(var(--trading-text-muted))]">
+              <div className="text-center">
+                <BarChart3 className="h-4 w-4 mx-auto mb-1 animate-pulse" />
+                <div className="text-xs">Loading...</div>
               </div>
             </div>
-          </div>
-
-          {/* Price */}
-          <div className="col-span-3 text-right">
-            <div className="font-mono font-medium text-[hsl(var(--trading-text))] text-xs">
-              ${formatNumber(market.lastPrice, market.lastPrice > 1 ? 2 : 6)}
+          ) : (
+            <div className="space-y-1 p-2">
+              {filteredMarkets.slice(0, 10).map((market) => (
+                <div
+                  key={market.symbol}
+                  onClick={() => handleMarketClick(market)}
+                  className={cn(
+                    "flex items-center justify-between p-2 rounded cursor-pointer transition-colors",
+                    selectedMarket === market.symbol
+                      ? "bg-[hsl(var(--trading-accent))] text-[hsl(var(--trading-accent-foreground))]"
+                      : "hover:bg-[hsl(var(--trading-muted))]"
+                  )}
+                >
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(market.symbol);
+                      }}
+                      className="p-1 hover:bg-[hsl(var(--trading-muted))] rounded"
+                    >
+                      <Star
+                        className={cn(
+                          "h-3 w-3",
+                          market.isFavorite
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-[hsl(var(--trading-text-muted))]"
+                        )}
+                      />
+                    </button>
+                    <div>
+                      <div className="text-xs font-medium">{market.symbol}</div>
+                      <div className="text-xs text-[hsl(var(--trading-text-muted))]">
+                        {market.baseAsset}/{market.quoteAsset}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs font-medium">
+                      {formatNumber(market.lastPrice, 4)}
+                    </div>
+                    <div className={cn(
+                      "text-xs",
+                      market.priceChangePercent24h >= 0 
+                        ? "text-[hsl(var(--trading-success))]" 
+                        : "text-[hsl(var(--trading-error))]"
+                    )}>
+                      {market.priceChangePercent24h >= 0 ? '+' : ''}{market.priceChangePercent24h.toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-
-          {/* 24h Change */}
-          <div className="col-span-3 text-right">
-            <div className={cn(
-              "font-medium text-xs",
-              priceChange >= 0 ? "text-[hsl(var(--trading-success))]" : "text-[hsl(var(--trading-error))]"
-            )}>
-              {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
-            </div>
-            <div className="text-xs text-[hsl(var(--trading-text-muted))]">
-              {priceChange >= 0 ? '+' : ''}${formatNumber(market.priceChange24h, 2)}
-            </div>
-          </div>
-
-          {/* Volume */}
-          <div className="col-span-2 text-right">
-            <div className="text-[hsl(var(--trading-text))] font-medium text-xs">
-              {formatNumber(market.volume24h, 0)}
-            </div>
-            <div className="text-xs text-[hsl(var(--trading-text-muted))]">
-              {market.baseAsset}
-            </div>
-          </div>
+          )}
         </div>
       </div>
     );
-  };
+  }
 
   return (
-    <div className={cn(
-      "flex flex-col bg-[hsl(var(--trading-bg-secondary))]",
-      compact ? "h-full" : "h-full border border-[hsl(var(--trading-border))] rounded-lg shadow-lg"
-    )}>
+    <div className="bg-[hsl(var(--trading-background))] border border-[hsl(var(--trading-border))] rounded-lg h-full flex flex-col">
       {/* Header */}
-      <div className="p-3 border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))]">
-        <div className="flex items-center justify-between mb-2">
-          {!compact && <h3 className="text-sm font-semibold text-[hsl(var(--trading-text))]">Markets</h3>}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className={cn(
-                "h-6 w-6 p-0",
-                showFilters ? "text-[hsl(var(--trading-accent))]" : "text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]"
-              )}
-            >
-              <Filter className="h-3 w-3" />
-            </Button>
-            <div className="flex items-center gap-1 text-xs text-[hsl(var(--trading-text-muted))]">
-              <Zap className="h-3 w-3 text-[hsl(var(--trading-accent))] animate-pulse" />
-              <span>Live</span>
-            </div>
-          </div>
+      <div className="p-4 border-b border-[hsl(var(--trading-border))]">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-[hsl(var(--trading-foreground))]">
+            Markets
+          </h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-foreground))]"
+          >
+            <Filter className="h-4 w-4 mr-1" />
+            Filters
+          </Button>
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[hsl(var(--trading-text-muted))]" />
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[hsl(var(--trading-text-muted))]" />
           <Input
             placeholder="Search markets..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-7 h-8 text-xs bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder:text-[hsl(var(--trading-text-muted))] focus:border-[hsl(var(--trading-accent))] focus:ring-1 focus:ring-[hsl(var(--trading-accent))]/20"
+            className="pl-10"
           />
         </div>
-      </div>
 
-      {/* Category Tabs */}
-      <div className="flex border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))] overflow-x-auto">
-        {categories.map((category) => (
-          <Button
-            key={category.id}
-            variant="ghost"
-            onClick={() => setSelectedCategory(category.id)}
-            className={cn(
-              "flex-shrink-0 h-8 px-2 rounded-none border-r border-[hsl(var(--trading-border))] last:border-r-0",
-              selectedCategory === category.id
-                ? "bg-[hsl(var(--trading-bg-secondary))] text-[hsl(var(--trading-text))] border-b-2 border-[hsl(var(--trading-accent))]"
-                : "text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]/50"
-            )}
-          >
-            <category.icon className="h-3 w-3 mr-1" />
-            <span className="text-xs">{category.label}</span>
-            {category.id === 'favorites' && favorites.size > 0 && (
-              <Badge variant="outline" className="ml-1 text-xs bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] px-1 py-0">
-                {favorites.size}
+        {/* Categories */}
+        <div className="flex space-x-2 mb-4">
+          {categories.map((category) => (
+            <Button
+              key={category.id}
+              variant={selectedCategory === category.id ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setSelectedCategory(category.id)}
+              className="text-xs"
+            >
+              {category.label}
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {category.count}
               </Badge>
-            )}
-          </Button>
-        ))}
-      </div>
+            </Button>
+          ))}
+        </div>
 
-      {/* Filters */}
-      {showFilters && (
-        <div className="p-2 border-b border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))]">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[hsl(var(--trading-text-muted))]">Sort by:</span>
-            <div className="flex gap-1">
-              {sortOptions.map((option) => (
-                <Button
-                  key={option.id}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort(option.id)}
-                  className={cn(
-                    "h-5 px-2 text-xs",
-                    sortBy === option.id
-                      ? "bg-[hsl(var(--trading-accent))] text-black font-medium"
-                      : "text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]/50"
-                  )}
-                >
-                  {option.label}
-                  {sortBy === option.id && (
-                    <ArrowUpDown className="h-3 w-3 ml-1" />
-                  )}
-                </Button>
-              ))}
+        {/* Sort Options */}
+        {showFilters && (
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-[hsl(var(--trading-foreground))] mb-2 block">
+                Sort by
+              </label>
+              <div className="flex space-x-2">
+                {sortOptions.map((option) => (
+                  <Button
+                    key={option.id}
+                    variant={sortBy === option.id ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setSortBy(option.id)}
+                    className="text-xs"
+                  >
+                    {option.label}
+                    {sortBy === option.id && (
+                      <ArrowUpDown className="ml-1 h-3 w-3" />
+                    )}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                className="text-xs"
+              >
+                {sortDirection === 'asc' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+              </Button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Table Header */}
-      <div className="grid grid-cols-12 gap-2 p-2 text-xs text-[hsl(var(--trading-text-muted))] bg-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))] font-medium">
-        <div className="col-span-4">Market</div>
-        <div className="col-span-3 text-right">Price</div>
-        <div className="col-span-3 text-right">24h Change</div>
-        <div className="col-span-2 text-right">Volume</div>
+        )}
       </div>
 
       {/* Markets List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredMarkets.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center p-6 text-[hsl(var(--trading-text-muted))]">
+            <div className="text-center">
+              <BarChart3 className="h-6 w-6 mx-auto mb-2 animate-pulse" />
+              <div className="text-sm">Loading markets...</div>
+            </div>
+          </div>
+        ) : error ? (
           <div className="flex items-center justify-center p-6 text-[hsl(var(--trading-text-muted))]">
             <div className="text-center">
               <BarChart3 className="h-6 w-6 mx-auto mb-2 opacity-50" />
-              <div className="text-xs">No markets found</div>
-              <div className="text-xs">Try adjusting your search or filters</div>
+              <div className="text-xs text-red-400">Error loading markets</div>
+              <div className="text-xs">{error}</div>
             </div>
           </div>
         ) : (
-          filteredMarkets.map((market) => (
-            <MarketRow key={market.symbol} market={market} />
-          ))
+          <div className="space-y-1 p-2">
+            {filteredMarkets.map((market) => {
+              const priceChange = market.priceChangePercent24h;
+              const isPositive = priceChange >= 0;
+              
+              return (
+                <div
+                  key={market.symbol}
+                  onClick={() => handleMarketClick(market)}
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 group",
+                    selectedMarket === market.symbol
+                      ? "bg-[hsl(var(--trading-accent))] text-[hsl(var(--trading-accent-foreground))] shadow-sm"
+                      : "hover:bg-[hsl(var(--trading-muted))] hover:shadow-sm"
+                  )}
+                >
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(market.symbol);
+                      }}
+                      className="p-1 hover:bg-[hsl(var(--trading-muted))] rounded transition-colors"
+                    >
+                      <Star
+                        className={cn(
+                          "h-4 w-4 transition-colors",
+                          market.isFavorite
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-[hsl(var(--trading-text-muted))] group-hover:text-yellow-400"
+                        )}
+                      />
+                    </button>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <div className="font-medium text-[hsl(var(--trading-foreground))]">
+                          {market.symbol}
+                        </div>
+                        {market.tags.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {market.tags[0]}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-sm text-[hsl(var(--trading-text-muted))]">
+                        {market.baseAsset}/{market.quoteAsset}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="font-medium text-[hsl(var(--trading-foreground))]">
+                      {formatNumber(market.lastPrice, 4)}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className={cn(
+                        "text-sm font-medium",
+                        isPositive ? "text-[hsl(var(--trading-success))]" : "text-[hsl(var(--trading-error))]"
+                      )}>
+                        {isPositive ? '+' : ''}{priceChange.toFixed(2)}%
+                      </div>
+                      {isPositive ? (
+                        <TrendingUp className="h-3 w-3 text-[hsl(var(--trading-success))]" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 text-[hsl(var(--trading-error))]" />
+                      )}
+                    </div>
+                    <div className="text-xs text-[hsl(var(--trading-text-muted))] flex items-center space-x-1">
+                      <Volume2 className="h-3 w-3" />
+                      <span>{formatNumber(market.volume24h, 0)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Footer Stats */}
-      <div className="p-3 border-t border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg))] text-xs text-[hsl(var(--trading-text-muted))]">
-        <div className="flex items-center justify-between">
-          <span>{filteredMarkets.length} markets</span>
-          <div className="flex items-center gap-2">
-            <span>Updated</span>
-            <Clock className="h-3 w-3" />
-            <span>few seconds ago</span>
+      {/* Footer */}
+      <div className="p-3 border-t border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-muted))]">
+        <div className="flex items-center justify-between text-xs text-[hsl(var(--trading-text-muted))]">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-1">
+              <Eye className="h-3 w-3" />
+              <span>{filteredMarkets.length} markets</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Clock className="h-3 w-3" />
+              <span>Live</span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Zap className="h-3 w-3" />
+            <span>Real-time</span>
           </div>
         </div>
       </div>
