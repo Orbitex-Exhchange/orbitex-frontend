@@ -1,7 +1,36 @@
 // Export all API services with specific exports to avoid conflicts
-export { useMarkets, useMarketTicker, useOrderBook, useTrades } from './services/markets';
-export { useWallets, useWallet, useDepositAddress } from './services/wallets';
-export { useOrders, useOrder, useCreateOrder, useCancelOrder } from './services/orders';
+
+// Public APIs (no authentication required)
+export { 
+  usePublicMarkets,
+  usePublicCurrencies,
+  usePublicTickers,
+  useTradingFees,
+  useMemberLevels,
+  useWithdrawLimits,
+  useServerTimestamp,
+  useServerVersion,
+  useServerHealth,
+  publicApi
+} from './services/public';
+
+// Trading APIs (authenticated)
+export { 
+  useOrders,
+  useOrder,
+  useCreateOrder,
+  useCancelOrder,
+  useCancelAllOrders,
+  useTrades,
+  useTrade,
+  useTicker,
+  useOrderBook,
+  useMarketTrades,
+  useKline,
+  tradingApi
+} from './services/trading';
+
+// Account APIs (authenticated)
 export { 
   useAccountBalances, 
   useAccountBalance, 
@@ -20,8 +49,11 @@ export {
   useAccountStats,
   useCreateInternalTransfer,
   useInternalTransfers,
-  useInternalTransfer
+  useInternalTransfer,
+  useWallets
 } from './services/account';
+
+// Identity APIs (authentication)
 export { 
   useIdentityPing, 
   useIdentityConfigs, 
@@ -32,59 +64,44 @@ export {
   useGeneratePasswordCode,
   useConfirmPasswordCode
 } from './services/identity';
-export { useCreateLead } from './services/leads';
+
+// User Resource APIs (Orbisigner - authenticated)
+export { 
+  useUserProfile,
+  useUpdateProfile,
+  useUserDocuments,
+  useCreateDocument,
+  useUpdateDocument,
+  useDeleteDocument,
+  useUserPhones,
+  useCreatePhone,
+  useVerifyPhone,
+  useDeletePhone,
+  useEnableOtp,
+  useDisableOtp,
+  useVerifyOtp,
+  useUserApiKeys,
+  useCreateApiKey,
+  useUpdateApiKey,
+  useDeleteApiKey,
+  useUserLabels,
+  useCreateLabel,
+  useUpdateLabel,
+  useDeleteLabel,
+  useUserDataStorage,
+  useSetDataStorage,
+  userApi
+} from './services/user';
+
+// Legacy exports for backward compatibility
 export { 
   useMarketOrders, 
   useMarketOrder, 
   useCreateOrder as useCreateMarketOrder,
   useCancelOrder as useCancelMarketOrder,
-  useCancelAllOrders,
-  useMarketTrades,
+  useCancelAllOrders as useCancelAllMarketOrders,
   useMarketTrade
 } from './services/market';
-export { 
-  usePublicMarkets,
-  usePublicMarket,
-  usePublicCurrencies,
-  usePublicCurrency,
-  usePublicTickers,
-  usePublicTicker,
-  usePublicOrderBook,
-  usePublicTrades,
-  usePublicKLines,
-  usePublicDepth,
-  usePublicMemberLevels,
-  usePublicTradingFees,
-  usePublicTimestamp,
-  usePublicTime,
-  usePublicWebhooks,
-  usePublicWithdrawLimits,
-  usePublicKWithPendingTrades
-} from './services/public';
-export { 
-  useUserProfile as useResourceUserProfile,
-  useUpdateUserProfile as useUpdateResourceProfile,
-  useApiKeys,
-  useCreateApiKey,
-  useUpdateApiKey,
-  useDeleteApiKey,
-  useLabels,
-  useDocuments,
-  useUploadDocument as useUploadResourceDocument,
-  usePhones,
-  useCreatePhone,
-  useGenerateOtpQrCode,
-  useEnableOtp,
-  useUpdateProfile as useUpdateResourceProfileData,
-  useChangePassword
-} from './services/resource';
-export { 
-  useUserProfile,
-  useUpdateUserProfile,
-  useUploadDocument,
-  useAddPhone,
-  useAddLabel
-} from './services/user';
 
 // Export API client
 export { api, APIError } from '../api-client';

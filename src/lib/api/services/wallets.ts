@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { V2Account, ApiResponse } from '../types/v2';
+import { V2Account, ApiResponse } from '../types/api_v2';
 
 // Wallet interface based on the V2 API response
 export interface Wallet {
@@ -13,9 +13,9 @@ export interface Wallet {
 
 // Wallets API endpoints - Updated to match V2 API structure
 const WALLETS_ENDPOINTS = {
-  list: '/api/v2/account/balances',
-  balance: '/api/v2/account/balances/:currency',
-  depositAddress: '/api/v2/account/deposit_address/:currency',
+  list: '/api/api_v2/account/balances',
+  balance: '/api/api_v2/account/balances/:currency',
+  depositAddress: '/api/api_v2/account/deposit_address/:currency',
 } as const;
 
 // Real V2 API functions

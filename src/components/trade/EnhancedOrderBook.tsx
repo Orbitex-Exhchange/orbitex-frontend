@@ -29,6 +29,8 @@ interface OrderBookProps {
   market: string;
   onPriceClick?: (price: number) => void;
   compact?: boolean;
+  orderBookData?: any;
+  marketTradesData?: any[];
 }
 
 interface OrderBookEntry {
@@ -66,7 +68,9 @@ const priceGroupings = [
 export const EnhancedOrderBook = React.memo(({ 
   market = 'BTC-USDT', 
   onPriceClick,
-  compact = false 
+  compact = false,
+  orderBookData: propOrderBookData,
+  marketTradesData: propMarketTradesData
 }: OrderBookProps) => {
   const { theme } = useTheme();
   
@@ -92,10 +96,79 @@ export const EnhancedOrderBook = React.memo(({
 
   // Generate mock order book data if no real data
   const processedOrderBookData = useMemo(() => {
-    console.log('Processing order book data:', { orderBookData, hasData: !!orderBookData });
-    if (orderBookData && (orderBookData.bids.length > 0 || orderBookData.asks.length > 0)) {
-      console.log('Using real order book data:', orderBookData);
-      return orderBookData;
+    console.log('Processing order book data:', { 
+      propOrderBookData, 
+      storeOrderBookData: orderBookData, 
+      hasPropData: !!propOrderBookData,
+      hasStoreData: !!orderBookData 
+    });
+    
+    // Prioritize prop data (from parent), then store data, then fallback to mock
+    const realOrderBookData = propOrderBookData || orderBookData;
+    
+    if (realOrderBookData && (realOrderBookData.bids?.length > 0 || realOrderBookData.asks?.length > 0)) {
+      console.log('Using real order book data:', realOrderBookData);
+      
+      // Process API data format [price, amount] to component format
+      let processedBids: OrderBookEntry[] = [];
+      let processedAsks: OrderBookEntry[] = [];
+      
+      if (realOrderBookData.bids && Array.isArray(realOrderBookData.bids)) {
+        let runningBids = 0;
+        processedBids = realOrderBookData.bids.map(([price, amount]: [string, string]) => {
+          const priceNum = parseFloat(price);
+          const amountNum = parseFloat(amount);
+          runningBids += amountNum;
+          return {
+            price: priceNum,
+            size: amountNum,
+            total: runningBids,
+            percentage: 0 // Will be calculated later
+          };
+        });
+      }
+      
+      if (realOrderBookData.asks && Array.isArray(realOrderBookData.asks)) {
+        let runningAsks = 0;
+        processedAsks = realOrderBookData.asks.map(([price, amount]: [string, string]) => {
+          const priceNum = parseFloat(price);
+          const amountNum = parseFloat(amount);
+          runningAsks += amountNum;
+          return {
+            price: priceNum,
+            size: amountNum,
+            total: runningAsks,
+            percentage: 0 // Will be calculated later
+          };
+        });
+      }
+      
+      // Sort: bids descending by price (highest first); asks ascending by price (lowest first)
+      processedBids = processedBids.sort((a, b) => b.price - a.price);
+      processedAsks = processedAsks.sort((a, b) => a.price - b.price);
+      
+      // Calculate percentages
+      const maxTotal = Math.max(
+        processedAsks[processedAsks.length - 1]?.total || 0,
+        processedBids[processedBids.length - 1]?.total || 0,
+        1
+      );
+      processedAsks.forEach(ask => ask.percentage = (ask.total / maxTotal) * 100);
+      processedBids.forEach(bid => bid.percentage = (bid.total / maxTotal) * 100);
+      
+      // Calculate spread
+      const bestBid = processedBids[0]?.price || 0;
+      const bestAsk = processedAsks[0]?.price || 0;
+      const spread = bestAsk && bestBid ? Math.max(0, bestAsk - bestBid) : 0;
+      const mid = bestAsk && bestBid ? (bestAsk + bestBid) / 2 : (bestBid || bestAsk || lastPrice);
+      const spreadPercentage = mid ? (spread / mid) * 100 : 0;
+      
+      return {
+        bids: processedBids,
+        asks: processedAsks,
+        spread,
+        spreadPercentage
+      };
     }
 
     // Fallback to mock data
@@ -149,12 +222,35 @@ export const EnhancedOrderBook = React.memo(({
     };
 
     return generateOrderBook();
-  }, [orderBookData, lastPrice, orderBookSettings.groupBy, orderBookSettings.depth]);
+  }, [propOrderBookData, orderBookData, lastPrice, orderBookSettings.groupBy, orderBookSettings.depth]);
 
   // Generate mock recent trades data if no real data
   const processedRecentTrades = useMemo(() => {
-    if (recentTrades.length > 0) {
-      return recentTrades;
+    // Prioritize prop data (from parent), then store data, then fallback to mock
+    const realTradesData = propMarketTradesData || recentTrades;
+    
+    if (realTradesData && realTradesData.length > 0) {
+      // Transform API trade data to component format
+      if (propMarketTradesData) {
+        return propMarketTradesData.map((trade: any) => ({
+          id: trade.id.toString(),
+          price: parseFloat(trade.price),
+          size: parseFloat(trade.volume),
+          side: trade.side as 'buy' | 'sell',
+          timestamp: new Date(trade.created_at).getTime()
+        }));
+      }
+      // Handle store data format
+      if (recentTrades && Array.isArray(recentTrades)) {
+        return recentTrades.map((trade: any) => ({
+          id: trade.id?.toString() || `trade-${Date.now()}-${Math.random()}`,
+          price: parseFloat(trade.price || trade.price),
+          size: parseFloat(trade.volume || trade.size),
+          side: trade.side as 'buy' | 'sell',
+          timestamp: new Date(trade.created_at || trade.timestamp).getTime()
+        }));
+      }
+      return realTradesData;
     }
 
     // Fallback to mock data
@@ -177,7 +273,7 @@ export const EnhancedOrderBook = React.memo(({
     }
     
     return trades.sort((a, b) => b.timestamp - a.timestamp);
-  }, [recentTrades, lastPrice]);
+  }, [propMarketTradesData, recentTrades, lastPrice]);
 
   // Virtualization for bids (buy orders) - TOP of panel
   const bidsVirtualizer = useVirtualizer({
@@ -232,8 +328,13 @@ export const EnhancedOrderBook = React.memo(({
     websocketService.subscribeToTrades(market, () => {});
   }, [market, websocketService]);
 
-  // Fetch order book from Orbitex v2 REST (public)
+  // Only fetch order book if not provided via props
   useEffect(() => {
+    if (propOrderBookData) {
+      // Data is provided via props, no need to fetch
+      return;
+    }
+
     const apiBase = env.NEXT_PUBLIC_API_URL;
     const symbol = (market || '').replace('-', '').toLowerCase();
     console.log('Order book effect triggered:', { market, symbol, apiBase });
@@ -242,7 +343,7 @@ export const EnhancedOrderBook = React.memo(({
     const fetchOrderBook = async () => {
       try {
         const limit = Math.max(orderBookSettings.depth, 20);
-        const url = `${apiBase}/api/v2/public/markets/${symbol}/order-book?limit=${limit}`;
+        const url = `${apiBase}/api/api_v2/public/markets/${symbol}/order-book?limit=${limit}`;
         console.log('Fetching order book from:', url);
         
         const res = await fetch(url);
@@ -327,7 +428,17 @@ export const EnhancedOrderBook = React.memo(({
     fetchOrderBook();
     const id = setInterval(fetchOrderBook, 3000);
     return () => clearInterval(id);
-  }, [market, orderBookSettings.depth, lastPrice]);
+  }, [market, orderBookSettings.depth, lastPrice, propOrderBookData]);
+
+  // Update last price when order book data changes
+  useEffect(() => {
+    if (processedOrderBookData.bids.length > 0 || processedOrderBookData.asks.length > 0) {
+      const bestBid = processedOrderBookData.bids[0]?.price || 0;
+      const bestAsk = processedOrderBookData.asks[0]?.price || 0;
+      const mid = bestAsk && bestBid ? (bestAsk + bestBid) / 2 : (bestBid || bestAsk || lastPrice);
+      setLastPrice(mid);
+    }
+  }, [processedOrderBookData, lastPrice]);
 
   const handlePriceClick = useCallback((price: number) => {
     onPriceClick?.(price);

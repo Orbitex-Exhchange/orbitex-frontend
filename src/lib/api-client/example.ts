@@ -14,7 +14,7 @@ interface CreateUserRequest {
   password: string;
 }
 
-// Trading API interfaces based on Peatio Management API v2
+// Trading API interfaces based on Orbitex Management API v2
 interface Market {
   id: string;
   name: string;
@@ -137,12 +137,12 @@ export const userApi = {
   },
 };
 
-// Trading API functions based on Peatio Management API v2
+// Trading API functions based on Orbitex Management API v2
 export const tradingApi = {
   // Get all markets
   getMarkets: async (): Promise<Market[]> => {
     try {
-      const data = await api.get<Market[]>('/api/v2/public/markets');
+      const data = await api.get<Market[]>('/api/api_v2/public/markets');
       // Handle empty response by providing fallback data
       if (!data || data.length === 0) {
         return [
@@ -169,7 +169,7 @@ export const tradingApi = {
         const tickers: Ticker[] = [];
         for (const market of marketList) {
           try {
-            const data = await api.get<{ticker: Ticker}>(`/api/v2/public/tickers/${market}`);
+            const data = await api.get<{ticker: Ticker}>(`/api/api_v2/public/tickers/${market}`);
             if (data && data.ticker) {
               tickers.push({...data.ticker, market});
             }
@@ -193,8 +193,8 @@ export const tradingApi = {
   getOrderBook: async (market: string, limit?: number): Promise<OrderBook> => {
     try {
       const endpoint = limit 
-        ? `/api/v2/public/order_book/${market}?asks_limit=${limit}&bids_limit=${limit}`
-        : `/api/v2/public/order_book/${market}`;
+        ? `/api/api_v2/public/order_book/${market}?asks_limit=${limit}&bids_limit=${limit}`
+        : `/api/api_v2/public/order_book/${market}`;
       return await api.get<OrderBook>(endpoint);
     } catch (error) {
       if (error instanceof APIError) {
@@ -208,8 +208,8 @@ export const tradingApi = {
   getTrades: async (market: string, limit?: number): Promise<Trade[]> => {
     try {
       const endpoint = limit 
-        ? `/api/v2/public/trades/${market}?limit=${limit}`
-        : `/api/v2/public/trades/${market}`;
+        ? `/api/api_v2/public/trades/${market}?limit=${limit}`
+        : `/api/api_v2/public/trades/${market}`;
       return await api.get<Trade[]>(endpoint);
     } catch (error) {
       if (error instanceof APIError) {
@@ -226,7 +226,7 @@ export const tradingApi = {
       formData.append('uid', uid);
       formData.append('currency', currency);
       
-      return await api.post<Balance>('/api/v2/management/orbitex/accounts/balance', formData, {
+      return await api.post<Balance>('/api/api_v2/management/accounts/balance', formData, {
         authToken,
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -248,7 +248,7 @@ export const tradingApi = {
       if (page) formData.append('page', page.toString());
       if (limit) formData.append('limit', limit.toString());
       
-      return await api.post<Balance[]>('/api/v2/management/orbitex/accounts/balances', formData, {
+      return await api.post<Balance[]>('/api/api_v2/management/accounts/balances', formData, {
         authToken,
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -265,7 +265,7 @@ export const tradingApi = {
   // Get server timestamp
   getTimestamp: async (): Promise<number> => {
     try {
-      return await api.post<number>('/api/v2/management/orbitex/timestamp');
+      return await api.post<number>('/api/api_v2/management/timestamp');
     } catch (error) {
       if (error instanceof APIError) {
         console.error(`API Error: ${error.message} (${error.status})`);

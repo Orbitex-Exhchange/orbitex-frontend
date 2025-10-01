@@ -15,7 +15,7 @@ accept: application/json
  x-amzn-trace-id: Root=1-5c13acf8-ac5ea11ba62fbd7d35f8dd2b
  x-cache: Miss from cloudfront
  x-envoy-expected-rq-timeout-ms: 3000
- x-envoy-original-path: /api/v2/peatio/public/markets/bchbtc/tickers
+ x-envoy-original-path: /api/v2/orbitex/public/markets/bchbtc/tickers
  x-envoy-upstream-service-time: 32
  x-forwarded-for: 195.214.197.210, 52.57.254.37, 10.101.20.153, 18.206.101.123
  x-forwarded-host: www.microkube.com

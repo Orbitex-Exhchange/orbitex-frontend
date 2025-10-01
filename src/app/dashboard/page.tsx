@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Navigation } from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAccountBalances, useAccountStats } from '@/lib/api/services/account';
-import { usePublicTickers } from '@/lib/api/services/public';
+import { useAccountBalances, useAccountStats } from '@/lib/api';
+import { usePublicTickers } from '@/lib/api';
 import { 
   User,
   Mail,

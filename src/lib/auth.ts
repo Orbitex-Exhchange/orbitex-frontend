@@ -82,112 +82,96 @@ class AuthService {
   }
 
   public async login(email: string, password: string, otpCode?: string): Promise<{ success: boolean; user: AuthUser; token: string }> {
-    const { env } = await import('./env');
-    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // V2 identity base
-    // V2 identity sessions endpoint: POST /api/v2/identity/sessions
-    const response = await fetch(`${authServiceUrl}/sessions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { authAPI } = await import('./api/auth');
+    
+    try {
+      const response = await authAPI.login({
         email,
         password,
-        otp_code: otpCode,
-      }),
-    });
+        ...(otpCode && { otp_code: otpCode }),
+      });
+      
+      // Convert Orbisigner user to AuthUser format
+      const profile = response.user.profiles[0] || {};
+      this.user = {
+        id: response.user.uid,
+        email: response.user.email,
+        role: response.user.role || 'member',
+        kyc_level: response.user.level || 0,
+        email_verified: response.user.state === 'active',
+        phone_verified: response.user.phones.length > 0,
+        two_factor_enabled: response.user.otp || false,
+      };
 
-    if (!response.ok) {
-      let errorMessage = 'Login failed';
-      try {
-        const error = await response.json();
-        errorMessage = error.error || error.message || 'Login failed';
-      } catch (parseError) {
-        console.error('Failed to parse error response:', parseError);
-        errorMessage = `Login failed (${response.status}: ${response.statusText})`;
+      // Use the generated JWT token for Orbitex-Clean API access
+      this.accessToken = response.jwt_token || '';
+      this.refreshToken = response.user.csrf_token; // Use CSRF token as refresh token
+
+      // Store tokens in localStorage
+      if (typeof window !== 'undefined' && this.accessToken) {
+        localStorage.setItem('access_token', this.accessToken);
+        localStorage.setItem('refresh_token', this.refreshToken || '');
+        localStorage.setItem('user', JSON.stringify(this.user));
       }
-      throw new Error(errorMessage);
-    }
 
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('Failed to parse login response:', parseError);
-      throw new Error('Invalid response from server');
+      return {
+        success: true,
+        user: this.user,
+        token: this.accessToken
+      };
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
     }
-    
-    // V2 identity returns { access_token, refresh_token, token_type, expires_in, user: { id, email, role, level, state } }
-    this.accessToken = data.access_token;
-    this.refreshToken = data.refresh_token;
-    this.user = {
-      id: data.user.id,
-      email: data.user.email,
-      role: data.user.role || 'member',
-      kyc_level: data.user.level || 0,
-      email_verified: data.user.state === 'active',
-      phone_verified: false, // Would need additional API call to check
-      two_factor_enabled: data.user.otp || false,
-    };
-
-    // Store tokens in localStorage
-    if (typeof window !== 'undefined' && this.accessToken && this.refreshToken) {
-      localStorage.setItem('access_token', this.accessToken);
-      localStorage.setItem('refresh_token', this.refreshToken);
-    }
-
-    return {
-      success: true,
-      user: this.user,
-      token: this.accessToken || ''
-    };
   }
 
   public async register(userData: {
     email: string;
     password: string;
-    password_confirmation: string;
+    username?: string;
     recaptcha_response?: string;
     refid?: string;
+    data?: string;
   }): Promise<void> {
-    const { env } = await import('./env');
-    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // V2 identity base
-    // V2 identity users endpoint: POST /api/v2/identity/users
-    const response = await fetch(`${authServiceUrl}/users`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
+    const { authAPI } = await import('./api/auth');
+    
+    try {
+      const response = await authAPI.register(userData);
+      
+      // Convert Orbisigner user to AuthUser format
+      const profile = response.user.profiles[0] || {};
+      this.user = {
+        id: response.user.uid,
+        email: response.user.email,
+        role: response.user.role || 'member',
+        kyc_level: response.user.level || 0,
+        email_verified: response.user.state === 'active',
+        phone_verified: response.user.phones.length > 0,
+        two_factor_enabled: response.user.otp || false,
+      };
 
-    if (!response.ok) {
-      let errorMessage = 'Registration failed';
-      try {
-        const error = await response.json();
-        errorMessage = error.error || error.message || 'Registration failed';
-      } catch (parseError) {
-        console.error('Failed to parse registration error response:', parseError);
-        errorMessage = `Registration failed (${response.status}: ${response.statusText})`;
+      // Use the generated JWT token for Orbitex-Clean API access
+      this.accessToken = response.jwt_token || '';
+      this.refreshToken = response.user.csrf_token; // Use CSRF token as refresh token
+
+      // Store tokens in localStorage
+      if (typeof window !== 'undefined' && this.accessToken) {
+        localStorage.setItem('access_token', this.accessToken);
+        localStorage.setItem('refresh_token', this.refreshToken || '');
+        localStorage.setItem('user', JSON.stringify(this.user));
       }
-      throw new Error(errorMessage);
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
     }
   }
 
   public async logout(): Promise<void> {
-    const { env } = await import('./env');
-    const authServiceUrl = env.NEXT_PUBLIC_AUTH_SERVICE_URL; // V2 identity base
+    const { authAPI } = await import('./api/auth');
     
     if (this.accessToken) {
       try {
-        // V2 identity sessions endpoint: DELETE /api/v2/identity/sessions
-        await fetch(`${authServiceUrl}/sessions`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        await authAPI.logout(this.accessToken);
       } catch (error) {
         console.error('Logout request failed:', error);
       }
@@ -358,6 +342,7 @@ class AuthService {
   }
 }
 
+export { AuthService };
 export const authService = AuthService.getInstance();
 
 // React hook for authentication state

@@ -14,7 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import Link from 'next/link';
-import { useBeneficiaries } from '@/lib/api/services/account';
+import { useBeneficiaries } from '@/lib/api';
 
 interface AddressBookEntry {
   id: string;

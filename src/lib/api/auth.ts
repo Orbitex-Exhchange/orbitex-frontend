@@ -1,6 +1,37 @@
 import { env } from '@/lib/env';
 
-// Types
+// Types matching Orbisigner API response format
+export interface OrbisignerUser {
+  email: string;
+  uid: string;
+  role: string;
+  level: number;
+  otp: boolean;
+  state: string;
+  referral_uid: string | null;
+  data: any;
+  csrf_token: string;
+  username: string | null;
+  labels: string[];
+  phones: string[];
+  profiles: Array<{
+    first_name: string | null;
+    last_name: string | null;
+    dob: string | null;
+    address: string | null;
+    postcode: string | null;
+    city: string | null;
+    country: string | null;
+    state: string | null;
+    metadata: any;
+    created_at: string;
+    updated_at: string;
+  }>;
+  data_storages: any[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -23,22 +54,22 @@ export interface AuthTokens {
 export interface RegisterRequest {
   email: string;
   password: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  terms_accepted: boolean;
+  username?: string;
+  recaptcha_response?: string;
+  refid?: string;
+  data?: string;
 }
 
 export interface LoginRequest {
   email: string;
   password: string;
-  two_factor_code?: string;
+  otp_code?: string;
+  recaptcha_response?: string;
 }
 
 export interface AuthResponse {
-  token: string;
-  user: User;
-  message: string;
+  user: OrbisignerUser;
+  jwt_token?: string; // Generated client-side
 }
 
 export interface VerifyEmailRequest {
@@ -113,20 +144,64 @@ class AuthAPI {
   // Register a new user
   async register(data: RegisterRequest): Promise<AuthResponse> {
     // POST /api/v2/identity/users
-    return this.request<AuthResponse>('/users', {
+    const response = await this.request<OrbisignerUser>('/users', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    return {
+      user: response,
+      jwt_token: await this.generateJWTToken(response)
+    };
   }
 
   // Login user
   async login(data: LoginRequest): Promise<AuthResponse> {
     // POST /api/v2/identity/sessions
-    return this.request<AuthResponse>('/sessions', {
+    const response = await this.request<OrbisignerUser>('/sessions', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    return {
+      user: response,
+      jwt_token: await this.generateJWTToken(response)
+    };
   }
+
+         // Generate JWT token for Orbitex-Clean API access
+         private async generateJWTToken(user: OrbisignerUser): Promise<string> {
+           const payload = {
+             uid: user.uid,
+             email: user.email,
+             username: user.username || user.email.split('@')[0],
+             role: user.role,
+             level: user.level,
+             state: user.state,
+             iat: Math.floor(Date.now() / 1000),
+             exp: Math.floor(Date.now() / 1000) + (1 * 60 * 60), // 1 hour
+             iss: 'Orbisigner',
+             aud: 'Orbitex',
+             sub: 'session',
+             jti: Math.random().toString(36).substring(2, 15)
+           };
+
+           // Use jose library for browser-compatible JWT signing
+           const { SignJWT } = await import('jose');
+           const secret = new TextEncoder().encode('6d69b7b372c13d635ed4abd69b7a7b30edcaa7eeda14e3970c5f1b4ae24b9258542476e3b4a01550a44d1e5d948f4ac0d44ebc2e2b36cb691504516fd0ab508e');
+           
+           const jwt = await new SignJWT(payload)
+             .setProtectedHeader({ alg: 'HS256' })
+             .setIssuedAt()
+             .setExpirationTime('1h')
+             .setIssuer('Orbisigner')
+             .setAudience('Orbitex')
+             .setSubject('session')
+             .setJti(payload.jti)
+             .sign(secret);
+           
+           return jwt;
+         }
 
   // Verify email
   async verifyEmail(data: VerifyEmailRequest): Promise<{ message: string; success: boolean }> {

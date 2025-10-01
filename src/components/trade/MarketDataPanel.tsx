@@ -16,44 +16,38 @@ import {
   Rocket
 } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
+import { usePublicTickers } from '@/lib/api';
 
 interface MarketDataPanelProps {
   market: string;
   onPriceClick?: (price: number) => void;
   compact?: boolean;
+  tickerData?: any;
 }
 
 export function MarketDataPanel({ 
   market, 
   onPriceClick,
-  compact = false 
+  compact = false,
+  tickerData: propTickerData
 }: MarketDataPanelProps) {
-  const [marketData, setMarketData] = useState({
-    lastPrice: 43250.50,
-    change24h: 2.45,
-    high24h: 44100.00,
-    low24h: 42800.00,
-    volume: 2847.65,
+  // Real API data
+  const { data: tickersData, isLoading: tickersLoading } = usePublicTickers();
+  
+  // Get current market ticker data - prioritize prop data
+  const currentTicker = propTickerData || tickersData?.find(ticker => ticker.market === market);
+  
+  const marketData = {
+    lastPrice: currentTicker ? parseFloat(currentTicker.ticker.last) : 43250.50,
+    change24h: currentTicker ? parseFloat(currentTicker.ticker.price_change_percent) : 2.45,
+    high24h: currentTicker ? parseFloat(currentTicker.ticker.high) : 44100.00,
+    low24h: currentTicker ? parseFloat(currentTicker.ticker.low) : 42800.00,
+    volume: currentTicker ? parseFloat(currentTicker.ticker.vol) : 2847.65,
     openInterest: 125000000,
-    bid: 43250.00,
-    ask: 43251.00,
-    spread: 0.0023
-  });
-
-  // Simulate real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMarketData(prev => ({
-        ...prev,
-        lastPrice: prev.lastPrice + (Math.random() - 0.5) * 10,
-        bid: prev.bid + (Math.random() - 0.5) * 5,
-        ask: prev.ask + (Math.random() - 0.5) * 5,
-        volume: prev.volume + Math.random() * 10
-      }));
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, []);
+    bid: currentTicker ? parseFloat(currentTicker.ticker.buy) : 43250.00,
+    ask: currentTicker ? parseFloat(currentTicker.ticker.sell) : 43251.00,
+    spread: currentTicker ? (parseFloat(currentTicker.ticker.sell) - parseFloat(currentTicker.ticker.buy)) / parseFloat(currentTicker.ticker.last) * 100 : 0.0023
+  };
 
   return (
     <div className={cn(

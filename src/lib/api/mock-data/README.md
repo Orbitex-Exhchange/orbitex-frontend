@@ -10,32 +10,32 @@ This directory contains comprehensive mock data for the trading application's AP
 
 ## API Endpoints Covered
 
-### 1. Identity API (`/api/v2/barong/identity/`)
+### 1. Identity API (`/api/v2/identity/`)
 - **Users**: User authentication and management
 - **Sessions**: Login/logout and session management
 - **Configs**: Platform configuration settings
 
-### 2. Resource API (`/api/v2/barong/resource/`)
+### 2. Resource API (`/api/v2/resource/`)
 - **User Profiles**: User profile information and settings
 - **API Keys**: Trading API key management
 - **Labels**: User labels and tags
 - **Documents**: KYC document management
 - **Phones**: Phone number verification
 
-### 3. Leads API (`/api/v2/barong/leads/`)
+### 3. Leads API (`/api/v2/leads/`)
 - **Leads**: Lead management for marketing
 
-### 4. Account API (`/api/v2/peatio/account/`)
+### 4. Account API (`/api/v2/account/`)
 - **Balances**: User wallet balances
 - **Deposits**: Deposit history and management
 - **Withdrawals**: Withdrawal history and management
 - **Beneficiaries**: Withdrawal address management
 
-### 5. Market API (`/api/v2/peatio/market/`)
+### 5. Market API (`/api/v2/market/`)
 - **Orders**: Trading order management
 - **Trades**: Trade history and execution
 
-### 6. Public API (`/api/v2/peatio/public/`)
+### 6. Public API (`/api/v2/public/`)
 - **Markets**: Available trading pairs
 - **Currencies**: Supported cryptocurrencies and fiat
 - **Tickers**: Real-time market data

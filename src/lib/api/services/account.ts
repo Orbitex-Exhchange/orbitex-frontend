@@ -9,24 +9,24 @@ import {
   V2InternalTransfer,
   V2Stats,
   ApiResponse
-} from '../types/v2';
+} from '../types/api_v2';
 
 // Account API endpoints - Updated to match V2 API structure
 const ACCOUNT_ENDPOINTS = {
-  balances: '/api/v2/account/balances',
-  balance: '/api/v2/account/balances/:currency',
-  deposits: '/api/v2/account/deposits',
-  deposit: '/api/v2/account/deposits/:txid',
-  depositAddress: '/api/v2/account/deposit_address/:currency',
-  withdraws: '/api/v2/account/withdraws',
-  withdraw: '/api/v2/account/withdraws/:txid',
-  transactions: '/api/v2/account/transactions',
-  transaction: '/api/v2/account/transactions/:txid',
-  beneficiaries: '/api/v2/account/beneficiaries',
-  beneficiary: '/api/v2/account/beneficiaries/:id',
-  internalTransfers: '/api/v2/account/internal_transfers',
-  internalTransfer: '/api/v2/account/internal_transfers/:id',
-  stats: '/api/v2/account/stats',
+  balances: '/api/api_v2/account/balances',
+  balance: '/api/api_v2/account/balances/:currency',
+  deposits: '/api/api_v2/account/deposits',
+  deposit: '/api/api_v2/account/deposits/:txid',
+  depositAddress: '/api/api_v2/account/deposit_address/:currency',
+  withdraws: '/api/api_v2/account/withdraws',
+  withdraw: '/api/api_v2/account/withdraws/:txid',
+  transactions: '/api/api_v2/account/transactions',
+  transaction: '/api/api_v2/account/transactions/:txid',
+  beneficiaries: '/api/api_v2/account/beneficiaries',
+  beneficiary: '/api/api_v2/account/beneficiaries/:id',
+  internalTransfers: '/api/api_v2/account/internal_transfers',
+  internalTransfer: '/api/api_v2/account/internal_transfers/:id',
+  stats: '/api/api_v2/account/stats',
 } as const;
 
 // Real V2 API functions
@@ -416,3 +416,6 @@ export const useAccountStats = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
+
+// Alias for backward compatibility
+export const useWallets = useAccountBalances;

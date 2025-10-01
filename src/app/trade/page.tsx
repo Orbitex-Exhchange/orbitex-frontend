@@ -40,6 +40,18 @@ import { MarketDataPanel } from '@/components/trade/MarketDataPanel';
 import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/auth';
 import TickerSearchPanel from '@/components/trade/TickerSearchPanel';
+import { 
+  usePublicTickers, 
+  useAccountBalances, 
+  useAccountStats,
+  useOrders,
+  useTrades,
+  useTicker,
+  useOrderBook,
+  useMarketTrades,
+  useKline
+} from '@/lib/api';
+import { useMarketWebSocket } from '@/lib/api/websocket';
 
 export default function TradingPage() {
   const router = useRouter();
@@ -53,6 +65,43 @@ export default function TradingPage() {
   const [showMarketSelector, setShowMarketSelector] = useState(false);
   
   const { toast } = useToast();
+
+  // Real API data hooks
+  const { data: tickersData, isLoading: tickersLoading, error: tickersError } = usePublicTickers();
+  const { data: balancesData, isLoading: balancesLoading, error: balancesError } = useAccountBalances();
+  const { data: statsData, isLoading: statsLoading, error: statsError } = useAccountStats();
+  const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useOrders({ limit: 10 });
+  const { data: tradesData, isLoading: tradesLoading, error: tradesError } = useTrades({ limit: 10 });
+  
+  // Market-specific real-time data hooks
+  const { data: currentTickerData, isLoading: tickerLoading, error: tickerError } = useTicker(selectedMarket);
+  const { data: orderBookData, isLoading: orderBookLoading, error: orderBookError } = useOrderBook(selectedMarket, 20);
+  const { data: marketTradesData, isLoading: marketTradesLoading, error: marketTradesError } = useMarketTrades(selectedMarket, 50);
+  const { data: klineData, isLoading: klineLoading, error: klineError } = useKline(selectedMarket, '1h', 200);
+
+  // Combined loading and error states
+  const isDataLoading = tickersLoading || balancesLoading || statsLoading || ordersLoading || tradesLoading || 
+                       tickerLoading || orderBookLoading || marketTradesLoading || klineLoading;
+  const hasDataError = tickersError || balancesError || statsError || ordersError || tradesError ||
+                      tickerError || orderBookError || marketTradesError || klineError;
+
+  // Get current market ticker data - prioritize real-time ticker data
+  const currentTicker = currentTickerData || tickersData?.find(ticker => ticker.market === selectedMarket);
+  const currentPriceFromAPI = currentTicker ? parseFloat(currentTicker.ticker.last) : currentPrice;
+  const priceChangeFromAPI = currentTicker ? parseFloat(currentTicker.ticker.price_change_percent) : priceChange24h;
+
+  // Calculate total balance
+  const totalBalance = balancesData?.reduce((sum, balance) => {
+    const price = currentTicker?.market === `${balance.currency}-USDT` ? 
+      parseFloat(currentTicker.ticker.last) : 1;
+    return sum + (parseFloat(balance.balance) * price);
+  }, 0) || 0;
+
+  // Calculate active orders count
+  const activeOrdersCount = ordersData?.filter(order => order.state === 'wait').length || 0;
+
+  // WebSocket integration for real-time updates
+  const { ticker: wsTicker, orderbook: wsOrderBook, trades: wsTrades } = useMarketWebSocket(selectedMarket);
 
   // Check authentication status
   useEffect(() => {
@@ -80,16 +129,42 @@ export default function TradingPage() {
     return () => clearInterval(authInterval);
   }, [toast]);
 
-  // Simulate real-time price updates
+  // Update price from API data
   useEffect(() => {
-    const interval = setInterval(() => {
-      const change = (Math.random() - 0.5) * 100;
-      setCurrentPrice(prev => prev + change);
-      setPriceChange24h(prev => prev + (Math.random() - 0.5) * 0.1);
-    }, 2000);
+    if (currentTicker) {
+      setCurrentPrice(currentPriceFromAPI);
+      setPriceChange24h(priceChangeFromAPI);
+    }
+  }, [currentTicker, currentPriceFromAPI, priceChangeFromAPI]);
 
-    return () => clearInterval(interval);
-  }, []);
+  // WebSocket data updates - automatically handled by useMarketWebSocket hook
+  useEffect(() => {
+    if (wsTicker) {
+      console.log('WebSocket ticker update:', wsTicker);
+    }
+  }, [wsTicker]);
+
+  useEffect(() => {
+    if (wsOrderBook) {
+      console.log('WebSocket order book update:', wsOrderBook);
+    }
+  }, [wsOrderBook]);
+
+  useEffect(() => {
+    if (wsTrades && wsTrades.length > 0) {
+      console.log('WebSocket trades update:', wsTrades);
+    }
+  }, [wsTrades]);
+
+  // Handle API errors
+  useEffect(() => {
+    if (hasDataError) {
+      toast({
+        title: "Data Loading Error",
+        description: "Failed to load some market data. Please refresh the page.",
+      });
+    }
+  }, [hasDataError, toast]);
 
   const handleMarketSelect = (market: string) => {
     setSelectedMarket(market);
@@ -201,6 +276,18 @@ export default function TradingPage() {
 
       {/* Enhanced Main Content */}
       <div className="flex-1 flex overflow-hidden relative">
+        {/* Loading Overlay */}
+        {isDataLoading && (
+          <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg p-6 shadow-xl">
+              <div className="flex items-center space-x-3">
+                <RefreshCw className="h-6 w-6 animate-spin text-[hsl(var(--trading-accent))]" />
+                <span className="text-[hsl(var(--trading-text))] font-medium">Loading market data...</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Enhanced Center Panel - Chart & Market Data */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Enhanced Chart Area - Fixed height with proper overflow */}
@@ -213,6 +300,7 @@ export default function TradingPage() {
               height="100%"
               selectedMarket={selectedMarket}
               onMarketSelect={handleMarketSelect}
+              klineData={klineData}
             />
           </div>
 
@@ -222,6 +310,7 @@ export default function TradingPage() {
               market={selectedMarket}
               onPriceClick={handlePriceClick}
               compact={false}
+              tickerData={currentTicker}
             />
           </div>
         </div>
@@ -234,6 +323,8 @@ export default function TradingPage() {
               market={selectedMarket}
               onPriceClick={handlePriceClick}
               compact={true}
+              orderBookData={orderBookData}
+              marketTradesData={marketTradesData}
             />
           </div>
 
@@ -244,6 +335,7 @@ export default function TradingPage() {
               currentPrice={currentPrice}
               onPriceClick={handlePriceClick}
               compact={true}
+              balancesData={balancesData || []}
             />
           </div>
         </div>
@@ -253,8 +345,8 @@ export default function TradingPage() {
       <div className="h-6 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] border-t border-[hsl(var(--trading-border))] flex items-center justify-between px-4 text-xs glass">
         <div className="flex items-center space-x-4">
           <span className="text-[hsl(var(--trading-text-muted))]">Connection: <span className="text-[#00ff88] font-medium">Stable</span></span>
-          <span className="text-[hsl(var(--trading-text-muted))]">Orders: <span className="text-[hsl(var(--trading-text))] font-medium">0 Active</span></span>
-          <span className="text-[hsl(var(--trading-text-muted))]">Balance: <span className="text-[hsl(var(--trading-text))] font-medium">$0.00</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Orders: <span className="text-[hsl(var(--trading-text))] font-medium">{activeOrdersCount} Active</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Balance: <span className="text-[hsl(var(--trading-text))] font-medium">${formatNumber(totalBalance, 2)}</span></span>
           {user && (
             <>
               <span className="text-[hsl(var(--trading-text-muted))]">KYC: <span className={`font-medium ${user.kyc_level >= 2 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>Level {user.kyc_level || 0}</span></span>

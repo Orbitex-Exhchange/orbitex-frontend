@@ -4,7 +4,7 @@ import { Lead, mockLeads } from '../mock-data/enhanced';
 
 // Leads API endpoints
 const LEADS_ENDPOINTS = {
-  create: '/api/v2/leads',
+  create: '/api/api_v2/leads',
 } as const;
 
 // Mock API functions

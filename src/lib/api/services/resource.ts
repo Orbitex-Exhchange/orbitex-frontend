@@ -15,14 +15,14 @@ import {
 
 // Resource API endpoints
 const RESOURCE_ENDPOINTS = {
-  userProfile: '/api/v2/barong/resource/users/me',
-  updateProfile: '/api/v2/barong/resource/users',
-  apiKeys: '/api/v2/barong/resource/api_keys',
-  labels: '/api/v2/barong/resource/labels',
-  documents: '/api/v2/barong/resource/documents',
-  phones: '/api/v2/barong/resource/phones',
-  otp: '/api/v2/barong/resource/otp',
-  profiles: '/api/v2/barong/resource/profiles',
+  userProfile: '/api/v2/resource/users/me',
+  updateProfile: '/api/v2/resource/users',
+  apiKeys: '/api/v2/resource/api_keys',
+  labels: '/api/v2/resource/labels',
+  documents: '/api/v2/resource/documents',
+  phones: '/api/v2/resource/phones',
+  otp: '/api/v2/resource/otp',
+  profiles: '/api/v2/resource/profiles',
 } as const;
 
 // Mock API functions

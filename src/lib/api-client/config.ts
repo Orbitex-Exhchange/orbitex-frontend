@@ -11,7 +11,7 @@ const getBaseUrl = () => {
   }
 
   // Updated to use the correct Cloud Run URL
-  const productionUrl = 'https://orbitex-976099405307.us-central1.run.app';
+  const productionUrl = 'http://0.0.0.0:3333';
 
   if (isDevelopment) {
     // In development, use production backend for real data

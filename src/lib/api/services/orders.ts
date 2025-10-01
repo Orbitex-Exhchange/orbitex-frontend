@@ -22,10 +22,10 @@ export interface Order {
 
 // Orders API endpoints
 const ORDERS_ENDPOINTS = {
-  list: '/api/v2/peatio/market/orders',
-  create: '/api/v2/peatio/market/orders',
-  cancel: '/api/v2/peatio/market/orders/:id/cancel',
-  get: '/api/v2/peatio/market/orders/:id',
+  list: '/api/api_v2/market/orders',
+  create: '/api/api_v2/market/orders',
+  cancel: '/api/api_v2/market/orders/:id/cancel',
+  get: '/api/api_v2/market/orders/:id',
 } as const;
 
 // Real API functions - Connected to our backend

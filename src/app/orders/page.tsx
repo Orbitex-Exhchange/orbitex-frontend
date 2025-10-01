@@ -22,6 +22,8 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { formatNumber, formatCurrency } from '@/lib/utils';
+import { useOrders, useCancelOrder } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface Order {
   id: string;
@@ -159,12 +161,36 @@ export default function OrdersPage() {
   const [showTrades, setShowTrades] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'price' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const { toast } = useToast();
 
-  const filteredOrders = mockOrders.filter(order => {
-    const matchesTab = activeTab === 'all' || order.status === 'open';
+  // Get real orders data from API
+  const { data: orders = [], isLoading, error, refetch } = useOrders(
+    activeTab === 'open' ? { state: 'wait', limit: 100 } : { limit: 100 }
+  );
+
+  const cancelOrderMutation = useCancelOrder();
+
+  const handleCancelOrder = async (orderId: number) => {
+    try {
+      await cancelOrderMutation.mutateAsync(orderId);
+      toast({
+        title: "Order Cancelled",
+        description: "Your order has been successfully cancelled.",
+      });
+      refetch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to cancel order. Please try again.",
+      });
+    }
+  };
+
+  const filteredOrders = orders.filter(order => {
+    const matchesTab = activeTab === 'all' || order.state === 'wait';
     const matchesSearch = order.market.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         order.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+                         order.id.toString().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || order.state === statusFilter;
     const matchesMarket = marketFilter === 'all' || order.market === marketFilter;
     
     return matchesTab && matchesSearch && matchesStatus && matchesMarket;
@@ -175,20 +201,20 @@ export default function OrdersPage() {
     
     switch (sortBy) {
       case 'date':
-        aValue = new Date(a.createdAt).getTime();
-        bValue = new Date(b.createdAt).getTime();
+        aValue = new Date(a.created_at).getTime();
+        bValue = new Date(b.created_at).getTime();
         break;
       case 'amount':
-        aValue = parseFloat(a.amount);
-        bValue = parseFloat(b.amount);
+        aValue = parseFloat(a.volume);
+        bValue = parseFloat(b.volume);
         break;
       case 'price':
         aValue = parseFloat(a.price);
         bValue = parseFloat(b.price);
         break;
       case 'status':
-        aValue = a.status;
-        bValue = b.status;
+        aValue = a.state;
+        bValue = b.state;
         break;
       default:
         return 0;
@@ -214,10 +240,6 @@ export default function OrdersPage() {
     setShowTrades(prev => ({ ...prev, [orderId]: !prev[orderId] }));
   };
 
-  const handleCancelOrder = (orderId: string) => {
-    // Here you would typically make an API call to cancel the order
-    console.log('Cancelling order:', orderId);
-  };
 
   const handleCancelAllOrders = () => {
     // Here you would typically make an API call to cancel all open orders
@@ -347,67 +369,68 @@ export default function OrdersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`font-medium ${getTypeColor(order.type)}`}>
-                      {order.type.toUpperCase()}
+                    <span className={`font-medium ${getTypeColor(order.ord_type)}`}>
+                      {order.ord_type.toUpperCase()}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <span className="text-white font-medium">{formatNumber(parseFloat(order.amount), 8)}</span>
-                      {parseFloat(order.remaining) > 0 && (
-                        <p className="text-sm text-[#888]">Remaining: {formatNumber(parseFloat(order.remaining), 8)}</p>
+                      <span className="text-white font-medium">{formatNumber(parseFloat(order.volume), 8)}</span>
+                      {parseFloat(order.remaining_volume) > 0 && (
+                        <p className="text-sm text-[#888]">Remaining: {formatNumber(parseFloat(order.remaining_volume), 8)}</p>
                       )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <span className="text-white font-medium">
-                        {order.type === 'market' ? 'Market' : formatNumber(parseFloat(order.price), 2)}
+                        {order.ord_type === 'market' ? 'Market' : formatNumber(parseFloat(order.price), 2)}
                       </span>
-                      {parseFloat(order.avgPrice) > 0 && (
-                        <p className="text-sm text-[#888]">Avg: {formatNumber(parseFloat(order.avgPrice), 2)}</p>
+                      {parseFloat(order.avg_price || '0') > 0 && (
+                        <p className="text-sm text-[#888]">Avg: {formatNumber(parseFloat(order.avg_price || '0'), 2)}</p>
                       )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-white font-medium">{formatNumber(parseFloat(order.executed), 8)}</span>
+                    <span className="text-white font-medium">{formatNumber(parseFloat(order.executed_volume), 8)}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status}
+                    <Badge className={getStatusColor(order.state)}>
+                      {order.state}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[#888]">
-                    {new Date(order.createdAt).toLocaleDateString()}
+                    {new Date(order.created_at).toLocaleDateString()}
                     <br />
-                    {new Date(order.createdAt).toLocaleTimeString()}
+                    {new Date(order.created_at).toLocaleTimeString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center space-x-2">
-                      {order.status === 'open' && (
+                      {order.state === 'wait' && (
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleCancelOrder(order.id)}
                           className="border-[#ff4444] text-[#ff4444] hover:bg-[#ff4444] hover:text-white"
+                          disabled={cancelOrderMutation.isPending}
                         >
                           <X className="w-3 h-3" />
                         </Button>
                       )}
-                      {order.trades && order.trades.length > 0 && (
+                      {order.trades_count > 0 && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => toggleTrades(order.id)}
+                          onClick={() => toggleTrades(order.id.toString())}
                           className="border-[#333] text-white hover:bg-[#333]"
                         >
-                          {showTrades[order.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          {showTrades[order.id.toString()] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                         </Button>
                       )}
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => copyToClipboard(order.id)}
+                        onClick={() => copyToClipboard(order.id.toString())}
                         className="border-[#333] text-white hover:bg-[#333]"
                       >
                         <Copy className="w-3 h-3" />
@@ -415,7 +438,7 @@ export default function OrdersPage() {
                     </div>
                   </td>
                 </tr>
-                {showTrades[order.id] && order.trades && order.trades.length > 0 && (
+                {showTrades[order.id.toString()] && order.trades_count > 0 && (
                   <tr className="bg-[#0a0a0a]">
                     <td colSpan={9} className="px-6 py-4">
                       <div className="bg-[#1a1a1a] rounded-lg p-4">
@@ -431,7 +454,7 @@ export default function OrdersPage() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-[#333]">
-                              {order.trades.map((trade) => (
+                              {order.trades?.map((trade) => (
                                 <tr key={trade.id}>
                                   <td className="py-2 text-white">{formatNumber(parseFloat(trade.price), 2)}</td>
                                   <td className="py-2 text-white">{formatNumber(parseFloat(trade.amount), 8)}</td>
@@ -502,7 +525,7 @@ export default function OrdersPage() {
         </div>
 
         {/* Cancel All Button */}
-        {activeTab === 'open' && filteredOrders.some(order => order.status === 'open') && (
+        {activeTab === 'open' && filteredOrders.some(order => order.state === 'wait') && (
           <div className="mb-6">
             <Button
               variant="outline"
@@ -563,20 +586,40 @@ export default function OrdersPage() {
         {/* Results */}
         <div className="mb-4">
           <p className="text-[#888]">
-            Showing {sortedOrders.length} of {mockOrders.length} orders
+            Showing {sortedOrders.length} of {orders.length} orders
           </p>
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex items-center space-x-2">
+              <RefreshCw className="w-5 h-5 animate-spin text-[#00ff88]" />
+              <span className="text-white">Loading orders...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-[#1a1a1a] border border-[#ff4444] rounded-lg p-4 mb-6">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-5 h-5 text-[#ff4444]" />
+              <span className="text-[#ff4444]">Failed to load orders. Please try again.</span>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
-        {sortedOrders.length > 0 ? (
+        {!isLoading && !error && sortedOrders.length > 0 ? (
           renderOrdersTable()
-        ) : (
+        ) : !isLoading && !error ? (
           <div className="bg-[#1a1a1a] rounded-lg p-12 text-center">
             <Clock className="w-12 h-12 text-[#888] mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">No orders found</h3>
             <p className="text-[#888]">Try adjusting your search or filter criteria</p>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

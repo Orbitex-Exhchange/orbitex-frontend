@@ -40,6 +40,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import TickerSearchPanel from './TickerSearchPanel';
+import { usePublicTickers, useKline } from '@/lib/api';
 
 interface TradingViewChartProps {
   symbol: string;
@@ -50,6 +51,7 @@ interface TradingViewChartProps {
   data?: any[];
   onMarketSelect?: (market: string) => void;
   selectedMarket?: string;
+  klineData?: any;
 }
 
 interface Indicator {
@@ -175,7 +177,8 @@ export const TradingViewChart = React.memo(({
   height = '100%',
   data = [],
   onMarketSelect,
-  selectedMarket
+  selectedMarket,
+  klineData: propKlineData
 }: TradingViewChartProps) => {
   const { theme: contextTheme } = useTheme();
   const theme = propTheme || contextTheme;
@@ -193,6 +196,28 @@ export const TradingViewChart = React.memo(({
   const [showVolume, setShowVolume] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
   const [autoScale, setAutoScale] = useState(true);
+
+  // Real API data hooks
+  const { data: tickersData, isLoading: tickersLoading } = usePublicTickers();
+  const { data: klinesData, isLoading: klinesLoading } = useKline(
+    symbol, 
+    selectedTimeframe, 
+    200
+  );
+  
+  // Use prop kline data if available, otherwise use API data
+  const finalKlineData = propKlineData || klinesData;
+
+  // Get current market ticker data
+  const currentTicker = tickersData?.find(ticker => ticker.market === symbol);
+  const marketData = useMemo(() => ({
+    lastPrice: currentTicker ? parseFloat(currentTicker.ticker.last) : 43250.50,
+    change24h: currentTicker ? parseFloat(currentTicker.ticker.price_change_percent) : 2.45,
+    high24h: currentTicker ? parseFloat(currentTicker.ticker.high) : 44100.00,
+    low24h: currentTicker ? parseFloat(currentTicker.ticker.low) : 42800.00,
+    volume: currentTicker ? parseFloat(currentTicker.ticker.vol) : 2847.65,
+    openInterest: 125000000
+  }), [currentTicker]);
   
   // Memoized indicators
   const indicators = useMemo(() => [
@@ -205,15 +230,6 @@ export const TradingViewChart = React.memo(({
     { id: 'stoch-14', name: 'Stochastic 14', type: 'stoch' as const, enabled: false, params: { kPeriod: 14, dPeriod: 3 }, color: '#FD79A8' }
   ], []);
 
-  // Memoized market data
-  const marketData = useMemo(() => ({
-    lastPrice: 43250.50,
-    change24h: 2.45,
-    high24h: 44100.00,
-    low24h: 42800.00,
-    volume: 2847.65,
-    openInterest: 125000000
-  }), []);
 
   // Memoized chart configuration
   const chartConfig = useMemo(() => getChartConfig(theme), [theme]);
@@ -266,12 +282,15 @@ export const TradingViewChart = React.memo(({
       });
     }
 
-    // Set initial data
-    const mockData = generateMockData(selectedTimeframe, theme);
+    // Set initial data - use real k-line data if available, otherwise fallback to mock
+    const chartData = finalKlineData && finalKlineData.k_line && finalKlineData.k_line.length > 0 ? 
+      processKlineData(finalKlineData.k_line, theme) : 
+      generateMockData(selectedTimeframe, theme);
+      
     if (chartType === 'candlestick') {
-      mainSeries.setData(mockData.candlesticks);
+      mainSeries.setData(chartData.candlesticks);
     } else {
-      const lineData = mockData.candlesticks.map(d => ({
+      const lineData = chartData.candlesticks.map(d => ({
         time: d.time as any,
         value: d.close
       }));
@@ -279,7 +298,7 @@ export const TradingViewChart = React.memo(({
     }
     
     if (volumeSeries) {
-      volumeSeries.setData(mockData.volumes);
+      volumeSeries.setData(chartData.volumes);
     }
 
     chartRef.current = chart;
@@ -302,7 +321,7 @@ export const TradingViewChart = React.memo(({
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [chartConfig, seriesConfig, chartType, showVolume, showGrid, autoScale, selectedTimeframe, theme]);
+  }, [chartConfig, seriesConfig, chartType, showVolume, showGrid, autoScale, selectedTimeframe, theme, finalKlineData]);
 
   // Initialize chart on mount and when dependencies change
   useEffect(() => {
@@ -670,6 +689,50 @@ export const TradingViewChart = React.memo(({
 });
 
 TradingViewChart.displayName = 'TradingViewChart';
+
+// Process real k-line data from API
+const processKlineData = (klines: any[], theme: 'light' | 'dark' = 'dark') => {
+  const candlesticks = [];
+  const volumes = [];
+  
+  for (const kline of klines) {
+    // Handle both array format [time, open, high, low, close, volume] and object format
+    let time, open, high, low, close, volume;
+    
+    if (Array.isArray(kline)) {
+      time = Math.floor(new Date(kline[0]).getTime() / 1000);
+      open = parseFloat(kline[1]);
+      high = parseFloat(kline[2]);
+      low = parseFloat(kline[3]);
+      close = parseFloat(kline[4]);
+      volume = parseFloat(kline[5]);
+    } else {
+      // Object format from API
+      time = Math.floor(new Date(kline.time).getTime() / 1000);
+      open = parseFloat(kline.open);
+      high = parseFloat(kline.high);
+      low = parseFloat(kline.low);
+      close = parseFloat(kline.close);
+      volume = parseFloat(kline.volume);
+    }
+    
+    candlesticks.push({
+      time: time as any,
+      open,
+      high,
+      low,
+      close,
+    });
+    
+    volumes.push({
+      time: time as any,
+      value: volume,
+      color: close >= open ? (theme === 'dark' ? '#00ff88' : '#10b981') : (theme === 'dark' ? '#ff4444' : '#ef4444'),
+    });
+  }
+  
+  return { candlesticks, volumes };
+};
 
 // Mock data generation with memoization
 const generateMockData = (timeframe: string = '1h', theme: 'light' | 'dark' = 'dark') => {

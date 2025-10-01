@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { useTheme } from '@/contexts/ThemeContext';
-import { usePublicMarkets, usePublicTickers } from '@/lib/api/services/public';
+import { usePublicMarkets, usePublicTickers } from '@/lib/api';
 import { 
   Search,
   Star,

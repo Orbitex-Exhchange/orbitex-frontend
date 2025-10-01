@@ -563,7 +563,7 @@ export const en = {
     'resource.phone.missing_verification_code': 'Verification code is missing',
     'resource.phone.empty_verification_code': 'Verification code is missing or empty',
 
-    // peatio
+    // orbitex
     'account.currency.doesnt_exist': 'Currency doesn\'t exist',
     'account.deposit.invalid_state': 'Deposit invalid state',
     'account.deposit.non_integer_limit': 'Value you send could not be parsed into Integer type',

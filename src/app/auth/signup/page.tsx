@@ -99,6 +99,8 @@ export default function SignUpPage() {
       newErrors.password = 'Password must be at least 8 characters long';
     } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(formData.password)) {
       newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character';
+    } else if (formData.password.length < 12) {
+      newErrors.password = 'Password must be at least 12 characters long for security';
     }
 
     if (!formData.confirmPassword) {
@@ -123,8 +125,37 @@ export default function SignUpPage() {
     setErrors({});
     
     try {
-      // Mock API call - replace with actual registration logic
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Use authService for registration
+      const { AuthService } = await import('@/lib/auth');
+      const auth = AuthService.getInstance();
+      
+      // Generate a valid username (4-12 chars, alphanumeric only)
+      const generateUsername = (firstName: string, lastName: string) => {
+        const base = (firstName + lastName).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        if (base.length >= 4) {
+          return base.substring(0, 12);
+        } else {
+          // Add random suffix to make it at least 4 chars
+          const suffix = Math.random().toString(36).substring(2, 6);
+          return (base + suffix).substring(0, 12);
+        }
+      };
+
+      const username = formData.firstName && formData.lastName ? generateUsername(formData.firstName, formData.lastName) : undefined;
+      
+      await auth.register({
+        email: formData.email,
+        password: formData.password,
+        ...(username && { username }),
+        data: JSON.stringify({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone: formData.phone,
+          language: formData.language,
+          country: formData.country,
+          accept_marketing: formData.acceptMarketing
+        })
+      });
       
       setSuccess(true);
       
@@ -135,8 +166,28 @@ export default function SignUpPage() {
       
     } catch (error: any) {
       console.error('Registration error:', error);
+      
+      // Parse specific error messages
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (error.message) {
+        if (error.message.includes('email.taken')) {
+          errorMessage = 'This email address is already registered. Please use a different email or try signing in.';
+        } else if (error.message.includes('password.weak')) {
+          errorMessage = 'Password is too weak. Please use a stronger password with at least 12 characters, including uppercase, lowercase, numbers, and special characters.';
+        } else if (error.message.includes('username.invalid')) {
+          errorMessage = 'Username format is invalid. Please check your name fields.';
+        } else if (error.message.includes('username.taken')) {
+          errorMessage = 'Username is already taken. Please try again.';
+        } else if (error.message.includes('422')) {
+          errorMessage = 'Please check your information and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       setErrors({ 
-        general: error.message || 'Registration failed. Please try again.' 
+        general: errorMessage
       });
     } finally {
       setIsLoading(false);
@@ -289,7 +340,7 @@ export default function SignUpPage() {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Create a password"
+                      placeholder="Create a strong password (12+ chars)"
                       value={formData.password}
                       onChange={(e) => handleInputChange('password', e.target.value)}
                       className={`pl-10 pr-10 bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder-[hsl(var(--trading-text-muted))] focus:ring-2 focus:ring-[hsl(var(--trading-accent))] focus:border-transparent ${
@@ -367,6 +418,7 @@ export default function SignUpPage() {
                     className="w-full p-3 bg-[hsl(var(--trading-bg-tertiary))] border border-[hsl(var(--trading-border))] rounded-lg text-[hsl(var(--trading-text))] focus:ring-2 focus:ring-[hsl(var(--trading-accent))] focus:border-transparent"
                   >
                     <option value="US">United States</option>
+                    <option value="SA">South Africa</option>
                     <option value="CA">Canada</option>
                     <option value="GB">United Kingdom</option>
                     <option value="AU">Australia</option>

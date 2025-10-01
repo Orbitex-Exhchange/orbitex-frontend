@@ -46,7 +46,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallets } from '@/lib/api';
-import { usePublicTickers } from '@/lib/api/services/public';
+import { usePublicTickers } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 interface Wallet {
@@ -123,7 +123,6 @@ export default function WalletsPage() {
       withdrawal_enabled: true,
       change24h: change24h,
       value: value,
-      ...(wallet.deposit_address && { deposit_address: wallet.deposit_address })
     };
   }) : [];
 

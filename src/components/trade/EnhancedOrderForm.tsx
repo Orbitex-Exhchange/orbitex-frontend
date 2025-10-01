@@ -16,17 +16,21 @@ import {
   Info,
   Settings,
   Clock,
-  BarChart3
+  BarChart3,
+  RefreshCw
 } from 'lucide-react';
 import { cn, formatNumber, formatCurrency } from '../../lib/utils';
 import { env } from '@/lib/env';
 import { authService } from '@/lib/auth';
+import { useCreateOrder, useAccountBalances } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface EnhancedOrderFormProps {
   market: string;
   currentPrice: number;
   onPriceClick?: (price: number) => void;
   compact?: boolean;
+  balancesData?: any[];
 }
 
 interface OrderFormData {
@@ -72,7 +76,8 @@ export function EnhancedOrderForm({
   market, 
   currentPrice,
   onPriceClick,
-  compact = false 
+  compact = false,
+  balancesData: propBalancesData
 }: EnhancedOrderFormProps) {
   const [orderData, setOrderData] = useState<OrderFormData>({
     side: 'buy',
@@ -94,6 +99,14 @@ export function EnhancedOrderForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [balances, setBalances] = useState<Record<string, number>>({});
 
+  // Real API hooks
+  const { toast } = useToast();
+  const createOrderMutation = useCreateOrder();
+  const { data: balancesData, isLoading: balancesLoading } = useAccountBalances();
+  
+  // Use prop balances data if available, otherwise use API data
+  const finalBalancesData = propBalancesData || balancesData;
+
   // Mock portfolio data
   const [portfolio] = useState<Portfolio>({
     baseBalance: 12.5847,
@@ -112,29 +125,19 @@ export function EnhancedOrderForm({
     ]
   });
 
+  // Update balances from API data
+  useEffect(() => {
+    if (finalBalancesData) {
+      const map: Record<string, number> = {};
+      finalBalancesData.forEach((balance: any) => {
+        map[(balance.currency || '').toUpperCase()] = parseFloat(balance.balance || '0');
+      });
+      setBalances(map);
+    }
+  }, [finalBalancesData]);
+
   // Update price when current price changes
   useEffect(() => {
-    // Fetch balances from orbitex-clean when authenticated
-    (async () => {
-      try {
-        const token = authService.getAccessToken();
-        if (!token) return;
-        const apiBase = env.NEXT_PUBLIC_API_URL;
-        const res = await fetch(`${apiBase}/api/v2/account/balances`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        // data: { uid, balances: [{currency, balance, locked}] }
-        const map: Record<string, number> = {};
-        (data.balances || []).forEach((b: any) => {
-          map[(b.currency || '').toUpperCase()] = parseFloat(b.balance || '0');
-        });
-        setBalances(map);
-      } catch (_e) {
-        // ignore
-      }
-    })();
     if (orderData.type === 'market') {
       setOrderData(prev => ({ ...prev, price: currentPrice.toString() }));
     }
@@ -157,7 +160,12 @@ export function EnhancedOrderForm({
   };
 
   const handlePercentageClick = (percentage: number) => {
-    const availableBalance = orderData.side === 'buy' ? portfolio.quoteBalance : portfolio.baseBalance;
+    // Get real balances from API data
+    const [baseCurrency, quoteCurrency] = market.split('-');
+    const baseBalance = balances[baseCurrency?.toUpperCase() || ''] || 0;
+    const quoteBalance = balances[quoteCurrency?.toUpperCase() || ''] || 0;
+    
+    const availableBalance = orderData.side === 'buy' ? quoteBalance : baseBalance;
     const maxAmount = orderData.side === 'buy' 
       ? (availableBalance * (percentage / 100)) / parseFloat(orderData.price || '1')
       : availableBalance * (percentage / 100);
@@ -221,11 +229,51 @@ export function EnhancedOrderForm({
     return false;
   };
 
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
     if (!validateOrder()) return;
     
-    console.log('Submitting order:', orderData);
-    // Here you would integrate with your order submission API
+    try {
+      const orderPayload: any = {
+        market: market,
+        side: orderData.side,
+        ord_type: orderData.type === 'stop' || orderData.type === 'stop_limit' || orderData.type === 'trailing_stop' ? 'limit' : orderData.type,
+        volume: orderData.size,
+        time_in_force: orderData.timeInForce,
+        reduce_only: orderData.reduceOnly,
+        post_only: orderData.postOnly,
+      };
+
+      // Only include price if it's not a market order
+      if (orderData.type !== 'market' && orderData.price) {
+        orderPayload.price = orderData.price;
+      }
+
+      // Only include stop_price for stop orders
+      if ((orderData.type === 'stop' || orderData.type === 'stop_limit') && orderData.stopPrice) {
+        orderPayload.stop_price = orderData.stopPrice;
+      }
+
+      await createOrderMutation.mutateAsync(orderPayload);
+      
+      toast({
+        title: "Order Submitted",
+        description: `${orderData.side.toUpperCase()} order for ${orderData.size} ${market.split('-')[0]} has been submitted successfully.`,
+      });
+
+      // Reset form
+      setOrderData(prev => ({
+        ...prev,
+        size: '',
+        total: '',
+        stopPrice: '',
+      }));
+    } catch (error: any) {
+      console.error('Order submission failed:', error);
+      toast({
+        title: "Order Failed",
+        description: error.message || "Failed to submit order. Please try again.",
+      });
+    }
   };
 
   const getEstimatedFee = () => {
@@ -587,15 +635,25 @@ export function EnhancedOrderForm({
       {/* Submit Button */}
       <Button
         onClick={handleSubmitOrder}
+        disabled={createOrderMutation.isPending}
         className={cn(
           "w-full h-12 font-semibold mt-auto",
           orderData.side === 'buy'
-            ? "bg-green-500 hover:bg-green-600 text-white"
-            : "bg-red-500 hover:bg-red-600 text-white"
+            ? "bg-green-500 hover:bg-green-600 text-white disabled:bg-green-500/50"
+            : "bg-red-500 hover:bg-red-600 text-white disabled:bg-red-500/50"
         )}
       >
-        {orderData.side === 'buy' ? 'Buy' : 'Sell'} {market.split('-')[0]}
-        {orderData.total && ` (~$${formatNumber(parseFloat(orderData.total), 2)})`}
+        {createOrderMutation.isPending ? (
+          <>
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            Submitting...
+          </>
+        ) : (
+          <>
+            {orderData.side === 'buy' ? 'Buy' : 'Sell'} {market.split('-')[0]}
+            {orderData.total && ` (~$${formatNumber(parseFloat(orderData.total), 2)})`}
+          </>
+        )}
       </Button>
 
       {/* Portfolio Summary */}

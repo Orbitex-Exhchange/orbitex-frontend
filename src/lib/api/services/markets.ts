@@ -3,10 +3,10 @@ import { api } from '../../api-client';
 
 // Markets API endpoints - Updated to match our backend
 const MARKETS_ENDPOINTS = {
-  list: '/api/v2/markets',
-  ticker: '/api/v2/markets/:id/ticker',
-  orderBook: '/api/v2/markets/:id/orderbook',
-  trades: '/api/v2/markets/:id/trades',
+  list: '/api/api_v2/markets',
+  ticker: '/api/api_v2/markets/:id/ticker',
+  orderBook: '/api/api_v2/markets/:id/orderbook',
+  trades: '/api/api_v2/markets/:id/trades',
 } as const;
 
 // Real API functions - Connected to our backend

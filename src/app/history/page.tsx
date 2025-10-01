@@ -23,6 +23,8 @@ import {
   EyeOff
 } from 'lucide-react';
 import { formatNumber, formatCurrency } from '@/lib/utils';
+import { useAccountTransactions, useAccountDeposits, useAccountWithdraws, useTrades } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface HistoryEntry {
   id: string;
@@ -123,12 +125,67 @@ export default function HistoryPage() {
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const { toast } = useToast();
 
-  const filteredHistory = mockHistory.filter(entry => {
+  // Get real data from APIs
+  const { data: deposits = [], isLoading: depositsLoading } = useAccountDeposits();
+  const { data: withdraws = [], isLoading: withdrawsLoading } = useAccountWithdraws();
+  const { data: trades = [], isLoading: tradesLoading } = useTrades();
+  const { data: transactions = [], isLoading: transactionsLoading } = useAccountTransactions();
+
+  // Combine all history data
+  const allHistory = [
+    ...deposits.map(deposit => ({
+      id: deposit.txid,
+      type: 'deposit' as const,
+      currency: deposit.currency,
+      amount: deposit.amount,
+      fee: deposit.fee || '0',
+      status: deposit.state === 'accepted' ? 'completed' as const : 
+              deposit.state === 'pending' ? 'pending' as const : 'failed' as const,
+      txid: deposit.txid,
+      address: deposit.to_address,
+      createdAt: deposit.created_at,
+      updatedAt: deposit.updated_at,
+      confirmations: deposit.confirmations,
+      requiredConfirmations: 3 // Default confirmation requirement
+    })),
+    ...withdraws.map(withdraw => ({
+      id: withdraw.txid,
+      type: 'withdraw' as const,
+      currency: withdraw.currency,
+      amount: withdraw.amount,
+      fee: withdraw.fee || '0',
+      status: withdraw.state === 'accepted' ? 'completed' as const : 
+              withdraw.state === 'pending' ? 'pending' as const : 'failed' as const,
+      txid: withdraw.txid,
+      address: withdraw.rid,
+      createdAt: withdraw.created_at,
+      updatedAt: withdraw.updated_at,
+      confirmations: withdraw.confirmations,
+      requiredConfirmations: 3 // Default confirmation requirement
+    })),
+    ...trades.map(trade => ({
+      id: trade.id.toString(),
+      type: 'trade' as const,
+      currency: trade.market?.split('usdt')[0]?.toUpperCase() || 'UNKNOWN',
+      amount: trade.volume,
+      fee: '0', // Fee would need to be calculated
+      status: 'completed' as const,
+      market: trade.market,
+      side: trade.side,
+      price: trade.price,
+      total: trade.amount,
+      createdAt: trade.created_at,
+      updatedAt: trade.created_at
+    }))
+  ];
+
+  const filteredHistory = allHistory.filter(entry => {
     const matchesType = activeTab === 'trades' ? entry.type === 'trade' : entry.type === activeTab.slice(0, -1) as 'deposit' | 'withdraw';
     const matchesSearch = entry.currency.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         entry.txid?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         entry.address?.toLowerCase().includes(searchTerm.toLowerCase());
+                         ('txid' in entry ? entry.txid?.toLowerCase().includes(searchTerm.toLowerCase()) : false) || 
+                         ('address' in entry ? entry.address?.toLowerCase().includes(searchTerm.toLowerCase()) : false);
     const matchesStatus = statusFilter === 'all' || entry.status === statusFilter;
     
     return matchesType && matchesSearch && matchesStatus;
@@ -290,7 +347,7 @@ export default function HistoryPage() {
                 {activeTab !== 'trades' && (
                   <td className="px-6 py-4">
                     <div className="max-w-xs">
-                      {entry.txid && (
+                      {'txid' in entry && entry.txid && (
                         <div className="mb-2">
                           <p className="text-xs text-[#888] mb-1">Transaction ID</p>
                           <div className="flex items-center space-x-2">
@@ -312,7 +369,7 @@ export default function HistoryPage() {
                           </div>
                         </div>
                       )}
-                      {entry.address && (
+                      {'address' in entry && entry.address && (
                         <div>
                           <p className="text-xs text-[#888] mb-1">Address</p>
                           <div className="flex items-center space-x-2">
@@ -337,7 +394,7 @@ export default function HistoryPage() {
                     </div>
                   </td>
                 )}
-                {activeTab === 'trades' && (
+                {activeTab === 'trades' && entry.type === 'trade' && (
                   <>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-white">{entry.market}</span>
@@ -362,7 +419,7 @@ export default function HistoryPage() {
                   <Badge className={getStatusColor(entry.status)}>
                     {entry.status}
                   </Badge>
-                  {activeTab !== 'trades' && entry.confirmations !== undefined && (
+                  {activeTab !== 'trades' && 'confirmations' in entry && entry.confirmations !== undefined && (
                     <p className="text-xs text-[#888] mt-1">
                       {entry.confirmations}/{entry.requiredConfirmations} confirmations
                     </p>
@@ -375,7 +432,7 @@ export default function HistoryPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                   <div className="flex items-center space-x-2">
-                    {entry.txid && (
+                    {'txid' in entry && entry.txid && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -483,20 +540,30 @@ export default function HistoryPage() {
         {/* Results */}
         <div className="mb-4">
           <p className="text-[#888]">
-            Showing {sortedHistory.length} of {mockHistory.length} transactions
+            Showing {sortedHistory.length} of {allHistory.length} transactions
           </p>
         </div>
 
+        {/* Loading State */}
+        {(depositsLoading || withdrawsLoading || tradesLoading || transactionsLoading) && (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex items-center space-x-2">
+              <History className="w-5 h-5 animate-spin text-[#00ff88]" />
+              <span className="text-white">Loading history...</span>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
-        {sortedHistory.length > 0 ? (
+        {!(depositsLoading || withdrawsLoading || tradesLoading || transactionsLoading) && sortedHistory.length > 0 ? (
           renderHistoryTable()
-        ) : (
+        ) : !(depositsLoading || withdrawsLoading || tradesLoading || transactionsLoading) ? (
           <div className="bg-[#1a1a1a] rounded-lg p-12 text-center">
             <History className="w-12 h-12 text-[#888] mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">No transactions found</h3>
             <p className="text-[#888]">Try adjusting your search or filter criteria</p>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

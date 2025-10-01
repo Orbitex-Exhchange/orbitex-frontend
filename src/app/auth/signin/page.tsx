@@ -124,22 +124,22 @@ export default function SignInPage() {
         loginSuccess = true;
         
         console.log('Development login successful with demo user');
-      } else if (showOtp && formData.otpCode) {
-        // Handle 2FA login with authService directly
-        const { authService } = await import('@/lib/auth');
-        const result = await authService.login(formData.email, formData.password, formData.otpCode);
-        
-        if (result.success) {
-          // Update AuthContext state manually
-          localStorage.setItem('access_token', result.token);
-          refreshAuthState(); // Refresh the auth context state
-          loginSuccess = true;
-        } else {
-          setErrors({ general: 'Invalid 2FA code. Please try again.' });
-        }
       } else {
-        // Use the login function from AuthContext for initial login
-        loginSuccess = await login(formData.email, formData.password);
+        // Handle login with authService (supports both regular and 2FA)
+        const { AuthService } = await import('@/lib/auth');
+        const auth = AuthService.getInstance();
+        
+        try {
+          const result = await auth.login(formData.email, formData.password, formData.otpCode);
+          if (result.success) {
+            await refreshAuthState();
+            loginSuccess = true;
+            console.log('Login successful');
+          }
+        } catch (error) {
+          console.error('Login failed:', error);
+          setErrors({ general: error instanceof Error ? error.message : 'Login failed' });
+        }
       }
       
       if (loginSuccess) {

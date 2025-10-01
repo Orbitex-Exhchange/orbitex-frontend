@@ -30,6 +30,7 @@ import {
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useUserProfile, useUpdateProfile, useUserPhones, useCreatePhone, useVerifyPhone } from '@/lib/api';
 
 interface UserProfile {
   id: string;
@@ -51,10 +52,8 @@ interface UserProfile {
 export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { authToken, isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>('');
@@ -66,51 +65,31 @@ export default function ProfilePage() {
     country: ''
   });
 
-  const authServiceUrl = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL;
+  // Get real profile data from API
+  const { data: profile, isLoading, error: profileError } = useUserProfile();
+  const { data: phones = [] } = useUserPhones();
+  const updateProfileMutation = useUpdateProfile();
+  const createPhoneMutation = useCreatePhone();
+  const verifyPhoneMutation = useVerifyPhone();
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/auth/signin');
       return;
     }
-    loadProfile();
-  }, [isAuthenticated, authToken, router]);
+  }, [isAuthenticated, router]);
 
-  const loadProfile = async () => {
-    if (!authToken) return;
-    
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${authServiceUrl}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          await logout();
-          router.push('/auth/signin');
-          return;
-        }
-        throw new Error('Failed to load profile');
-      }
-
-      const data = await response.json();
-      setProfile(data);
+  useEffect(() => {
+    if (profile) {
+      const profileData = profile?.profiles?.[0];
       setEditForm({
-        first_name: data.first_name || '',
-        last_name: data.last_name || '',
-        phone: data.phone || '',
-        country: data.country || ''
+        first_name: profileData?.first_name || '',
+        last_name: profileData?.last_name || '',
+        phone: phones?.[0]?.number || '',
+        country: profileData?.country || ''
       });
-    } catch (error) {
-      console.error('Failed to load profile:', error);
-      setError('Failed to load profile. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [profile, phones]);
 
   const handleLogout = () => {
     logout();
@@ -125,28 +104,20 @@ export default function ProfilePage() {
     setSuccess('');
 
     try {
-      const accessToken = authToken;
-      
-      const response = await fetch(`${authServiceUrl}/auth/me`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(editForm),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
-      }
-
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile);
+      await updateProfileMutation.mutateAsync(editForm);
       setSuccess('Profile updated successfully!');
       setIsEditing(false);
+      toast({
+        title: "Success",
+        description: "Profile updated successfully!",
+      });
     } catch (error) {
       console.error('Failed to update profile:', error);
       setError('Failed to update profile. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -187,13 +158,13 @@ export default function ProfilePage() {
     );
   }
 
-  if (!profile) {
+  if (profileError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="h-8 w-8 mx-auto mb-4 text-red-600" />
           <p className="text-gray-600">Failed to load profile</p>
-          <Button onClick={loadProfile} className="mt-4">
+          <Button onClick={() => window.location.reload()} className="mt-4">
             Try Again
           </Button>
         </div>
@@ -298,17 +269,17 @@ export default function ProfilePage() {
                     <Label htmlFor="email" className="text-white">Email</Label>
                     <Input
                       id="email"
-                      value={profile.email}
+                      value={profile?.email || ''}
                       disabled
                       className="bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] opacity-50"
                     />
                     <div className="flex items-center text-sm text-gray-400">
-                      {profile.email_verified ? (
+                      {profile?.state === 'active' ? (
                         <CheckCircle className="h-4 w-4 mr-1 text-green-400" />
                       ) : (
                         <AlertCircle className="h-4 w-4 mr-1 text-yellow-400" />
                       )}
-                      {profile.email_verified ? 'Verified' : 'Not verified'}
+                      {profile?.state === 'active' ? 'Verified' : 'Not verified'}
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -321,7 +292,7 @@ export default function ProfilePage() {
                       placeholder="Enter your phone number"
                       className="bg-[hsl(var(--trading-bg-tertiary))] border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] placeholder:text-[hsl(var(--trading-text-muted))]"
                     />
-                    {profile.phone_verified && (
+                    {phones?.[0]?.validated_at && (
                       <div className="flex items-center text-sm text-green-400">
                         <CheckCircle className="h-4 w-4 mr-1" />
                         Verified
@@ -354,7 +325,7 @@ export default function ProfilePage() {
                     <User className="h-5 w-5 text-gray-400" />
                     <div>
                       <p className="text-sm font-medium text-gray-900">Role</p>
-                      <p className="text-sm text-gray-500 capitalize">{profile.role}</p>
+                      <p className="text-sm text-gray-500 capitalize">{profile?.role || 'member'}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
@@ -362,21 +333,10 @@ export default function ProfilePage() {
                     <div>
                       <p className="text-sm font-medium text-gray-900">Member Since</p>
                       <p className="text-sm text-gray-500">
-                        {new Date(profile.created_at).toLocaleDateString()}
+                        {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
                       </p>
                     </div>
                   </div>
-                  {profile.last_login && (
-                    <div className="flex items-center space-x-3">
-                      <Calendar className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Last Login</p>
-                        <p className="text-sm text-gray-500">
-                          {new Date(profile.last_login).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -395,13 +355,13 @@ export default function ProfilePage() {
                     <div>
                       <p className="text-sm font-medium text-gray-900">Two-Factor Authentication</p>
                       <p className="text-sm text-gray-500">
-                        {profile.two_factor_enabled ? 'Enabled' : 'Disabled'}
+                        {profile?.otp ? 'Enabled' : 'Disabled'}
                       </p>
                     </div>
                   </div>
                   <Link href="/auth/2fa">
                     <Button variant="outline" size="sm">
-                      {profile.two_factor_enabled ? 'Manage' : 'Enable'}
+                      {profile?.otp ? 'Manage' : 'Enable'}
                     </Button>
                   </Link>
                 </div>
@@ -437,7 +397,7 @@ export default function ProfilePage() {
                       <p className="text-sm font-medium text-gray-900">KYC Level</p>
                       <p className="text-sm text-gray-500">Current verification level</p>
                     </div>
-                    {getKycLevelBadge(profile.kyc_level)}
+                    {getKycLevelBadge(profile?.level || 0)}
                   </div>
 
                   <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -445,7 +405,7 @@ export default function ProfilePage() {
                       <p className="text-sm font-medium text-gray-900">KYC Status</p>
                       <p className="text-sm text-gray-500">Verification status</p>
                     </div>
-                    {getKycStatusBadge(profile.kyc_status)}
+                    {getKycStatusBadge(profile?.state || 'pending')}
                   </div>
                 </div>
 
