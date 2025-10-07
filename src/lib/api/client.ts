@@ -157,14 +157,17 @@ export class ApiClient {
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
-        // Add auth token
-        const token = this.getAuthToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+        // Add auth token only for non-public endpoints
+        const isPublicEndpoint = this.isPublicEndpoint(config.url || '');
+        if (!isPublicEndpoint) {
+          const token = this.getAuthToken();
+          if (token && !token.startsWith('demo_token')) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
         }
 
         if (this.config.enableLogging) {
-          console.log('API Request:', { method: config.method, url: config.url });
+          console.log('API Request:', { method: config.method, url: config.url, isPublic: isPublicEndpoint });
         }
 
         return config;
@@ -199,6 +202,22 @@ export class ApiClient {
       return localStorage.getItem('access_token');
     }
     return null;
+  }
+
+  private isPublicEndpoint(url: string): boolean {
+    const publicEndpoints = [
+      '/api/api_v2/public/',
+      '/api/v2/public/',
+      '/public/',
+      '/markets',
+      '/tickers',
+      '/currencies',
+      '/k-line',
+      '/trades',
+      '/order-book'
+    ];
+    
+    return publicEndpoints.some(endpoint => url.includes(endpoint));
   }
 
   // ===== CONFIGURATION =====

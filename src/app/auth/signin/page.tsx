@@ -95,64 +95,26 @@ export default function SignInPage() {
     setSuccess('');
     
     try {
-      let loginSuccess = false;
+      // Handle login with authService (supports both regular and 2FA)
+      const { AuthService } = await import('@/lib/auth');
+      const auth = AuthService.getInstance();
       
-      // Check if this is a development login
-      const isDevelopment = process.env.NODE_ENV === 'development' || 
-                           (typeof window !== 'undefined' && window.location.hostname === 'localhost');
-      
-      if (isDevelopment && formData.email === 'demo@orbitex.com' && formData.password === 'demo123') {
-        // Development login - create mock user
-        const mockUser = {
-          id: 'demo_user_123',
-          email: 'demo@orbitex.com',
-          role: 'member',
-          kyc_level: 2,
-          email_verified: true,
-          phone_verified: true,
-          two_factor_enabled: false,
-        };
-        
-        const mockToken = `demo_token_${Date.now()}`;
-        
-        // Store in localStorage
-        localStorage.setItem('access_token', mockToken);
-        localStorage.setItem('refresh_token', mockToken);
-        
-        // Update auth context and wait for it to complete
-        await refreshAuthState();
-        loginSuccess = true;
-        
-        console.log('Development login successful with demo user');
-      } else {
-        // Handle login with authService (supports both regular and 2FA)
-        const { AuthService } = await import('@/lib/auth');
-        const auth = AuthService.getInstance();
-        
-        try {
-          const result = await auth.login(formData.email, formData.password, formData.otpCode);
-          if (result.success) {
-            await refreshAuthState();
-            loginSuccess = true;
-            console.log('Login successful');
-          }
-        } catch (error) {
-          console.error('Login failed:', error);
-          setErrors({ general: error instanceof Error ? error.message : 'Login failed' });
+      try {
+        const result = await auth.login(formData.email, formData.password, formData.otpCode);
+        if (result.success) {
+          await refreshAuthState();
+          console.log('Login successful');
+          
+          setSuccess('Login successful! Redirecting...');
+          
+          // Redirect to dashboard or intended page
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 1000);
         }
-      }
-      
-      if (loginSuccess) {
-        setSuccess('Login successful! Redirecting...');
-        
-        console.log('Login successful, about to redirect...');
-        console.log('Current auth state:', { isAuthenticated, user });
-        
-        // Redirect to dashboard immediately after successful login
-        console.log('Executing redirect to dashboard...');
-        router.push('/dashboard');
-      } else {
-        setErrors({ general: 'Login failed. Please check your credentials and try again.' });
+      } catch (error) {
+        console.error('Login failed:', error);
+        setErrors({ general: error instanceof Error ? error.message : 'Login failed' });
       }
       
     } catch (error: any) {

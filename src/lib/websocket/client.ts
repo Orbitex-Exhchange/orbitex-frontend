@@ -1,4 +1,6 @@
 import { WebSocketMessage, RangerEvent, TickerEvent, OrderEvent, TradeEvent } from '@/types';
+import { socketeerClient } from './socketeer-client';
+import { env } from '@/lib/env';
 
 // ===== WEBSOCKET CONFIGURATION =====
 
@@ -16,20 +18,18 @@ export interface WebSocketConnection {
   subscriptions: string[];
 }
 
-// ===== MAIN WEBSOCKET CLIENT =====
+// ===== MAIN WEBSOCKET CLIENT (Socketeer Adapter) =====
 
 export class WebSocketClient {
-  private ws: WebSocket | null = null;
   private config: WebSocketConfig;
   private connection: WebSocketConnection;
-  private reconnectTimer: NodeJS.Timeout | null = null;
   private eventListeners = new Map<string, Set<(data: any) => void>>();
   private messageListeners = new Set<(message: WebSocketMessage) => void>();
   private connectionListeners = new Set<(connected: boolean) => void>();
 
   constructor(config: Partial<WebSocketConfig> = {}) {
     this.config = {
-      url: 'ws://localhost:3001/ws',
+      url: env.NEXT_PUBLIC_WS_URL, // Use environment variable for socketeer
       reconnectInterval: 5000,
       maxReconnectAttempts: 10,
       enableLogging: process.env.NODE_ENV === 'development',
@@ -42,88 +42,46 @@ export class WebSocketClient {
       reconnectAttempts: 0,
       subscriptions: [],
     };
+
+    // Set up socketeer client listeners
+    this.setupSocketeerListeners();
+  }
+
+  // ===== SOCKETEER INTEGRATION =====
+
+  private setupSocketeerListeners(): void {
+    // Listen to all socketeer messages and forward them
+    socketeerClient.on('*', (data: any) => {
+      this.handleMessage(data);
+    });
   }
 
   // ===== CONNECTION MANAGEMENT =====
 
   connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.connection.connected || this.connection.connecting) {
-        resolve();
-        return;
-      }
+    this.connection.connecting = true;
+    this.log('Connecting via Socketeer');
 
-      this.connection.connecting = true;
-      this.log('Connecting to WebSocket', { url: this.config.url });
-
-      try {
-        this.ws = new WebSocket(this.config.url);
-        this.setupEventHandlers(resolve, reject);
-      } catch (error) {
-        this.connection.connecting = false;
-        reject(error);
-      }
+    return socketeerClient.connectPublic().then(() => {
+      this.connection.connected = true;
+      this.connection.connecting = false;
+      this.connection.reconnectAttempts = 0;
+      this.notifyConnectionListeners(true);
+    }).catch((error) => {
+      this.connection.connecting = false;
+      throw error;
     });
   }
 
   disconnect(): void {
-    this.log('Disconnecting from WebSocket');
-    
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-
+    this.log('Disconnecting from Socketeer');
+    socketeerClient.disconnect();
     this.connection.connected = false;
     this.connection.connecting = false;
     this.notifyConnectionListeners(false);
   }
 
   // ===== EVENT HANDLERS =====
-
-  private setupEventHandlers(resolve: () => void, reject: (error: any) => void): void {
-    if (!this.ws) return;
-
-    this.ws.onopen = () => {
-      this.log('WebSocket connected');
-      this.connection.connected = true;
-      this.connection.connecting = false;
-      this.connection.reconnectAttempts = 0;
-      this.notifyConnectionListeners(true);
-      resolve();
-    };
-
-    this.ws.onclose = (event) => {
-      this.log('WebSocket disconnected', { code: event.code, reason: event.reason });
-      this.connection.connected = false;
-      this.connection.connecting = false;
-      this.notifyConnectionListeners(false);
-      
-      if (event.code !== 1000) {
-        this.scheduleReconnect();
-      }
-    };
-
-    this.ws.onerror = (error) => {
-      this.log('WebSocket error', { error });
-      this.connection.connecting = false;
-      reject(error);
-    };
-
-    this.ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        this.handleMessage(message);
-      } catch (error) {
-        this.log('Failed to parse message', { error, data: event.data });
-      }
-    };
-  }
 
   // ===== MESSAGE HANDLING =====
 
@@ -174,24 +132,15 @@ export class WebSocketClient {
   // ===== SUBSCRIPTION MANAGEMENT =====
 
   subscribe(channel: string, params?: any): void {
-    const message = {
-      event: 'subscribe',
-      stream: channel,
-      ...params,
-    };
-
-    this.send(message);
+    socketeerClient.subscribe([channel]);
     this.connection.subscriptions.push(channel);
+    this.log('Subscribed to channel via Socketeer', { channel });
   }
 
   unsubscribe(channel: string): void {
-    const message = {
-      event: 'unsubscribe',
-      stream: channel,
-    };
-
-    this.send(message);
+    socketeerClient.unsubscribe([channel]);
     this.connection.subscriptions = this.connection.subscriptions.filter(s => s !== channel);
+    this.log('Unsubscribed from channel via Socketeer', { channel });
   }
 
   // ===== EVENT LISTENERS =====
@@ -201,6 +150,9 @@ export class WebSocketClient {
       this.eventListeners.set(event, new Set());
     }
     this.eventListeners.get(event)!.add(listener);
+    
+    // Also register with socketeer client
+    socketeerClient.on(event, listener);
   }
 
   off(event: string, listener: (data: any) => void): void {
@@ -208,6 +160,9 @@ export class WebSocketClient {
     if (listeners) {
       listeners.delete(listener);
     }
+    
+    // Also unregister from socketeer client
+    socketeerClient.off(event, listener);
   }
 
   onMessage(listener: (message: WebSocketMessage) => void): void {
@@ -271,7 +226,7 @@ export class WebSocketClient {
   // ===== STATUS =====
 
   isConnected(): boolean {
-    return this.connection.connected;
+    return socketeerClient.isPublicConnected();
   }
 
   isConnecting(): boolean {
@@ -283,7 +238,10 @@ export class WebSocketClient {
   }
 
   getConnectionStatus(): WebSocketConnection {
-    return { ...this.connection };
+    return { 
+      ...this.connection,
+      connected: this.isConnected()
+    };
   }
 }
 

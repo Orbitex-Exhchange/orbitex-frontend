@@ -41,17 +41,24 @@ import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/auth';
 import TickerSearchPanel from '@/components/trade/TickerSearchPanel';
 import { 
+  useMarketStore, useMarkets, useTickers, useMarketLoading, useMarketError, marketActions,
+  useWalletStore, useBalances, useWalletLoading, useWalletError, walletActions,
+  useTradingStore, useOrderBookData, useRecentTrades, tradingActions
+} from '@/store';
+import { 
   usePublicTickers, 
   useAccountBalances, 
-  useAccountStats,
-  useOrders,
-  useTrades,
+  useAccountStats, 
+  useOrders, 
+  useTrades
+} from '@/lib/api';
+import { 
   useTicker,
   useOrderBook,
   useMarketTrades,
   useKline
-} from '@/lib/api';
-import { useMarketWebSocket } from '@/lib/api/websocket';
+} from '@/lib/api/services/trading';
+import { useSocketIOMarketData, useSocketIODiagnostics } from '@/hooks/useSocketIO';
 
 export default function TradingPage() {
   const router = useRouter();
@@ -79,11 +86,10 @@ export default function TradingPage() {
   const { data: marketTradesData, isLoading: marketTradesLoading, error: marketTradesError } = useMarketTrades(selectedMarket, 50);
   const { data: klineData, isLoading: klineLoading, error: klineError } = useKline(selectedMarket, '1h', 200);
 
-  // Combined loading and error states
-  const isDataLoading = tickersLoading || balancesLoading || statsLoading || ordersLoading || tradesLoading || 
-                       tickerLoading || orderBookLoading || marketTradesLoading || klineLoading;
-  const hasDataError = tickersError || balancesError || statsError || ordersError || tradesError ||
-                      tickerError || orderBookError || marketTradesError || klineError;
+  // Combined loading and error states - only show loading if critical data is loading
+  const isCriticalDataLoading = tickersLoading || tickerLoading;
+  const isDataLoading = isCriticalDataLoading && !tickersData && !currentTickerData;
+  const hasDataError = tickersError || tickerError;
 
   // Get current market ticker data - prioritize real-time ticker data
   const currentTicker = currentTickerData || tickersData?.find(ticker => ticker.market === selectedMarket);
@@ -100,8 +106,19 @@ export default function TradingPage() {
   // Calculate active orders count
   const activeOrdersCount = ordersData?.filter(order => order.state === 'wait').length || 0;
 
-  // WebSocket integration for real-time updates
-  const { ticker: wsTicker, orderbook: wsOrderBook, trades: wsTrades } = useMarketWebSocket(selectedMarket);
+  // Socket.IO integration for high-frequency real-time updates
+  const { 
+    ticker: wsTicker, 
+    orderbook: wsOrderBook, 
+    trades: wsTrades,
+    kline: wsKline,
+    isConnected: wsConnected,
+    lastUpdate: wsLastUpdate,
+    performanceMetrics: wsMetrics
+  } = useSocketIOMarketData(selectedMarket);
+  
+  // WebSocket diagnostics for monitoring
+  const wsDiagnostics = useSocketIODiagnostics();
 
   // Check authentication status
   useEffect(() => {
@@ -112,12 +129,9 @@ export default function TradingPage() {
       setUser(currentUser);
       setIsAuthenticated(authenticated);
       
+      // No demo mode - just set authentication state
       if (!authenticated) {
-        setShowAuthWarning(true);
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to access trading features",
-        });
+        setShowAuthWarning(false); // Don't show warning immediately
       }
     };
 
@@ -229,10 +243,15 @@ export default function TradingPage() {
       <div className="h-8 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))] flex items-center justify-between px-4 text-xs glass">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full animate-pulse shadow-lg ${isAuthenticated ? 'bg-gradient-to-r from-[#00ff88] to-[#00cc6a]' : 'bg-gradient-to-r from-[#ff4444] to-[#cc3333]'}`}></div>
-            <span className={`font-medium ${isAuthenticated ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
-              {isAuthenticated ? 'Live' : 'Unauthorized'}
+            <div className={`w-2 h-2 rounded-full animate-pulse shadow-lg ${wsConnected ? 'bg-gradient-to-r from-[#00ff88] to-[#00cc6a]' : 'bg-gradient-to-r from-[#ff4444] to-[#cc3333]'}`}></div>
+            <span className={`font-medium ${wsConnected ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
+              {wsConnected ? 'Live' : 'Disconnected'}
             </span>
+            {wsConnected && wsDiagnostics.latency > 0 && (
+              <span className="text-xs text-[hsl(var(--trading-text-muted))]">
+                {wsDiagnostics.latency}ms
+              </span>
+            )}
           </div>
           <span className="text-[hsl(var(--trading-text-muted))]">Last updated: {new Date().toLocaleTimeString()}</span>
           {user && (
@@ -268,8 +287,15 @@ export default function TradingPage() {
             Refresh
           </Button>
           <div className="flex items-center space-x-2">
-            <span className="text-[hsl(var(--trading-text-muted))]">Ping:</span>
-            <span className="text-[#00ff88] font-mono font-medium">12ms</span>
+            <span className="text-[hsl(var(--trading-text-muted))]">Transport:</span>
+            <span className="text-[#00ff88] font-mono font-medium">{wsDiagnostics.transportType}</span>
+            {wsMetrics && (
+              <>
+                <span className="text-[hsl(var(--trading-text-muted))]">|</span>
+                <span className="text-[hsl(var(--trading-text-muted))]">Rate:</span>
+                <span className="text-[#00ff88] font-mono font-medium">{wsMetrics.messagesPerSecond.toFixed(1)}/s</span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -329,14 +355,48 @@ export default function TradingPage() {
           </div>
 
           {/* Enhanced Order Form Panel */}
-          <div className="w-[300px] trading-panel border border-[hsl(var(--trading-border))] rounded-lg shadow-xl overflow-hidden">
+          <div className="w-[300px] trading-panel border border-[hsl(var(--trading-border))] rounded-lg shadow-xl overflow-hidden relative">
             <EnhancedOrderForm
               market={selectedMarket}
               currentPrice={currentPrice}
               onPriceClick={handlePriceClick}
               compact={true}
               balancesData={balancesData || []}
+              isAuthenticated={isAuthenticated}
+              onAuthRequired={() => setShowAuthWarning(true)}
             />
+            
+            {/* Authentication Overlay for Order Form */}
+            {!isAuthenticated && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
+                <div className="bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg p-6 shadow-xl max-w-sm w-full mx-4">
+                  <div className="text-center">
+                    <div className="h-12 w-12 bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] rounded-full flex items-center justify-center mx-auto mb-4">
+                      <User className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-[hsl(var(--trading-text))] mb-2">Sign in to Trade</h3>
+                    <p className="text-[hsl(var(--trading-text-muted))] text-sm mb-6">
+                      Create an account or sign in to start trading on Orbitex
+                    </p>
+                    <div className="flex flex-col space-y-3">
+                      <Button
+                        className="w-full btn-gradient-primary"
+                        onClick={() => router.push('/auth/signup')}
+                      >
+                        Get Started
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
+                        onClick={() => router.push('/auth/signin')}
+                      >
+                        Sign In
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -357,9 +417,6 @@ export default function TradingPage() {
         <div className="flex items-center space-x-4">
           <span className="text-[hsl(var(--trading-text-muted))]">24h P&L: <span className="text-[#00ff88] font-medium">+$0.00</span></span>
           <span className="text-[hsl(var(--trading-text-muted))]">Total P&L: <span className="text-[#00ff88] font-medium">+$0.00</span></span>
-          {!isAuthenticated && (
-            <span className="text-[#ff4444] font-medium">⚠️ Demo Mode</span>
-          )}
         </div>
       </div>
 
@@ -452,35 +509,6 @@ export default function TradingPage() {
         </div>
       )}
 
-      {/* Authentication Warning Overlay */}
-      {showAuthWarning && !isAuthenticated && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="glass border border-[#2a2a2a] rounded-lg p-6 shadow-2xl backdrop-blur-xl max-w-md w-full mx-4">
-            <div className="flex items-center space-x-3 mb-4">
-              <AlertTriangle className="h-6 w-6 text-[#ff4444]" />
-              <h3 className="text-lg font-semibold text-white">Authentication Required</h3>
-            </div>
-            <p className="text-[hsl(var(--trading-text-muted))] mb-6">
-              You need to be signed in to access trading features. Please sign in to continue.
-            </p>
-            <div className="flex space-x-3">
-              <Button
-                className="flex-1 btn-gradient-primary"
-                onClick={() => router.push('/auth/signin')}
-              >
-                Sign In
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))]"
-                onClick={() => setShowAuthWarning(false)}
-              >
-                Continue as Guest
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

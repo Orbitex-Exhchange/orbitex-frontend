@@ -17,6 +17,7 @@ class TradingWebSocket {
   private connect() {
     try {
       const wsUrl = env.NEXT_PUBLIC_WS_URL;
+      console.log('Attempting to connect to WebSocket:', wsUrl);
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
@@ -45,6 +46,9 @@ class TradingWebSocket {
 
       this.ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        // Disable WebSocket if it's not available
+        this.isConnected = false;
+        this.reconnectAttempts = this.maxReconnectAttempts; // Stop trying to reconnect
       };
     } catch (error) {
       console.error('Failed to connect WebSocket:', error);

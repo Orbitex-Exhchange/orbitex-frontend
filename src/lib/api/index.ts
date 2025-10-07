@@ -103,6 +103,9 @@ export {
   useMarketTrade
 } from './services/market';
 
+// WebSocket APIs
+export { useMarketWebSocket } from './websocket';
+
 // Export API client
 export { api, APIError } from '../api-client';
 export { apiConfig, getApiBaseUrl, getAuthHeaders } from '../api-client/config';

@@ -10,18 +10,13 @@ const getBaseUrl = () => {
     return envApiUrl;
   }
 
-  // Updated to use the correct Cloud Run URL
-  const productionUrl = 'http://0.0.0.0:3333';
-
+  // Default to local development
   if (isDevelopment) {
-    // In development, use production backend for real data
-    return productionUrl;
+    return 'http://localhost:3330';
   }
-  if (isProduction) {
-    return productionUrl;
-  }
-  // Default to production backend
-  return productionUrl;
+  
+  // Production URL
+  return 'http://0.0.0.0:3002';
 };
 
 const baseUrl = getBaseUrl();

@@ -97,8 +97,8 @@ export interface VersionInfo {
 const publicApi = {
   // Market data
   getMarkets: async (): Promise<PublicMarket[]> => {
-    const response = await apiClient.get<{ data: PublicMarket[] }>(PUBLIC_ENDPOINTS.markets);
-    return response.data.data;
+    const response = await apiClient.get<PublicMarket[]>(PUBLIC_ENDPOINTS.markets);
+    return response.data;
   },
 
   getCurrencies: async (): Promise<PublicCurrency[]> => {
@@ -138,8 +138,16 @@ const publicApi = {
   },
 
   getTickers: async (): Promise<any[]> => {
-    const response = await apiClient.get<{ data: any[] }>('/api/api_v2/public/tickers');
-    return response.data.data;
+    const response = await apiClient.get<any>('/api/api_v2/public/markets/tickers');
+    // The API returns a hash of market_id -> ticker_data, convert to array
+    const tickersHash = response.data;
+    if (typeof tickersHash === 'object' && tickersHash !== null) {
+      return Object.entries(tickersHash).map(([market, ticker]) => ({
+        market,
+        ticker
+      }));
+    }
+    return [];
   },
 };
 

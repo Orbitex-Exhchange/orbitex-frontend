@@ -2,45 +2,24 @@ import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
 export const env = createEnv({
-  server: {
-    // Database Configuration
-    DATABASE_URL: z.string().url().optional(),
-    DATABASE_URL_AUTH: z.string().url().optional(),
-    
-    // Redis Configuration
-    REDIS_URL: z.string().url().optional(),
-    
-    // JWT Configuration
-    JWT_SECRET: z.string().min(32).optional(),
-    JWT_REFRESH_SECRET: z.string().min(32).optional(),
-    
-    // SMTP Configuration
-    SMTP_HOST: z.string().optional(),
-    SMTP_PORT: z.string().transform(Number).optional(),
-    SMTP_USER: z.string().optional(),
-    SMTP_PASS: z.string().optional(),
-    
-    // External Services
-    KYC_AID_URL: z.string().url().optional(),
-    SENTRY_DSN: z.string().url().optional(),
-  },
+
   client: {
     // API URLs
     NEXT_PUBLIC_API_URL: z.string().url().default('http://localhost:3333'),
     // Point directly to Orbisigner v2 identity base for clean endpoint usage
-    NEXT_PUBLIC_AUTH_SERVICE_URL: z.string().url().default('http://localhost:3330/api/v2/identity'),
+    NEXT_PUBLIC_AUTH_SERVICE_URL: z.string().url().default('http://localhost:3330/api/v2'),
     
     // Frontend URLs
     NEXT_PUBLIC_FRONTEND_URL: z.string().url().default('http://localhost:3000'),
     NEXT_PUBLIC_ADMIN_DASHBOARD_URL: z.string().url().default('https://orbitex-admin-dashboard.vercel.app'),
     
     // WebSocket URLs
-    NEXT_PUBLIC_WS_URL: z.string().url().default('ws://localhost:3333/ws'),
+    NEXT_PUBLIC_WS_URL: z.string().default('ws://localhost:8081/public'),
     
     // Feature flags
-    NEXT_PUBLIC_ENABLE_2FA: z.string().transform((val) => val === 'true').default('true'),
-    NEXT_PUBLIC_ENABLE_KYC: z.string().transform((val) => val === 'true').default('true'),
-    NEXT_PUBLIC_ENABLE_WEBAUTHN: z.string().transform((val) => val === 'true').default('false'),
+    NEXT_PUBLIC_ENABLE_2FA: z.boolean().default(true),
+    NEXT_PUBLIC_ENABLE_KYC: z.boolean().default(true),
+    NEXT_PUBLIC_ENABLE_WEBAUTHN: z.boolean().default(false),
     
     // Analytics
     NEXT_PUBLIC_GA_ID: z.string().optional(),

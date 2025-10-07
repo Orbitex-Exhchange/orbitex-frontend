@@ -428,7 +428,7 @@ export const en = {
     'success.email.confirmed': 'Your email address has been successfully confirmed',
 
     // error messages
-    // barong
+    // orbitex
     'resource.labels.private': 'Can\'t update label',
     'resource.user.no_activity': 'No activity recorded or wrong topic',
     'resource.profile.not_exist': 'User has no profile',

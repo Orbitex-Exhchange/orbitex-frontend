@@ -6,7 +6,7 @@ describe('My First Test', function() {
 
   it('Can login', function() {
     cy.contains('Sign In').click()
-    cy.get('input[type=email]').type('admin@barong.io')
+    cy.get('input[type=email]').type('admin@orbitex.io')
     cy.get('input[type=password]').type('0lDHd9ufs9t@')
     cy.get('input[type=submit]').click()
   })

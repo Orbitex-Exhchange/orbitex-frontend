@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { WebSocketMessage, RangerEvent } from '@/types';
+import { env } from '@/lib/env';
 
 interface UseWebSocketOptions {
   url: string;
@@ -211,7 +212,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
 export function useTradingWebSocket() {
   const ws = useWebSocket({
-    url: 'ws://localhost:3001/ws/trading',
+    url: env.NEXT_PUBLIC_WS_URL,
     reconnectInterval: 1000,
     maxReconnectAttempts: 20,
     heartbeatInterval: 15000,

@@ -31,6 +31,8 @@ interface EnhancedOrderFormProps {
   onPriceClick?: (price: number) => void;
   compact?: boolean;
   balancesData?: any[];
+  isAuthenticated?: boolean;
+  onAuthRequired?: () => void;
 }
 
 interface OrderFormData {
@@ -77,7 +79,9 @@ export function EnhancedOrderForm({
   currentPrice,
   onPriceClick,
   compact = false,
-  balancesData: propBalancesData
+  balancesData: propBalancesData,
+  isAuthenticated = false,
+  onAuthRequired
 }: EnhancedOrderFormProps) {
   const [orderData, setOrderData] = useState<OrderFormData>({
     side: 'buy',
@@ -230,6 +234,12 @@ export function EnhancedOrderForm({
   };
 
   const handleSubmitOrder = async () => {
+    // Check authentication first
+    if (!isAuthenticated) {
+      onAuthRequired?.();
+      return;
+    }
+    
     if (!validateOrder()) return;
     
     try {

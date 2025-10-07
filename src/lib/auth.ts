@@ -281,35 +281,10 @@ class AuthService {
   }
 
   public getUser(): AuthUser | null {
-    // Check if we have a demo token
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('access_token');
-      if (token && token.startsWith('demo_token_')) {
-        // Return demo user
-        return {
-          id: 'demo_user_123',
-          email: 'demo@orbitex.com',
-          role: 'member',
-          kyc_level: 2,
-          email_verified: true,
-          phone_verified: true,
-          two_factor_enabled: false,
-        };
-      }
-    }
-    
     return this.user;
   }
 
   public isAuthenticated(): boolean {
-    // Check if we have a demo token
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('access_token');
-      if (token && token.startsWith('demo_token_')) {
-        return true;
-      }
-    }
-    
     return !!this.accessToken && !this.isTokenExpired(this.accessToken);
   }
 

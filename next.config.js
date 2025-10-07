@@ -6,7 +6,6 @@ const nextConfig = {
   // Image configuration
   images: {
     domains: [
-      'localhost',
       'orbitex-frontend.vercel.app',
       'orbitex-admin-dashboard.vercel.app',
       'orbitex-backend-976099405307.us-central1.run.app',
@@ -103,7 +102,16 @@ const nextConfig = {
   // Rewrites for API proxying (if needed)
   async rewrites() {
     return [
-      // Add API rewrites here if needed
+      // Proxy API calls to orbitex-clean backend
+      {
+        source: '/api/api_v2/:path*',
+        destination: 'http://localhost:3333/api/api_v2/:path*',
+      },
+      // Proxy WebSocket connections to orbitex-clean backend
+      {
+        source: '/ws/:path*',
+        destination: 'http://localhost:3333/ws/:path*',
+      },
     ];
   },
   

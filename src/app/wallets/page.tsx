@@ -45,8 +45,8 @@ import { formatNumber, formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWallets } from '@/lib/api';
-import { usePublicTickers } from '@/lib/api';
+import { useWalletStore, useBalances, useWalletLoading, useWalletError, walletActions } from '@/store/walletStore';
+import { useMarketStore, useTickers, marketActions } from '@/store/marketStore';
 import { useToast } from '@/hooks/use-toast';
 
 interface Wallet {
@@ -74,51 +74,69 @@ export default function WalletsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showBalances, setShowBalances] = useState(true);
 
-  // Use real API hooks
-  const { data: apiWallets, isLoading, error, refetch } = useWallets();
-  const { data: tickersData } = usePublicTickers();
+  // Use Zustand stores
+  const balances = useBalances();
+  const isLoading = useWalletLoading();
+  const error = useWalletError();
+  const tickers = useTickers();
 
-  // Transform API data to match our interface
-  const wallets: Wallet[] = apiWallets ? apiWallets.map(wallet => {
-    const balance = parseFloat(wallet.balance);
-    const locked = parseFloat(wallet.locked);
-    const available = balance + locked;
+  // Fetch data on component mount
+  useEffect(() => {
+    if (isAuthenticated) {
+      walletActions.fetchBalances();
+      marketActions.fetchTickers();
+    }
+  }, [isAuthenticated]);
+
+  // Refetch function for refresh button
+  const refetch = () => {
+    if (isAuthenticated) {
+      walletActions.fetchBalances();
+      marketActions.fetchTickers();
+    }
+  };
+
+  // Transform store data to match our interface
+  const wallets: Wallet[] = balances ? balances.map(balance => {
+    const balanceAmount = parseFloat(balance.balance);
+    const lockedAmount = parseFloat(balance.locked);
+    const availableAmount = balanceAmount + lockedAmount;
     
     // Get real price data from tickers
     let price = 1;
     let change24h = 0;
     
-    if (tickersData) {
+    if (tickers) {
       // Find ticker for this currency (look for markets like BTCUSDT, ETHUSDT, etc.)
-      const ticker = tickersData.find(t => 
+      const ticker = tickers.find(t => 
         t.market.endsWith('USDT') && 
-        t.market.startsWith(wallet.currency.toUpperCase())
+        t.market.startsWith(balance.currency.toUpperCase())
       );
       
       if (ticker) {
-        price = parseFloat(ticker.ticker.last);
-        change24h = parseFloat(ticker.ticker.price_change_percent);
+        price = parseFloat(ticker.last);
+        change24h = parseFloat(ticker.change_percent);
       } else {
         // Fallback to USD pairs or other quote currencies
-        const fallbackTicker = tickersData.find(t => 
-          t.market.includes(wallet.currency.toUpperCase())
+        const fallbackTicker = tickers.find(t => 
+          t.market.includes(balance.currency.toUpperCase())
         );
         if (fallbackTicker) {
-          price = parseFloat(fallbackTicker.ticker.last);
-          change24h = parseFloat(fallbackTicker.ticker.price_change_percent);
+          price = parseFloat(fallbackTicker.last);
+          change24h = parseFloat(fallbackTicker.change_percent);
         }
       }
     }
     
-    const value = available * price;
+    const value = availableAmount * price;
     
     return {
-      currency: wallet.currency,
-      balance: wallet.balance,
-      locked: wallet.locked,
-      available: available.toString(),
-      name: getCurrencyName(wallet.currency),
-      type: wallet.currency === 'ZAR' ? 'fiat' : 'crypto',
+      currency: balance.currency,
+      balance: balance.balance,
+      locked: balance.locked,
+      available: availableAmount.toString(),
+      name: getCurrencyName(balance.currency),
+      type: balance.currency === 'ZAR' ? 'fiat' : 'crypto',
       deposit_enabled: true,
       withdrawal_enabled: true,
       change24h: change24h,
