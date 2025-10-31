@@ -31,8 +31,6 @@ interface EnhancedOrderFormProps {
   onPriceClick?: (price: number) => void;
   compact?: boolean;
   balancesData?: any[];
-  isAuthenticated?: boolean;
-  onAuthRequired?: () => void;
 }
 
 interface OrderFormData {
@@ -79,14 +77,12 @@ export function EnhancedOrderForm({
   currentPrice,
   onPriceClick,
   compact = false,
-  balancesData: propBalancesData,
-  isAuthenticated = false,
-  onAuthRequired
+  balancesData: propBalancesData
 }: EnhancedOrderFormProps) {
   const [orderData, setOrderData] = useState<OrderFormData>({
     side: 'buy',
     type: 'limit',
-    price: currentPrice.toString(),
+    price: currentPrice?.toString() || '0',
     size: '',
     total: '',
     stopPrice: '',
@@ -111,32 +107,28 @@ export function EnhancedOrderForm({
   // Use prop balances data if available, otherwise use API data
   const finalBalancesData = propBalancesData || balancesData;
 
-  // Mock portfolio data
+  // Portfolio data from API
   const [portfolio] = useState<Portfolio>({
-    baseBalance: 12.5847,
-    quoteBalance: 25430.75,
-    unrealizedPnL: 1247.85,
-    marginUsed: 8940.25,
-    marginAvailable: 16490.50,
-    positions: [
-      {
-        size: 2.5,
-        avgPrice: 42150.00,
-        markPrice: currentPrice,
-        pnl: 1247.85,
-        percentage: 5.92
-      }
-    ]
+    baseBalance: 0,
+    quoteBalance: 0,
+    unrealizedPnL: 0,
+    marginUsed: 0,
+    marginAvailable: 0,
+    positions: []
   });
 
   // Update balances from API data
   useEffect(() => {
-    if (finalBalancesData) {
+    if (finalBalancesData && Array.isArray(finalBalancesData)) {
       const map: Record<string, number> = {};
       finalBalancesData.forEach((balance: any) => {
-        map[(balance.currency || '').toUpperCase()] = parseFloat(balance.balance || '0');
+        const currency = (balance.currency || '').toUpperCase();
+        const balanceValue = parseFloat(balance.balance || '0');
+        map[currency] = balanceValue;
+        console.log(`Balance for ${currency}:`, balanceValue);
       });
       setBalances(map);
+      console.log('Updated balances map:', map);
     }
   }, [finalBalancesData]);
 
@@ -234,35 +226,39 @@ export function EnhancedOrderForm({
   };
 
   const handleSubmitOrder = async () => {
-    // Check authentication first
-    if (!isAuthenticated) {
-      onAuthRequired?.();
+    if (!validateOrder()) return;
+    
+    // Check if user is authenticated
+    if (!authService.isAuthenticated()) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to place orders.",
+      });
       return;
     }
     
-    if (!validateOrder()) return;
-    
     try {
+      // Convert market format from BTC-USDT to btcusdt
+      const marketId = market.replace('-', '').toLowerCase();
+      
       const orderPayload: any = {
-        market: market,
+        market: marketId,
         side: orderData.side,
-        ord_type: orderData.type === 'stop' || orderData.type === 'stop_limit' || orderData.type === 'trailing_stop' ? 'limit' : orderData.type,
         volume: orderData.size,
-        time_in_force: orderData.timeInForce,
-        reduce_only: orderData.reduceOnly,
-        post_only: orderData.postOnly,
       };
 
-      // Only include price if it's not a market order
-      if (orderData.type !== 'market' && orderData.price) {
-        orderPayload.price = orderData.price;
+      // Add ord_type only for limit orders (default is limit)
+      if (orderData.type === 'market') {
+        orderPayload.ord_type = 'market';
+      } else {
+        orderPayload.ord_type = 'limit';
+        // Price is required for limit orders
+        if (orderData.price) {
+          orderPayload.price = orderData.price;
+        }
       }
 
-      // Only include stop_price for stop orders
-      if ((orderData.type === 'stop' || orderData.type === 'stop_limit') && orderData.stopPrice) {
-        orderPayload.stop_price = orderData.stopPrice;
-      }
-
+      console.log('Submitting order:', orderPayload);
       await createOrderMutation.mutateAsync(orderPayload);
       
       toast({
@@ -282,6 +278,7 @@ export function EnhancedOrderForm({
       toast({
         title: "Order Failed",
         description: error.message || "Failed to submit order. Please try again.",
+        variant: "destructive"
       });
     }
   };
@@ -299,7 +296,7 @@ export function EnhancedOrderForm({
 
   return (
     <div className={cn(
-      "bg-[#1a1a1a] h-full flex flex-col",
+      "bg-[#1a1a1a] h-full flex flex-col overflow-y-auto",
       compact ? "p-3" : "p-4"
     )}>
       {/* Buy/Sell Tabs - Moved to top */}
@@ -479,7 +476,7 @@ export function EnhancedOrderForm({
       {orderData.type !== 'market' && (
         <div className="mb-4">
           <label className="block text-sm font-medium text-[#888] mb-2">
-            Price ({market.split('-')[1] || 'USDT'})
+            Price ({(market.split('-')[1] || market.slice(-3)).toUpperCase()})
           </label>
           <div className="relative">
             <Input
@@ -523,7 +520,7 @@ export function EnhancedOrderForm({
       {/* Size Input */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-[#888] mb-2">
-          Size ({market.split('-')[0] || 'BTC'})
+          Size ({(market.split('-')[0] || market.slice(0, -3)).toUpperCase()})
         </label>
         <Input
           value={orderData.size}
@@ -557,7 +554,7 @@ export function EnhancedOrderForm({
       {/* Total */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-[#888] mb-2">
-          Total ({market.split('-')[1] || 'USDT'})
+          Total ({(market.split('-')[1] || market.slice(-3)).toUpperCase()})
         </label>
         <Input
           value={orderData.total}
@@ -660,8 +657,8 @@ export function EnhancedOrderForm({
           </>
         ) : (
           <>
-            {orderData.side === 'buy' ? 'Buy' : 'Sell'} {market.split('-')[0]}
-            {orderData.total && ` (~$${formatNumber(parseFloat(orderData.total), 2)})`}
+            {orderData.side === 'buy' ? 'Buy' : 'Sell'} {(market.split('-')[0] || market.slice(0, -3)).toUpperCase()}
+            {orderData.total && ` (~${formatNumber(parseFloat(orderData.total), 2)} ${(market.split('-')[1] || market.slice(-3)).toUpperCase()})`}
           </>
         )}
       </Button>

@@ -131,7 +131,9 @@ class AuthAPI {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        // Handle errors array (Orbisigner format) or error string
+        const errorMessage = errorData.errors?.[0] || errorData.error || `HTTP error! status: ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       return await response.json();

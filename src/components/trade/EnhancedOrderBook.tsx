@@ -90,11 +90,12 @@ export const EnhancedOrderBook = React.memo(({
   const [lastPrice, setLastPrice] = useState(43250.50);
   const [priceChange, setPriceChange] = useState(0);
 
-  // Virtualization refs
-  const orderBookParentRef = React.useRef<HTMLDivElement>(null);
+  // Virtualization refs - use separate scroll containers for bids and asks
+  const bidsParentRef = React.useRef<HTMLDivElement>(null);
+  const asksParentRef = React.useRef<HTMLDivElement>(null);
   const tradesParentRef = React.useRef<HTMLDivElement>(null);
 
-  // Generate mock order book data if no real data
+  // Process order book data from API
   const processedOrderBookData = useMemo(() => {
     console.log('Processing order book data:', { 
       propOrderBookData, 
@@ -171,62 +172,18 @@ export const EnhancedOrderBook = React.memo(({
       };
     }
 
-    // Fallback to mock data
-    const generateOrderBook = (): OrderBookData => {
-      const basePrice = lastPrice;
-      const asks: OrderBookEntry[] = [];
-      const bids: OrderBookEntry[] = [];
-      let runningTotalAsks = 0;
-      let runningTotalBids = 0;
-
-      // Generate asks (sell orders)
-      for (let i = 0; i < orderBookSettings.depth; i++) {
-        const price = basePrice + (i + 1) * orderBookSettings.groupBy + Math.random() * orderBookSettings.groupBy * 0.5;
-        const size = Math.random() * 10 + 0.1;
-        runningTotalAsks += size;
-        asks.push({
-          price,
-          size,
-          total: runningTotalAsks,
-          percentage: 0 // Will be calculated later
-        });
-      }
-
-      // Generate bids (buy orders)
-      for (let i = 0; i < orderBookSettings.depth; i++) {
-        const price = basePrice - (i + 1) * orderBookSettings.groupBy - Math.random() * orderBookSettings.groupBy * 0.5;
-        const size = Math.random() * 10 + 0.1;
-        runningTotalBids += size;
-        bids.push({
-          price,
-          size,
-          total: runningTotalBids,
-          percentage: 0 // Will be calculated later
-        });
-      }
-
-      // Calculate percentages
-      const maxTotal = Math.max(runningTotalAsks, runningTotalBids);
-      asks.forEach(ask => ask.percentage = (ask.total / maxTotal) * 100);
-      bids.forEach(bid => bid.percentage = (bid.total / maxTotal) * 100);
-
-      const spread = (asks[0]?.price || 0) - (bids[0]?.price || 0);
-      const spreadPercentage = ((spread / basePrice) * 100) || 0;
-
-      return {
-        asks: asks.sort((a, b) => b.price - a.price), // Highest price first (descending)
-        bids: bids.sort((a, b) => b.price - a.price), // Highest price first (descending)
-        spread,
-        spreadPercentage
-      };
-    };
-
-    return generateOrderBook();
+    // No mock fallback: return empty order book to reflect real API absence
+    return {
+      asks: [],
+      bids: [],
+      spread: 0,
+      spreadPercentage: 0
+    } as OrderBookData;
   }, [propOrderBookData, orderBookData, lastPrice, orderBookSettings.groupBy, orderBookSettings.depth]);
 
-  // Generate mock recent trades data if no real data
+  // Process recent trades data from API
   const processedRecentTrades = useMemo(() => {
-    // Prioritize prop data (from parent), then store data, then fallback to mock
+    // Prioritize prop data (from parent), then store data
     const realTradesData = propMarketTradesData || recentTrades;
     
     if (realTradesData && realTradesData.length > 0) {
@@ -253,32 +210,14 @@ export const EnhancedOrderBook = React.memo(({
       return realTradesData;
     }
 
-    // Fallback to mock data
-    const trades: TradeEntry[] = [];
-    const basePrice = lastPrice;
-    
-    for (let i = 0; i < 50; i++) {
-      const price = basePrice + (Math.random() - 0.5) * 100;
-      const size = Math.random() * 5 + 0.01;
-      const side = Math.random() > 0.5 ? 'buy' : 'sell';
-      const timestamp = Date.now() - Math.random() * 3600000; // Last hour
-      
-      trades.push({
-        id: `trade-${i}`,
-        price,
-        size,
-        side,
-        timestamp
-      });
-    }
-    
-    return trades.sort((a, b) => b.timestamp - a.timestamp);
+    // Return empty trades if no data available
+    return [] as TradeEntry[];
   }, [propMarketTradesData, recentTrades, lastPrice]);
 
   // Virtualization for bids (buy orders) - TOP of panel
   const bidsVirtualizer = useVirtualizer({
     count: Math.min(processedOrderBookData.bids.length, Math.ceil(orderBookSettings.depth / 2)),
-    getScrollElement: () => orderBookParentRef.current,
+    getScrollElement: () => bidsParentRef.current,
     estimateSize: () => 32,
     overscan: 5,
   });
@@ -286,7 +225,7 @@ export const EnhancedOrderBook = React.memo(({
   // Virtualization for asks (sell orders) - BOTTOM of panel
   const asksVirtualizer = useVirtualizer({
     count: Math.min(processedOrderBookData.asks.length, Math.ceil(orderBookSettings.depth / 2)),
-    getScrollElement: () => orderBookParentRef.current,
+    getScrollElement: () => asksParentRef.current,
     estimateSize: () => 32,
     overscan: 5,
   });
@@ -343,7 +282,8 @@ export const EnhancedOrderBook = React.memo(({
     const fetchOrderBook = async () => {
       try {
         const limit = Math.max(orderBookSettings.depth, 20);
-        const url = `${apiBase}/api/api_v2/public/markets/${symbol}/order-book?limit=${limit}`;
+        // Use /depth endpoint that returns simple [price, amount] arrays
+        const url = `${apiBase}/api/api_v2/public/markets/${symbol}/depth?limit=${limit}`;
         console.log('Fetching order book from:', url);
         
         const res = await fetch(url);
@@ -667,7 +607,7 @@ export const EnhancedOrderBook = React.memo(({
           <div className="overflow-hidden flex-1 flex flex-col">
             {/* Bids (Buy Orders) - Green - ABOVE SPREAD */}
             <div className="flex-1 overflow-hidden border-b border-[hsl(var(--trading-border))]">
-              <div className="h-full overflow-auto">
+              <div ref={bidsParentRef} className="h-full overflow-auto">
                 <div
                   style={{
                     height: `${bidsVirtualizer.getTotalSize()}px`,
@@ -713,10 +653,10 @@ export const EnhancedOrderBook = React.memo(({
                     className="font-mono font-bold text-[hsl(var(--trading-accent))] transition-colors duration-1000"
                     style={{ fontSize: '14px' }}
                   >
-                    ${processedOrderBookData.spread.toFixed(2)}
+                    ${(processedOrderBookData.spread || 0).toFixed(2)}
                   </span>
                   <span className="text-xs text-[hsl(var(--trading-text-muted))]">
-                    ({processedOrderBookData.spreadPercentage.toFixed(3)}%)
+                    ({(processedOrderBookData.spreadPercentage || 0).toFixed(3)}%)
                   </span>
                 </div>
                 
@@ -729,7 +669,7 @@ export const EnhancedOrderBook = React.memo(({
 
             {/* Asks (Sell Orders) - Red - BELOW SPREAD */}
             <div className="flex-1 overflow-hidden">
-              <div className="h-full overflow-auto">
+              <div ref={asksParentRef} className="h-full overflow-auto">
                 <div
                   style={{
                     height: `${asksVirtualizer.getTotalSize()}px`,
@@ -818,37 +758,47 @@ export const EnhancedOrderBook = React.memo(({
 
           {/* Recent Trades Content with Virtualization */}
           <div className="overflow-hidden flex-1">
-            <div ref={tradesParentRef} className="h-full overflow-auto">
-              <div
-                style={{
-                  height: `${tradesVirtualizer.getTotalSize()}px`,
-                  width: '100%',
-                  position: 'relative',
-                }}
-              >
-                {tradesVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const trade = processedRecentTrades[virtualRow.index];
-                  
-                  if (!trade) return null;
-                  
-                  return (
-                    <div
-                      key={virtualRow.index}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      <TradeRow trade={trade} />
-                    </div>
-                  );
-                })}
+            {processedRecentTrades.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                <Clock className="h-12 w-12 text-[hsl(var(--trading-text-muted))] mb-2" />
+                <p className="text-[hsl(var(--trading-text-muted))] text-sm">No recent trades</p>
+                <p className="text-[hsl(var(--trading-text-muted))] text-xs mt-1">
+                  Trade history will appear here
+                </p>
               </div>
-            </div>
+            ) : (
+              <div ref={tradesParentRef} className="h-full overflow-auto">
+                <div
+                  style={{
+                    height: `${tradesVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {tradesVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const trade = processedRecentTrades[virtualRow.index];
+                    
+                    if (!trade) return null;
+                    
+                    return (
+                      <div
+                        key={virtualRow.index}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        <TradeRow trade={trade} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Recent Trades Footer */}

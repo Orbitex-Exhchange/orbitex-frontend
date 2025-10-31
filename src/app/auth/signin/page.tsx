@@ -99,22 +99,27 @@ export default function SignInPage() {
       const { AuthService } = await import('@/lib/auth');
       const auth = AuthService.getInstance();
       
-      try {
-        const result = await auth.login(formData.email, formData.password, formData.otpCode);
-        if (result.success) {
-          await refreshAuthState();
-          console.log('Login successful');
-          
-          setSuccess('Login successful! Redirecting...');
-          
-          // Redirect to dashboard or intended page
-          setTimeout(() => {
-            router.push('/dashboard');
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Login failed:', error);
-        setErrors({ general: error instanceof Error ? error.message : 'Login failed' });
+      const result = await auth.login(formData.email, formData.password, formData.otpCode);
+      
+      if (result.success) {
+        // Refresh auth state first
+        refreshAuthState();
+        console.log('Login successful');
+        
+        // Wait a moment for state to update, then redirect
+        setSuccess('Login successful! Redirecting...');
+        
+        // Give time for localStorage, cookies, and context state to sync
+        // Then use window.location for a full page reload which will re-initialize AuthContext
+        setTimeout(() => {
+          console.log('Executing redirect to dashboard...');
+          console.log('Token in localStorage:', !!localStorage.getItem('access_token'));
+          // Use window.location.href for full page reload to ensure auth state is read from localStorage
+          // Cookie is already set by auth.login(), so middleware will see it on next request
+          window.location.href = '/dashboard';
+        }, 500);
+      } else {
+        setErrors({ general: 'Login failed. Please check your credentials and try again.' });
       }
       
     } catch (error: any) {
@@ -234,15 +239,6 @@ export default function SignInPage() {
                 {errors.password && (
                   <p className="text-sm text-red-400">{errors.password}</p>
                 )}
-                
-                {/* Development Login Hint */}
-                {(process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.location.hostname === 'localhost')) && (
-                  <div className="mt-2 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                    <p className="text-xs text-blue-300">
-                      <strong>Development Mode:</strong> Use <code className="bg-blue-800/50 px-1 rounded">demo@orbitex.com</code> / <code className="bg-blue-800/50 px-1 rounded">demo123</code> for quick login
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* 2FA Code Field */}
@@ -335,10 +331,18 @@ export default function SignInPage() {
 
         {/* Demo Credentials (for testing) */}
         <div className="mt-4 p-4 border border-[hsl(var(--trading-border))] rounded-lg bg-[hsl(var(--trading-bg-tertiary))]">
-          <h3 className="text-sm font-medium text-[hsl(var(--trading-text))] mb-2">Demo Credentials (for testing):</h3>
-          <div className="space-y-1 text-xs text-[hsl(var(--trading-text-secondary))]">
-            <p><strong>Email:</strong> user@orbitex.com</p>
-            <p><strong>Password:</strong> DemoUser123!</p>
+          <h3 className="text-sm font-medium text-[hsl(var(--trading-text))] mb-2">Demo Credentials (seeded in database):</h3>
+          <div className="space-y-2 text-xs text-[hsl(var(--trading-text-secondary))]">
+            <div>
+              <p><strong>Member Account:</strong></p>
+              <p>Email: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">john@orbisigner.io</code></p>
+              <p>Password: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">Am8icnzEI3d!</code></p>
+            </div>
+            <div className="pt-2 border-t border-[hsl(var(--trading-border))]">
+              <p><strong>Admin Account:</strong></p>
+              <p>Email: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">admin@orbisigner.io</code></p>
+              <p>Password: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">0lDHd9ufs9t@</code></p>
+            </div>
           </div>
         </div>
       </div>

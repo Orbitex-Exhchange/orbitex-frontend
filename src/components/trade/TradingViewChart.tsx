@@ -37,7 +37,8 @@ import {
   Zap,
   Globe,
   Bitcoin,
-  DollarSign
+  DollarSign,
+  RefreshCw
 } from 'lucide-react';
 import TickerSearchPanel from './TickerSearchPanel';
 import { usePublicTickers, useKline } from '@/lib/api';
@@ -92,7 +93,7 @@ const drawingTools = [
 ];
 
 // Memoized chart configuration
-const getChartConfig = (theme: 'light' | 'dark') => ({
+const getChartConfig = (theme: 'light' | 'dark', timeframe: string) => ({
   layout: {
     background: { 
       type: ColorType.Solid,
@@ -131,7 +132,9 @@ const getChartConfig = (theme: 'light' | 'dark') => ({
   timeScale: {
     borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
     timeVisible: true,
-    secondsVisible: false,
+    secondsVisible: timeframe === '1m' || timeframe === '5m',
+    rightOffset: 10,
+    barSpacing: timeframe === '1w' ? 20 : timeframe === '1d' ? 15 : timeframe === '4h' ? 12 : 10,
   },
   handleScroll: {
     mouseWheel: true,
@@ -199,7 +202,7 @@ export const TradingViewChart = React.memo(({
 
   // Real API data hooks
   const { data: tickersData, isLoading: tickersLoading } = usePublicTickers();
-  const { data: klinesData, isLoading: klinesLoading } = useKline(
+  const { data: klinesData, isLoading: klinesLoading, refetch: refetchKlines } = useKline(
     symbol, 
     selectedTimeframe, 
     200
@@ -207,6 +210,13 @@ export const TradingViewChart = React.memo(({
   
   // Use prop kline data if available, otherwise use API data
   const finalKlineData = propKlineData || klinesData;
+  
+  // Refetch klines when timeframe changes
+  useEffect(() => {
+    if (!propKlineData) {
+      refetchKlines();
+    }
+  }, [selectedTimeframe, refetchKlines, propKlineData]);
 
   // Get current market ticker data
   const currentTicker = tickersData?.find(ticker => ticker.market === symbol);
@@ -232,7 +242,7 @@ export const TradingViewChart = React.memo(({
 
 
   // Memoized chart configuration
-  const chartConfig = useMemo(() => getChartConfig(theme), [theme]);
+  const chartConfig = useMemo(() => getChartConfig(theme, selectedTimeframe), [theme, selectedTimeframe]);
   const seriesConfig = useMemo(() => getSeriesConfig(chartType, theme), [chartType, theme]);
 
   // Market selection handlers
@@ -282,10 +292,19 @@ export const TradingViewChart = React.memo(({
       });
     }
 
-    // Set initial data - use real k-line data if available, otherwise fallback to mock
-    const chartData = finalKlineData && finalKlineData.k_line && finalKlineData.k_line.length > 0 ? 
-      processKlineData(finalKlineData.k_line, theme) : 
-      generateMockData(selectedTimeframe, theme);
+    // Set initial data - use real k-line data from API with fallback
+    let chartData;
+    try {
+      if (finalKlineData && finalKlineData.k_line && finalKlineData.k_line.length > 0) {
+        chartData = processKlineData(finalKlineData.k_line, theme);
+      } else {
+        // Generate minimal fallback data to prevent chart crash
+        chartData = generateFallbackData();
+      }
+    } catch (error) {
+      console.error('Error processing kline data:', error);
+      chartData = generateFallbackData();
+    }
       
     if (chartType === 'candlestick') {
       mainSeries.setData(chartData.candlesticks);
@@ -321,7 +340,7 @@ export const TradingViewChart = React.memo(({
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [chartConfig, seriesConfig, chartType, showVolume, showGrid, autoScale, selectedTimeframe, theme, finalKlineData]);
+  }, [chartConfig, seriesConfig, chartType, showVolume, showGrid, autoScale, selectedTimeframe, theme, finalKlineData, klinesLoading]);
 
   // Initialize chart on mount and when dependencies change
   useEffect(() => {
@@ -681,9 +700,20 @@ export const TradingViewChart = React.memo(({
 
       {/* Chart Area - Fixed positioning and proper sizing */}
       <div 
-        className="absolute inset-0 left-10 top-12 bottom-0 bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] chart-area" 
+        className="absolute top-12 left-10 right-0 bottom-0 bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] chart-area" 
         ref={chartContainerRef}
-      />
+        style={{ width: 'calc(100% - 40px)', height: 'calc(100% - 48px)' }}
+      >
+        {/* Loading Indicator */}
+        {klinesLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[hsl(var(--trading-bg))]/50 backdrop-blur-sm z-10">
+            <div className="flex flex-col items-center gap-2">
+              <RefreshCw className="h-8 w-8 animate-spin text-[hsl(var(--trading-accent))]" />
+              <span className="text-sm text-[hsl(var(--trading-text-muted))]">Loading chart data...</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 });
@@ -734,47 +764,22 @@ const processKlineData = (klines: any[], theme: 'light' | 'dark' = 'dark') => {
   return { candlesticks, volumes };
 };
 
-// Mock data generation with memoization
-const generateMockData = (timeframe: string = '1h', theme: 'light' | 'dark' = 'dark') => {
+// Fallback data generation for chart stability
+const generateFallbackData = () => {
   const candlesticks = [];
   const volumes = [];
   const basePrice = 43250.50;
-  let currentPrice = basePrice;
+  const now = Math.floor(Date.now() / 1000);
   
-  // Calculate interval in seconds based on timeframe
-  const getIntervalSeconds = (tf: string) => {
-    switch (tf) {
-      case '1m': return 60;
-      case '5m': return 300;
-      case '15m': return 900;
-      case '30m': return 1800;
-      case '1h': return 3600;
-      case '4h': return 14400;
-      case '1d': return 86400;
-      case '1w': return 604800;
-      default: return 3600;
-    }
-  };
-  
-  const intervalSeconds = getIntervalSeconds(timeframe);
-  const dataPoints = timeframe === '1w' ? 52 : timeframe === '1d' ? 365 : 200;
-  
-  for (let i = 0; i < dataPoints; i++) {
-    const time = Math.floor(Date.now() / 1000) - (dataPoints - i) * intervalSeconds;
-    const volatility = timeframe === '1m' ? 0.005 : 
-                      timeframe === '5m' ? 0.008 : 
-                      timeframe === '15m' ? 0.01 : 
-                      timeframe === '30m' ? 0.012 : 
-                      timeframe === '1h' ? 0.015 : 
-                      timeframe === '4h' ? 0.02 : 
-                      timeframe === '1d' ? 0.03 : 0.05;
-    
-    const change = (Math.random() - 0.5) * volatility * currentPrice;
-    const open = currentPrice;
-    const close = currentPrice + change;
-    const high = Math.max(open, close) + Math.random() * volatility * currentPrice * 0.5;
-    const low = Math.min(open, close) - Math.random() * volatility * currentPrice * 0.5;
-    const volume = Math.random() * 50 + 10;
+  // Generate 24 hours of hourly data
+  for (let i = 0; i < 24; i++) {
+    const time = now - (24 - i) * 3600;
+    const price = basePrice + (Math.random() - 0.5) * 1000;
+    const open = price;
+    const close = price + (Math.random() - 0.5) * 100;
+    const high = Math.max(open, close) + Math.random() * 50;
+    const low = Math.min(open, close) - Math.random() * 50;
+    const volume = Math.random() * 100 + 10;
     
     candlesticks.push({
       time: time as any,
@@ -787,11 +792,10 @@ const generateMockData = (timeframe: string = '1h', theme: 'light' | 'dark' = 'd
     volumes.push({
       time: time as any,
       value: volume,
-      color: close >= open ? (theme === 'dark' ? '#00ff88' : '#10b981') : (theme === 'dark' ? '#ff4444' : '#ef4444'),
+      color: close >= open ? '#00ff88' : '#ff4444',
     });
-    
-    currentPrice = close;
   }
   
   return { candlesticks, volumes };
 };
+

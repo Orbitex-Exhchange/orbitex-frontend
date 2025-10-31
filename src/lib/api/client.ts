@@ -80,6 +80,7 @@ export class ApiClient {
       enableLogging: true,
       ...config,
     };
+    console.log('API Client baseURL:', this.config.baseURL);
 
     this.retryManager = new RetryManager();
     this.client = axios.create({
@@ -134,10 +135,29 @@ export class ApiClient {
         };
       } catch (error) {
         if (error instanceof AxiosError) {
+          // Handle different error response formats
+          let errorMessage = error.message;
+          let errorCode = 'UNKNOWN_ERROR';
+          
+          if (error.response?.data) {
+            const data = error.response.data;
+            
+            // Handle Peatio V2 error format: { "errors": ["error.code"] }
+            if (data.errors && Array.isArray(data.errors)) {
+              errorMessage = data.errors.join(', ');
+              errorCode = data.errors[0] || errorCode;
+            } 
+            // Handle standard error format: { "message": "...", "code": "..." }
+            else if (data.message) {
+              errorMessage = data.message;
+              errorCode = data.code || errorCode;
+            }
+          }
+          
           throw new ApiError(
-            error.response?.data?.message || error.message,
+            errorMessage,
             error.response?.status || 0,
-            error.response?.data?.code || 'UNKNOWN_ERROR'
+            errorCode
           );
         }
         throw error;
@@ -157,17 +177,48 @@ export class ApiClient {
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
-        // Add auth token only for non-public endpoints
-        const isPublicEndpoint = this.isPublicEndpoint(config.url || '');
-        if (!isPublicEndpoint) {
-          const token = this.getAuthToken();
-          if (token && !token.startsWith('demo_token')) {
-            config.headers.Authorization = `Bearer ${token}`;
+        // Always get fresh token from localStorage on each request
+        const token = this.getAuthToken();
+        if (token) {
+          // Ensure proper Bearer token format
+          config.headers.Authorization = `Bearer ${token}`;
+          if (this.config.enableLogging) {
+            // Log token presence (not the token itself for security)
+            const tokenParts = token.split('.');
+            const tokenInfo: any = { 
+              method: config.method?.toUpperCase(), 
+              url: config.url,
+              hasToken: true,
+              tokenLength: token.length,
+              tokenParts: tokenParts.length
+            };
+            
+            // Decode token to verify it's valid
+            try {
+              if (tokenParts.length === 3 && tokenParts[1]) {
+                const payload = JSON.parse(atob(tokenParts[1]));
+                tokenInfo.hasUid = !!payload.uid;
+                tokenInfo.hasEmail = !!payload.email;
+                tokenInfo.hasRole = !!payload.role;
+                tokenInfo.hasState = !!payload.state;
+                tokenInfo.hasLevel = payload.level !== undefined;
+                tokenInfo.exp = payload.exp ? new Date(payload.exp * 1000).toISOString() : null;
+                tokenInfo.isExpired = payload.exp ? Date.now() > payload.exp * 1000 : false;
+              }
+            } catch (e) {
+              console.warn('Failed to decode token for logging:', e);
+            }
+            
+            console.log('API Request:', tokenInfo);
           }
-        }
-
-        if (this.config.enableLogging) {
-          console.log('API Request:', { method: config.method, url: config.url, isPublic: isPublicEndpoint });
+        } else {
+          if (this.config.enableLogging) {
+            console.warn('API Request without token:', { 
+              method: config.method?.toUpperCase(), 
+              url: config.url,
+              endpoint: config.url?.includes('/account/') ? 'Account endpoint - requires auth' : ''
+            });
+          }
         }
 
         return config;
@@ -188,7 +239,70 @@ export class ApiClient {
         }
         return response;
       },
-      (error) => {
+      async (error) => {
+        if (error.response) {
+          // Handle 401/403 errors - might be auth issue
+          if (error.response.status === 401 || error.response.status === 403) {
+            const errorData = error.response.data;
+            const errorMessage = errorData?.errors?.[0] || errorData?.error?.message || error.message;
+            
+            console.error('API Auth Error:', {
+              status: error.response.status,
+              url: error.config?.url,
+              error: errorMessage,
+              hasToken: !!this.getAuthToken(),
+              endpoint: error.config?.url
+            });
+
+            // If it's a permission error and we have a token, log detailed token info
+            if (errorMessage.includes('not_permitted') || errorMessage.includes('ability')) {
+              const token = this.getAuthToken();
+              if (token) {
+                try {
+                  const parts = token.split('.');
+                  if (parts.length === 3 && parts[1]) {
+                    const payload = JSON.parse(atob(parts[1]));
+                    console.error('Token Details:', {
+                      exp: payload.exp ? new Date(payload.exp * 1000).toISOString() : 'N/A',
+                      isExpired: payload.exp ? Date.now() > payload.exp * 1000 : false,
+                      uid: payload.uid || 'MISSING',
+                      role: payload.role || 'MISSING',
+                      email: payload.email || 'MISSING',
+                      state: payload.state || 'MISSING',
+                      level: payload.level !== undefined ? payload.level : 'MISSING',
+                      hasAllFields: !!(payload.uid && payload.email && payload.role && payload.state && payload.level !== undefined)
+                    });
+                    
+                    // Clear invalid token if it's expired or missing required fields
+                    if (payload.exp && Date.now() > payload.exp * 1000) {
+                      console.error('Token is expired, clearing from localStorage');
+                      if (typeof window !== 'undefined') {
+                        localStorage.removeItem('access_token');
+                        // Dispatch event to notify auth context
+                        window.dispatchEvent(new Event('storage'));
+                      }
+                    } else if (!payload.uid || !payload.email || !payload.role || !payload.state || payload.level === undefined) {
+                      console.error('Token missing required fields, may cause auth issues');
+                    }
+                  } else {
+                    console.error('Invalid token format - expected 3 parts, got:', parts.length);
+                  }
+                } catch (e) {
+                  console.error('Failed to decode token:', e);
+                }
+              } else {
+                console.error('No token found in localStorage');
+              }
+            }
+            
+            // Don't automatically logout on 403 - might be permission issue, not auth issue
+            // But do clear token if it's clearly invalid (401 or expired)
+            if (error.response.status === 401) {
+              console.warn('401 Unauthorized - token may be invalid, consider refreshing');
+            }
+          }
+        }
+
         if (this.config.enableLogging) {
           console.error('API Response Error:', error);
         }
@@ -199,25 +313,32 @@ export class ApiClient {
 
   private getAuthToken(): string | null {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token');
+      // Validate token format (should be a JWT with 3 parts)
+      if (token) {
+        const parts = token.split('.');
+        if (parts.length !== 3) {
+          console.warn('Invalid token format in localStorage, expected JWT with 3 parts');
+          return null;
+        }
+        // Check if token is expired
+        try {
+          if (parts[1]) {
+            const payload = JSON.parse(atob(parts[1]));
+            if (payload.exp && Date.now() > payload.exp * 1000) {
+              console.warn('Token in localStorage is expired');
+              localStorage.removeItem('access_token');
+              return null;
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse token payload:', e);
+          return null;
+        }
+      }
+      return token;
     }
     return null;
-  }
-
-  private isPublicEndpoint(url: string): boolean {
-    const publicEndpoints = [
-      '/api/api_v2/public/',
-      '/api/v2/public/',
-      '/public/',
-      '/markets',
-      '/tickers',
-      '/currencies',
-      '/k-line',
-      '/trades',
-      '/order-book'
-    ];
-    
-    return publicEndpoints.some(endpoint => url.includes(endpoint));
   }
 
   // ===== CONFIGURATION =====

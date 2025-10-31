@@ -11,13 +11,13 @@ class TradingWebSocket {
   private isConnected = false;
 
   constructor() {
-    this.connect();
+    // Disable auto-connect to prevent conflicts with HFT WebSocket service
+    // this.connect();
   }
 
   private connect() {
     try {
       const wsUrl = env.NEXT_PUBLIC_WS_URL;
-      console.log('Attempting to connect to WebSocket:', wsUrl);
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
@@ -46,9 +46,6 @@ class TradingWebSocket {
 
       this.ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        // Disable WebSocket if it's not available
-        this.isConnected = false;
-        this.reconnectAttempts = this.maxReconnectAttempts; // Stop trying to reconnect
       };
     } catch (error) {
       console.error('Failed to connect WebSocket:', error);
@@ -193,8 +190,9 @@ class TradingWebSocket {
   }
 }
 
-// Singleton instance
-export const tradingWebSocket = new TradingWebSocket();
+// Singleton instance - disabled to prevent conflicts with HFT WebSocket service
+// export const tradingWebSocket = new TradingWebSocket();
+export const tradingWebSocket: TradingWebSocket | null = null;
 
 // React hook for WebSocket subscriptions
 export const useWebSocketSubscription = (channel: string, callback: (data: any) => void, deps: any[] = []) => {
@@ -206,12 +204,19 @@ export const useWebSocketSubscription = (channel: string, callback: (data: any) 
   }, [callback]);
 
   useEffect(() => {
+    // Skip if tradingWebSocket is disabled (null)
+    if (!tradingWebSocket) {
+      console.log('useWebSocketSubscription: tradingWebSocket is null, skipping subscription');
+      return;
+    }
+
     const stableCallback = (data: any) => callbackRef.current(data);
+    const ws = tradingWebSocket as TradingWebSocket;
     
-    tradingWebSocket.subscribe(channel, stableCallback);
+    ws.subscribe(channel, stableCallback);
     
     return () => {
-      tradingWebSocket.unsubscribe(channel, stableCallback);
+      ws.unsubscribe(channel, stableCallback);
     };
   }, [channel, ...deps]);
 };
@@ -224,6 +229,12 @@ export const useMarketWebSocket = (market: string) => {
   const [trades, setTrades] = useState([]);
 
   useEffect(() => {
+    // Skip if tradingWebSocket is disabled (null)
+    if (!tradingWebSocket) {
+      console.log('useMarketWebSocket: tradingWebSocket is null, skipping subscription');
+      return;
+    }
+
     const handleMarketData = (data: any) => {
       if (data.type === 'ticker') {
         setTicker(data);
@@ -234,10 +245,11 @@ export const useMarketWebSocket = (market: string) => {
       }
     };
 
-    tradingWebSocket.subscribeToMarket(market, handleMarketData);
+    const ws = tradingWebSocket as TradingWebSocket;
+    ws.subscribeToMarket(market, handleMarketData);
 
     return () => {
-      tradingWebSocket.unsubscribeFromMarket(market, handleMarketData);
+      ws.unsubscribeFromMarket(market, handleMarketData);
     };
   }, [market]);
 
@@ -252,6 +264,12 @@ export const useUserWebSocket = (userId: string) => {
   const [balances, setBalances] = useState({});
 
   useEffect(() => {
+    // Skip if tradingWebSocket is disabled (null)
+    if (!tradingWebSocket) {
+      console.log('useUserWebSocket: tradingWebSocket is null, skipping subscription');
+      return;
+    }
+
     const handleUserData = (data: any) => {
       if (data.type === 'order') {
         setOrders((prev: any[]) => {
@@ -269,14 +287,15 @@ export const useUserWebSocket = (userId: string) => {
       }
     };
 
-    tradingWebSocket.subscribeToUserOrders(userId, handleUserData);
-    tradingWebSocket.subscribeToUserTrades(userId, handleUserData);
-    tradingWebSocket.subscribeToUserBalances(userId, handleUserData);
+    const ws = tradingWebSocket as TradingWebSocket;
+    ws.subscribeToUserOrders(userId, handleUserData);
+    ws.subscribeToUserTrades(userId, handleUserData);
+    ws.subscribeToUserBalances(userId, handleUserData);
 
     return () => {
-      tradingWebSocket.unsubscribeFromMarket(`user.${userId}.orders`, handleUserData);
-      tradingWebSocket.unsubscribeFromMarket(`user.${userId}.trades`, handleUserData);
-      tradingWebSocket.unsubscribeFromMarket(`user.${userId}.balances`, handleUserData);
+      ws.unsubscribeFromMarket(`user.${userId}.orders`, handleUserData);
+      ws.unsubscribeFromMarket(`user.${userId}.trades`, handleUserData);
+      ws.unsubscribeFromMarket(`user.${userId}.balances`, handleUserData);
     };
   }, [userId]);
 

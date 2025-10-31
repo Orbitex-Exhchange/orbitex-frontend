@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Navigation } from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { authService } from '@/lib/auth';
 import { useAccountBalances, useAccountStats } from '@/lib/api';
 import { usePublicTickers } from '@/lib/api';
 import { 
@@ -52,13 +53,36 @@ export default function DashboardPage() {
 
   useEffect(() => {
     console.log('Dashboard auth check:', { isAuthenticated, user, isLoading });
-    if (!isAuthenticated) {
-      console.log('Not authenticated, redirecting to signin...');
-      router.push('/auth/signin');
-      return;
-    }
-    console.log('Authenticated, setting loading to false');
-    setIsLoading(false);
+    
+    // Add delay to allow auth state to initialize after redirect
+    const checkAuth = () => {
+      // Check localStorage directly as well, in case context hasn't updated
+      const token = localStorage.getItem('access_token');
+      const currentUser = authService.getUser();
+      
+      if (!isAuthenticated && !token && !currentUser) {
+        // Only redirect if we're sure there's no auth after a delay
+        setTimeout(() => {
+          const finalToken = localStorage.getItem('access_token');
+          const finalUser = authService.getUser();
+          if (!finalToken && !finalUser) {
+            console.log('Not authenticated after delay, redirecting to signin...');
+            router.push('/auth/signin');
+          } else {
+            setIsLoading(false);
+          }
+        }, 500);
+        return;
+      }
+      
+      console.log('Authenticated, setting loading to false');
+      setIsLoading(false);
+    };
+
+    // Wait a moment for auth state to initialize
+    const timeout = setTimeout(checkAuth, 100);
+    
+    return () => clearTimeout(timeout);
   }, [isAuthenticated, router, user, isLoading]);
 
   const handleLogout = async () => {
@@ -83,9 +107,12 @@ export default function DashboardPage() {
   };
 
   // Get real data from V2 API
-  const { data: balances } = useAccountBalances();
-  const { data: stats } = useAccountStats();
-  const { data: tickersData } = usePublicTickers();
+  const { data: balances, error: balancesError, isLoading: balancesLoading } = useAccountBalances();
+  const { data: stats, error: statsError } = useAccountStats();
+  const { data: tickersData, error: tickersError } = usePublicTickers();
+  
+  // Check for errors
+  const hasError = balancesError || statsError || tickersError;
 
   // Calculate portfolio data from real balances and tickers
   const portfolioData = React.useMemo(() => {

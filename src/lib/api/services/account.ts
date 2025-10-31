@@ -230,11 +230,22 @@ const v2Api = {
 
 // React Query hooks
 export const useAccountBalances = () => {
+  // Check if authenticated
+  const isAuthenticated = typeof window !== 'undefined' ? !!localStorage.getItem('access_token') : false;
+  
   return useQuery({
     queryKey: ['account', 'balances'],
     queryFn: v2Api.getBalances,
+    enabled: isAuthenticated, // Only run if authenticated
     staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 30 * 1000, // Refetch every 30 seconds
+    refetchInterval: isAuthenticated ? 30 * 1000 : false, // Refetch every 30 seconds if authenticated
+    retry: (failureCount, error: any) => {
+      // Don't retry on 403 permission errors
+      if (error?.status === 403 || error?.code === 'user.ability.not_permitted') {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
 };
 

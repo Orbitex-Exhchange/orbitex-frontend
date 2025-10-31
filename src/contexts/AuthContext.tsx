@@ -34,8 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // Clear any invalid tokens
         localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('demo_user_email');
         setAuthToken(null);
         setUser(null);
         setIsAuthenticated(false);
@@ -60,12 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await authService.login(email, password);
       if (result.success && result.token) {
         localStorage.setItem('access_token', result.token);
-        if (result.refreshToken) {
-          localStorage.setItem('refresh_token', result.refreshToken);
-        }
         setAuthToken(result.token);
         setUser(result.user);
         setIsAuthenticated(true);
+        // Dispatch custom event to notify React Query
+        window.dispatchEvent(new Event('auth:changed'));
         return true;
       }
       return false;
@@ -82,11 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Logout error:', error);
     } finally {
       localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('demo_user_email');
       setAuthToken(null);
       setUser(null);
       setIsAuthenticated(false);
+      // Dispatch custom event to notify React Query
+      window.dispatchEvent(new Event('auth:changed'));
     }
   };
 
@@ -98,6 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthToken(result.token);
         setUser(result.user);
         setIsAuthenticated(true);
+        // Dispatch custom event to notify React Query
+        window.dispatchEvent(new Event('auth:changed'));
       } else {
         // Token refresh failed, logout user
         await logout();
@@ -123,13 +122,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthToken(token);
       setUser(currentUser);
       setIsAuthenticated(true);
+      // Dispatch custom event to notify React Query
+      window.dispatchEvent(new Event('auth:changed'));
     } else {
       localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('demo_user_email');
       setAuthToken(null);
       setUser(null);
       setIsAuthenticated(false);
+      // Dispatch custom event to notify React Query
+      window.dispatchEvent(new Event('auth:changed'));
     }
   };
 

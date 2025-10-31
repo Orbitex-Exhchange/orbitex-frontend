@@ -11,7 +11,7 @@ const MARKET_ENDPOINTS = {
   orders: '/api/api_v2/market/orders',
   order: '/api/api_v2/market/orders/:id',
   cancelOrder: '/api/api_v2/market/orders/:id/cancel',
-  cancelAllOrders: '/api/api_v2/market/orders_cancel',
+  cancelAllOrders: '/api/api_v2/market/orders/cancel',
   trades: '/api/api_v2/market/trades',
   trade: '/api/api_v2/market/trades/:id',
 } as const;
@@ -25,17 +25,17 @@ const v2Api = {
     page?: number;
     order_by?: string;
   }): Promise<V2Order[]> => {
-    const response = await apiClient.get<ApiResponse<V2Order[]>>(MARKET_ENDPOINTS.orders, {
+    const response = await apiClient.get<V2Order[]>(MARKET_ENDPOINTS.orders, {
       params
     });
-    return response.data.data;
+    return response.data;
   },
 
   getOrder: async (id: number): Promise<V2Order | null> => {
     try {
       const url = MARKET_ENDPOINTS.order.replace(':id', id.toString());
-      const response = await apiClient.get<{ data: V2Order }>(url);
-      return response.data.data;
+      const response = await apiClient.get<V2Order>(url);
+      return response.data;
     } catch (error) {
       return null;
     }
@@ -45,24 +45,24 @@ const v2Api = {
     market: string;
     side: 'buy' | 'sell';
     volume: string;
-    ord_type: 'limit' | 'market';
+    ord_type?: 'limit' | 'market';
     price?: string;
-    time_in_force?: string;
   }): Promise<V2Order> => {
-    const response = await apiClient.post<{ data: V2Order }>(MARKET_ENDPOINTS.orders, data);
-    return response.data.data;
+    const response = await apiClient.post<V2Order>(MARKET_ENDPOINTS.orders, data);
+    return response.data;
   },
 
   cancelOrder: async (id: number): Promise<V2Order> => {
     const url = MARKET_ENDPOINTS.cancelOrder.replace(':id', id.toString());
-    const response = await apiClient.post<{ data: V2Order }>(url);
-    return response.data.data;
+    const response = await apiClient.post<V2Order>(url);
+    return response.data;
   },
 
   cancelAllOrders: async (params?: {
     market?: string;
-  }): Promise<{ message: string }> => {
-    const response = await apiClient.post<{ message: string }>(MARKET_ENDPOINTS.cancelAllOrders, params);
+    side?: string;
+  }): Promise<V2Order[]> => {
+    const response = await apiClient.post<V2Order[]>(MARKET_ENDPOINTS.cancelAllOrders, params);
     return response.data;
   },
 
@@ -72,17 +72,17 @@ const v2Api = {
     page?: number;
     order_by?: string;
   }): Promise<V2Trade[]> => {
-    const response = await apiClient.get<ApiResponse<V2Trade[]>>(MARKET_ENDPOINTS.trades, {
+    const response = await apiClient.get<V2Trade[]>(MARKET_ENDPOINTS.trades, {
       params
     });
-    return response.data.data;
+    return response.data;
   },
 
   getTrade: async (id: number): Promise<V2Trade | null> => {
     try {
       const url = MARKET_ENDPOINTS.trade.replace(':id', id.toString());
-      const response = await apiClient.get<{ data: V2Trade }>(url);
-      return response.data.data;
+      const response = await apiClient.get<V2Trade>(url);
+      return response.data;
     } catch (error) {
       return null;
     }

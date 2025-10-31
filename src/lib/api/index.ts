@@ -3,8 +3,10 @@
 // Public APIs (no authentication required)
 export { 
   usePublicMarkets,
+  usePublicMarkets as useMarkets, // Alias for useMarkets
   usePublicCurrencies,
   usePublicTickers,
+  usePublicTickers as useTickers, // Alias for useTickers
   useTradingFees,
   useMemberLevels,
   useWithdrawLimits,
@@ -26,6 +28,7 @@ export {
   useTicker,
   useOrderBook,
   useMarketTrades,
+  useMarketTrades as usePublicMarketTrades, // Alias for public market trades
   useKline,
   tradingApi
 } from './services/trading';

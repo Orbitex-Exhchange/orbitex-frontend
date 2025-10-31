@@ -45,8 +45,7 @@ import { formatNumber, formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWalletStore, useBalances, useWalletLoading, useWalletError, walletActions } from '@/store/walletStore';
-import { useMarketStore, useTickers, marketActions } from '@/store/marketStore';
+import { useAccountBalances, useTickers } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 interface Wallet {
@@ -74,30 +73,33 @@ export default function WalletsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showBalances, setShowBalances] = useState(true);
 
-  // Use Zustand stores
-  const balances = useBalances();
-  const isLoading = useWalletLoading();
-  const error = useWalletError();
-  const tickers = useTickers();
+  // Use React Query hooks (same as dashboard and trade pages)
+  const { data: balances = [], isLoading: balancesLoading, error: balancesError, refetch: refetchBalances } = useAccountBalances();
+  const { data: tickersData = [], isLoading: tickersLoading, error: tickersError, refetch: refetchTickers } = useTickers();
 
-  // Fetch data on component mount
-  useEffect(() => {
-    if (isAuthenticated) {
-      walletActions.fetchBalances();
-      marketActions.fetchTickers();
-    }
-  }, [isAuthenticated]);
+  const isLoading = balancesLoading || tickersLoading;
+  const error = balancesError || tickersError;
+  
+  // Extract error message for better display
+  const errorMessage = error instanceof Error 
+    ? error.message 
+    : (error as any)?.message || (error as any)?.code || 'Failed to load wallet data';
 
   // Refetch function for refresh button
   const refetch = () => {
-    if (isAuthenticated) {
-      walletActions.fetchBalances();
-      marketActions.fetchTickers();
+    if (isAuthenticated && authToken) {
+      refetchBalances();
+      refetchTickers();
+    } else {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to view your wallet balances.",
+      });
     }
   };
 
-  // Transform store data to match our interface
-  const wallets: Wallet[] = balances ? balances.map(balance => {
+  // Transform API data to match our interface
+  const wallets: Wallet[] = balances && balances.length > 0 ? balances.map((balance: any) => {
     const balanceAmount = parseFloat(balance.balance);
     const lockedAmount = parseFloat(balance.locked);
     const availableAmount = balanceAmount + lockedAmount;
@@ -106,24 +108,28 @@ export default function WalletsPage() {
     let price = 1;
     let change24h = 0;
     
-    if (tickers) {
+    if (tickersData && tickersData.length > 0) {
       // Find ticker for this currency (look for markets like BTCUSDT, ETHUSDT, etc.)
-      const ticker = tickers.find(t => 
-        t.market.endsWith('USDT') && 
-        t.market.startsWith(balance.currency.toUpperCase())
-      );
+      const ticker = tickersData.find((t: any) => {
+        const market = t.market || t.id;
+        return market?.endsWith('USDT') && 
+               market?.startsWith(balance.currency.toUpperCase());
+      });
       
       if (ticker) {
-        price = parseFloat(ticker.last);
-        change24h = parseFloat(ticker.change_percent);
+        const tickerData = ticker.ticker || ticker;
+        price = parseFloat(tickerData?.last || tickerData?.last || '0') || 1;
+        change24h = parseFloat(tickerData?.price_change_percent || tickerData?.change_percent || '0') || 0;
       } else {
         // Fallback to USD pairs or other quote currencies
-        const fallbackTicker = tickers.find(t => 
-          t.market.includes(balance.currency.toUpperCase())
-        );
+        const fallbackTicker = tickersData.find((t: any) => {
+          const market = t.market || t.id;
+          return market?.includes(balance.currency.toUpperCase());
+        });
         if (fallbackTicker) {
-          price = parseFloat(fallbackTicker.last);
-          change24h = parseFloat(fallbackTicker.change_percent);
+          const tickerData = fallbackTicker.ticker || fallbackTicker;
+          price = parseFloat(tickerData?.last || tickerData?.last || '0') || 1;
+          change24h = parseFloat(tickerData?.price_change_percent || tickerData?.change_percent || '0') || 0;
         }
       }
     }
@@ -345,7 +351,20 @@ export default function WalletsPage() {
           <motion.div className="mb-6" variants={itemVariants}>
         <Card className="border-red-500 bg-red-900/20">
           <CardContent className="pt-6">
-            <p className="text-red-300">Error loading wallets: {error.message}</p>
+            <div className="text-red-300">
+              <p className="font-semibold mb-2">Error loading wallets:</p>
+              <p className="text-sm">{errorMessage}</p>
+              {errorMessage.includes('not_permitted') && (
+                <p className="text-xs text-red-400 mt-2">
+                  This may be an authentication issue. Please try logging out and logging back in.
+                </p>
+              )}
+              {isAuthenticated && !authToken && (
+                <p className="text-xs text-red-400 mt-2">
+                  No authentication token found. Please log in again.
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
           </motion.div>

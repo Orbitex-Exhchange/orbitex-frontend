@@ -34,6 +34,11 @@ class AuthService {
       this.accessToken = localStorage.getItem('access_token');
       this.refreshToken = localStorage.getItem('refresh_token');
       this.user = this.getUserFromToken();
+      
+      // Also set cookie if token exists (for middleware access)
+      if (this.accessToken) {
+        this.setCookie('access_token', this.accessToken, 1);
+      }
     }
   }
 
@@ -81,6 +86,20 @@ class AuthService {
     return false;
   }
 
+  // Helper to set cookie for middleware access
+  private setCookie(name: string, value: string, days: number = 1): void {
+    if (typeof document === 'undefined') return;
+    const expires = new Date();
+    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = `${name}=${value}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
+  }
+
+  // Helper to remove cookie
+  private removeCookie(name: string): void {
+    if (typeof document === 'undefined') return;
+    document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  }
+
   public async login(email: string, password: string, otpCode?: string): Promise<{ success: boolean; user: AuthUser; token: string }> {
     const { authAPI } = await import('./api/auth');
     
@@ -107,11 +126,13 @@ class AuthService {
       this.accessToken = response.jwt_token || '';
       this.refreshToken = response.user.csrf_token; // Use CSRF token as refresh token
 
-      // Store tokens in localStorage
+      // Store tokens in localStorage and cookie (for middleware access)
       if (typeof window !== 'undefined' && this.accessToken) {
         localStorage.setItem('access_token', this.accessToken);
         localStorage.setItem('refresh_token', this.refreshToken || '');
         localStorage.setItem('user', JSON.stringify(this.user));
+        // Set cookie for middleware to access (server-side)
+        this.setCookie('access_token', this.accessToken, 1); // 1 day expiry
       }
 
       return {
@@ -154,11 +175,13 @@ class AuthService {
       this.accessToken = response.jwt_token || '';
       this.refreshToken = response.user.csrf_token; // Use CSRF token as refresh token
 
-      // Store tokens in localStorage
+      // Store tokens in localStorage and cookie (for middleware access)
       if (typeof window !== 'undefined' && this.accessToken) {
         localStorage.setItem('access_token', this.accessToken);
         localStorage.setItem('refresh_token', this.refreshToken || '');
         localStorage.setItem('user', JSON.stringify(this.user));
+        // Set cookie for middleware to access (server-side)
+        this.setCookie('access_token', this.accessToken, 1); // 1 day expiry
       }
     } catch (error) {
       console.error('Registration failed:', error);
@@ -184,6 +207,9 @@ class AuthService {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
+      // Also remove cookie
+      this.removeCookie('access_token');
     }
   }
 
@@ -228,6 +254,8 @@ class AuthService {
 
       if (typeof window !== 'undefined' && this.accessToken) {
         localStorage.setItem('access_token', this.accessToken);
+        // Also update cookie
+        this.setCookie('access_token', this.accessToken, 1);
       }
 
       return {

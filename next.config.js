@@ -6,6 +6,7 @@ const nextConfig = {
   // Image configuration
   images: {
     domains: [
+      'localhost',
       'orbitex-frontend.vercel.app',
       'orbitex-admin-dashboard.vercel.app',
       'orbitex-backend-976099405307.us-central1.run.app',
@@ -67,6 +68,8 @@ const nextConfig = {
   
   // Headers for security
   async headers() {
+    const isDev = process.env.NODE_ENV === 'development';
+    
     return [
       {
         source: '/(.*)',
@@ -82,6 +85,12 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: isDev
+              ? "default-src 'self' 'unsafe-eval' 'unsafe-inline' localhost:* 127.0.0.1:* ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline' localhost:* 127.0.0.1:*; connect-src 'self' localhost:* 127.0.0.1:* ws: wss:; img-src 'self' data: blob: localhost:* 127.0.0.1:*; style-src 'self' 'unsafe-inline';"
+              : "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline';",
           },
         ],
       },
@@ -102,16 +111,7 @@ const nextConfig = {
   // Rewrites for API proxying (if needed)
   async rewrites() {
     return [
-      // Proxy API calls to orbitex-clean backend
-      {
-        source: '/api/api_v2/:path*',
-        destination: 'http://localhost:3333/api/api_v2/:path*',
-      },
-      // Proxy WebSocket connections to orbitex-clean backend
-      {
-        source: '/ws/:path*',
-        destination: 'http://localhost:3333/ws/:path*',
-      },
+      // Add API rewrites here if needed
     ];
   },
   
