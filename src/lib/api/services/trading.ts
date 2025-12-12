@@ -10,11 +10,11 @@ const TRADING_ENDPOINTS = {
   order: '/api/api_v2/market/orders/:id',
   cancelOrder: '/api/api_v2/market/orders/:id/cancel',
   cancelAllOrders: '/api/api_v2/market/orders_cancel',
-  
+
   // Trade history
   trades: '/api/api_v2/market/trades',
   trade: '/api/api_v2/market/trades/:id',
-  
+
   // Market data (real-time)
   ticker: '/api/api_v2/public/markets/:market/ticker',
   orderbook: '/api/api_v2/public/markets/:market/order-book',
@@ -99,111 +99,118 @@ export interface CreateOrderRequest {
   time_in_force?: 'GTC' | 'IOC' | 'FOK';
 }
 
-// Trading API functions
-const tradingApi = {
-  // Order management
-  getOrders: async (params?: {
-    market?: string;
-    state?: string;
-    limit?: number;
-    page?: number;
-    order_by?: string;
-  }): Promise<Order[]> => {
-    const response = await apiClient.get<{ data: Order[] }>(TRADING_ENDPOINTS.orders, {
-      params
-    });
+// Trading API functions - Standalone (No ObjectWrapper to avoid TDZ)
+// Order management
+export const getOrders = async (params?: {
+  market?: string;
+  state?: string;
+  limit?: number;
+  page?: number;
+  order_by?: string;
+}): Promise<Order[]> => {
+  const response = await apiClient.get<any>(TRADING_ENDPOINTS.orders, {
+    params
+  });
+  // Handle both { data: [...] } and [...] response formats
+  return response.data?.data || response.data || [];
+};
+
+export const getOrder = async (id: number): Promise<Order | null> => {
+  try {
+    const url = TRADING_ENDPOINTS.order.replace(':id', id.toString());
+    const response = await apiClient.get<{ data: Order }>(url);
     return response.data.data;
-  },
+  } catch (error) {
+    return null;
+  }
+};
 
-  getOrder: async (id: number): Promise<Order | null> => {
-    try {
-      const url = TRADING_ENDPOINTS.order.replace(':id', id.toString());
-      const response = await apiClient.get<{ data: Order }>(url);
-      return response.data.data;
-    } catch (error) {
-      return null;
-    }
-  },
+export const createOrder = async (data: CreateOrderRequest): Promise<Order> => {
+  const response = await apiClient.post<{ data: Order }>(TRADING_ENDPOINTS.orders, data);
+  return response.data.data;
+};
 
-  createOrder: async (data: CreateOrderRequest): Promise<Order> => {
-    const response = await apiClient.post<{ data: Order }>(TRADING_ENDPOINTS.orders, data);
+export const cancelOrder = async (id: number): Promise<Order> => {
+  const url = TRADING_ENDPOINTS.cancelOrder.replace(':id', id.toString());
+  const response = await apiClient.post<{ data: Order }>(url);
+  return response.data.data;
+};
+
+export const cancelAllOrders = async (params?: {
+  market?: string;
+}): Promise<{ message: string }> => {
+  const response = await apiClient.post<{ message: string }>(TRADING_ENDPOINTS.cancelAllOrders, params);
+  return response.data;
+};
+
+// Trade history
+export const getTrades = async (params?: {
+  market?: string;
+  limit?: number;
+  page?: number;
+  order_by?: string;
+}): Promise<Trade[]> => {
+  const response = await apiClient.get<any>(TRADING_ENDPOINTS.trades, {
+    params
+  });
+  return response.data?.data || response.data || [];
+};
+
+export const getTrade = async (id: number): Promise<Trade | null> => {
+  try {
+    const url = TRADING_ENDPOINTS.trade.replace(':id', id.toString());
+    const response = await apiClient.get<{ data: Trade }>(url);
     return response.data.data;
-  },
+  } catch (error) {
+    return null;
+  }
+};
 
-  cancelOrder: async (id: number): Promise<Order> => {
-    const url = TRADING_ENDPOINTS.cancelOrder.replace(':id', id.toString());
-    const response = await apiClient.post<{ data: Order }>(url);
-    return response.data.data;
-  },
+// Market data
+export const getTicker = async (market: string): Promise<Ticker> => {
+  // Convert BTC-USDT to btcusdt format for API
+  const symbol = market.replace('-', '').toLowerCase();
+  const url = TRADING_ENDPOINTS.ticker.replace(':market', symbol);
+  const response = await apiClient.get<Ticker>(url);
+  // Handle wrapper if present
+  // Handle wrapper if present
+  return (response.data as any)?.ticker ? response.data : ((response.data as any)?.data || response.data);
+};
 
-  cancelAllOrders: async (params?: {
-    market?: string;
-  }): Promise<{ message: string }> => {
-    const response = await apiClient.post<{ message: string }>(TRADING_ENDPOINTS.cancelAllOrders, params);
-    return response.data;
-  },
+export const getOrderBook = async (market: string, limit?: number): Promise<OrderBook> => {
+  // Convert BTC-USDT to btcusdt format for API
+  const symbol = market.replace('-', '').toLowerCase();
+  const url = TRADING_ENDPOINTS.orderbook.replace(':market', symbol);
+  const response = await apiClient.get<OrderBook>(url, {
+    params: limit ? { limit } : undefined
+  });
+  // Handle wrapper if present
+  // Handle wrapper if present
+  return (response.data as any)?.asks ? response.data : ((response.data as any)?.data || { asks: [], bids: [], market: market, at: Date.now() });
+};
 
-  // Trade history
-  getTrades: async (params?: {
-    market?: string;
-    limit?: number;
-    page?: number;
-    order_by?: string;
-  }): Promise<Trade[]> => {
-    const response = await apiClient.get<{ data: Trade[] }>(TRADING_ENDPOINTS.trades, {
-      params
-    });
-    return response.data.data;
-  },
+export const getMarketTrades = async (market: string, limit?: number): Promise<Trade[]> => {
+  // Convert BTC-USDT to btcusdt format for API
+  const symbol = market.replace('-', '').toLowerCase();
+  const url = TRADING_ENDPOINTS.marketTrades.replace(':market', symbol);
+  const response = await apiClient.get<{ data: Trade[] }>(url, {
+    params: limit ? { limit } : undefined
+  });
+  // Handle wrapper if present
+  // Handle wrapper if present
+  return (response.data as any)?.data || (Array.isArray(response.data) ? response.data : []);
+};
 
-  getTrade: async (id: number): Promise<Trade | null> => {
-    try {
-      const url = TRADING_ENDPOINTS.trade.replace(':id', id.toString());
-      const response = await apiClient.get<{ data: Trade }>(url);
-      return response.data.data;
-    } catch (error) {
-      return null;
-    }
-  },
-
-  // Market data
-  getTicker: async (market: string): Promise<Ticker> => {
-    // Convert BTC-USDT to btcusdt format for API
-    const symbol = market.replace('-', '').toLowerCase();
-    const url = TRADING_ENDPOINTS.ticker.replace(':market', symbol);
-    const response = await apiClient.get<Ticker>(url);
-    return response.data;
-  },
-
-  getOrderBook: async (market: string, limit?: number): Promise<OrderBook> => {
-    // Convert BTC-USDT to btcusdt format for API
-    const symbol = market.replace('-', '').toLowerCase();
-    const url = TRADING_ENDPOINTS.orderbook.replace(':market', symbol);
-    const response = await apiClient.get<OrderBook>(url, {
-      params: limit ? { limit } : undefined
-    });
-    return response.data;
-  },
-
-  getMarketTrades: async (market: string, limit?: number): Promise<Trade[]> => {
-    // Convert BTC-USDT to btcusdt format for API
-    const symbol = market.replace('-', '').toLowerCase();
-    const url = TRADING_ENDPOINTS.marketTrades.replace(':market', symbol);
-    const response = await apiClient.get<{ data: Trade[] }>(url, {
-      params: limit ? { limit } : undefined
-    });
-    return response.data.data;
-  },
-
-  getKline: async (market: string, period: string = '1m', limit?: number): Promise<Kline> => {
-    // Convert BTC-USDT to btcusdt format for API
-    const symbol = market.replace('-', '').toLowerCase();
-    const url = TRADING_ENDPOINTS.kline.replace(':market', symbol);
-    const response = await apiClient.get<Kline>(url, {
-      params: { period, ...(limit && { limit }) }
-    });
-    return response.data;
-  },
+export const getKline = async (market: string, period: string = '1m', limit?: number): Promise<Kline> => {
+  // Convert BTC-USDT to btcusdt format for API
+  const symbol = market.replace('-', '').toLowerCase();
+  const url = TRADING_ENDPOINTS.kline.replace(':market', symbol);
+  const response = await apiClient.get<Kline>(url, {
+    params: { period, ...(limit && { limit }) }
+  });
+  // Handle wrapper if present
+  // Handle wrapper if present
+  return (response.data as any)?.k_line ? response.data : ((response.data as any)?.data || response.data);
 };
 
 // Performance-optimized React Query hooks for trading
@@ -218,7 +225,7 @@ export const useOrders = (params?: {
     queryKey: ['trading', 'orders', params],
     queryFn: () => {
       const endTiming = performanceMonitor.startTiming('getOrders');
-      return tradingApi.getOrders(params).finally(endTiming);
+      return getOrders(params).finally(endTiming);
     },
     staleTime: 2 * 1000, // 2 seconds for high-frequency trading
     refetchInterval: 2 * 1000, // Refetch every 2 seconds
@@ -229,7 +236,7 @@ export const useOrders = (params?: {
 export const useOrder = (id: number) => {
   return useQuery({
     queryKey: ['trading', 'order', id],
-    queryFn: () => tradingApi.getOrder(id),
+    queryFn: () => getOrder(id),
     enabled: !!id,
     staleTime: 5 * 1000, // 5 seconds
     refetchInterval: 5 * 1000, // Refetch every 5 seconds
@@ -238,9 +245,9 @@ export const useOrder = (id: number) => {
 
 export const useCreateOrder = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: tradingApi.createOrder,
+    mutationFn: createOrder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trading', 'orders'] });
       queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
@@ -250,9 +257,9 @@ export const useCreateOrder = () => {
 
 export const useCancelOrder = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: tradingApi.cancelOrder,
+    mutationFn: cancelOrder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trading', 'orders'] });
       queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
@@ -262,9 +269,9 @@ export const useCancelOrder = () => {
 
 export const useCancelAllOrders = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: tradingApi.cancelAllOrders,
+    mutationFn: cancelAllOrders,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trading', 'orders'] });
       queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
@@ -280,7 +287,7 @@ export const useTrades = (params?: {
 }) => {
   return useQuery({
     queryKey: ['trading', 'trades', params],
-    queryFn: () => tradingApi.getTrades(params),
+    queryFn: () => getTrades(params),
     staleTime: 10 * 1000, // 10 seconds
     refetchInterval: 10 * 1000, // Refetch every 10 seconds
   });
@@ -289,7 +296,7 @@ export const useTrades = (params?: {
 export const useTrade = (id: number) => {
   return useQuery({
     queryKey: ['trading', 'trade', id],
-    queryFn: () => tradingApi.getTrade(id),
+    queryFn: () => getTrade(id),
     enabled: !!id,
     staleTime: 30 * 1000, // 30 seconds
   });
@@ -298,12 +305,12 @@ export const useTrade = (id: number) => {
 // Real-time market data hooks with WebSocket integration
 export const useTicker = (market: string) => {
   const { ticker: wsTicker } = useMarketWebSocket(market);
-  
+
   const queryResult = useQuery({
     queryKey: ['trading', 'ticker', market],
     queryFn: () => {
       const endTiming = performanceMonitor.startTiming('getTicker');
-      return tradingApi.getTicker(market).finally(endTiming);
+      return getTicker(market).finally(endTiming);
     },
     enabled: !!market,
     staleTime: 1 * 1000, // 1 second for real-time data
@@ -320,12 +327,12 @@ export const useTicker = (market: string) => {
 
 export const useOrderBook = (market: string, limit?: number) => {
   const { orderbook: wsOrderBook } = useMarketWebSocket(market);
-  
+
   const queryResult = useQuery({
     queryKey: ['trading', 'orderbook', market, limit],
     queryFn: () => {
       const endTiming = performanceMonitor.startTiming('getOrderBook');
-      return tradingApi.getOrderBook(market, limit).finally(endTiming);
+      return getOrderBook(market, limit).finally(endTiming);
     },
     enabled: !!market,
     staleTime: 1 * 1000, // 1 second for real-time data
@@ -341,12 +348,12 @@ export const useOrderBook = (market: string, limit?: number) => {
 
 export const useMarketTrades = (market: string, limit?: number) => {
   const { trades: wsTrades } = useMarketWebSocket(market);
-  
+
   const queryResult = useQuery({
     queryKey: ['trading', 'market_trades', market, limit],
     queryFn: () => {
       const endTiming = performanceMonitor.startTiming('getMarketTrades');
-      return tradingApi.getMarketTrades(market, limit).finally(endTiming);
+      return getMarketTrades(market, limit).finally(endTiming);
     },
     enabled: !!market,
     staleTime: 2 * 1000, // 2 seconds
@@ -363,7 +370,7 @@ export const useMarketTrades = (market: string, limit?: number) => {
 export const useKline = (market: string, period: string = '1m', limit?: number) => {
   return useQuery({
     queryKey: ['trading', 'kline', market, period, limit],
-    queryFn: () => tradingApi.getKline(market, period, limit),
+    queryFn: () => getKline(market, period, limit),
     enabled: !!market,
     staleTime: 5 * 1000, // 5 seconds
     refetchInterval: 5 * 1000, // Refetch every 5 seconds
@@ -416,5 +423,5 @@ export const getOrderSideColor = (side: 'buy' | 'sell'): string => {
   return side === 'buy' ? 'text-green-600' : 'text-red-600';
 };
 
-// Export the API functions for direct use
-export { tradingApi };
+// Export the API functions for direct use (Backward compatibility)
+// Object export removed to prevent TDZ issues

@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Navigation } from '@/components/layout/Navigation';
-import { 
-  ChevronDown, 
+import {
+  ChevronDown,
   X,
   Bell,
   RefreshCw,
@@ -41,16 +41,17 @@ import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/auth';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import TickerSearchPanel from '@/components/trade/TickerSearchPanel';
-import { 
-  useAccountBalances, 
-  useAccountStats,
+import { useAccountBalances, useAccountStats } from '@/lib/api/services/account';
+import {
   useTicker,
   useOrderBook as useAPIOrderBook,
-  usePublicMarketTrades,
-  useKline,
-  useMarkets,
-  useTickers
-} from '@/lib/api';
+  useMarketTrades as usePublicMarketTrades,
+  useKline
+} from '@/lib/api/services/trading';
+import {
+  usePublicMarkets as useMarkets,
+  usePublicTickers as useTickers
+} from '@/lib/api/services/public';
 import { useMarketWebSocket } from '@/lib/api/websocket';
 import { useHFTWebSocket } from '@/services/hftWebSocketService';
 import { useHFTPerformance } from '@/hooks/useHFTPerformance';
@@ -96,9 +97,9 @@ class SimpleErrorBoundary extends React.Component<
     if (this.state.hasError && this.state.error) {
       const FallbackComponent = this.props.fallback;
       return (
-        <FallbackComponent 
-          error={this.state.error} 
-          reset={() => this.setState({ hasError: false, error: null })} 
+        <FallbackComponent
+          error={this.state.error}
+          reset={() => this.setState({ hasError: false, error: null })}
         />
       );
     }
@@ -139,8 +140,8 @@ function ErrorState({ error }: { error: any }) {
       <p className="text-[hsl(var(--trading-text-muted))] mb-6 text-center max-w-md">
         {error?.message || 'Unable to connect to trading services. Please check your connection and try again.'}
       </p>
-      <Button 
-        onClick={() => window.location.reload()} 
+      <Button
+        onClick={() => window.location.reload()}
         className="bg-[hsl(var(--trading-accent))] hover:bg-[hsl(var(--trading-accent))]/80 text-black"
       >
         <RefreshCw className="h-4 w-4 mr-2" />
@@ -199,7 +200,7 @@ function TradingPage() {
   console.log("🔵 Trade Page: Component starting...");
 
   const router = useRouter();
-  const [selectedMarket, setSelectedMarket] = useState('btcusd');
+  const [selectedMarket, setSelectedMarket] = useState('btc-usdt');
   console.log("✅ Trade Page: useRouter initialized");
   const [currentPrice, setCurrentPrice] = useState(43250.50);
   const [priceChange24h, setPriceChange24h] = useState(2.45);
@@ -208,7 +209,7 @@ function TradingPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuthWarning, setShowAuthWarning] = useState(false);
   const [showMarketSelector, setShowMarketSelector] = useState(false);
-  
+
   const { toast } = useToast();
 
   // Use React Query hooks for all data
@@ -217,27 +218,27 @@ function TradingPage() {
   const { data: balancesData, isLoading: balancesLoading, error: balancesError } = useAccountBalances();
   const { data: statsData, isLoading: statsLoading, error: statsError } = useAccountStats();
   const { data: currentTickerData, isLoading: tickerLoading, error: tickerError } = useTicker(selectedMarket);
-  const { data: orderBookData, isLoading: orderBookLoading, error: orderBookError } = useAPIOrderBook(selectedMarket, 20, 20);
+  const { data: orderBookData, isLoading: orderBookLoading, error: orderBookError } = useAPIOrderBook(selectedMarket, 20);
   const { data: marketTradesData, isLoading: marketTradesLoading, error: marketTradesError } = usePublicMarketTrades(selectedMarket, 50);
   const { data: klineData, isLoading: klineLoading, error: klineError } = useKline(selectedMarket, '1h', 200);
 
   // Combined loading and error states - only show loading for public data when not authenticated
-  const isDataLoading = marketsLoading || tickersLoading || 
-                       tickerLoading || orderBookLoading || marketTradesLoading || klineLoading ||
-                       (isAuthenticated && (balancesLoading || statsLoading));
-  const hasDataError = marketsError || tickersError || 
-                      tickerError || orderBookError || marketTradesError || klineError ||
-                      (isAuthenticated && (balancesError || statsError));
+  const isDataLoading = marketsLoading || tickersLoading ||
+    tickerLoading || orderBookLoading || marketTradesLoading || klineLoading ||
+    (isAuthenticated && (balancesLoading || statsLoading));
+  const hasDataError = marketsError || tickersError ||
+    tickerError || orderBookError || marketTradesError || klineError ||
+    (isAuthenticated && (balancesError || statsError));
 
   // Memoized data processing for performance
   const processedMarketData = useMemo(() => {
     // Add early return if data is still loading
     if (isDataLoading && !currentTickerData && !tickersData) return null;
     if (!currentTickerData && !tickersData) return null;
-    
+
     const ticker = currentTickerData || tickersData?.find((t: any) => t.market === selectedMarket);
     if (!ticker) return null;
-    
+
     // Safely parse values with fallbacks
     const tickerData = ticker.ticker || ticker;
     return {
@@ -252,9 +253,9 @@ function TradingPage() {
   // Memoized balance calculation
   const totalBalance = useMemo(() => {
     if (!isAuthenticated || !balancesData || !processedMarketData) return 0;
-    
+
     return balancesData.reduce((sum: number, balance: any) => {
-      const price = selectedMarket === `${balance.currency}-usdt` ? 
+      const price = selectedMarket === `${balance.currency}-usdt` ?
         processedMarketData.lastPrice : 1;
       return sum + (parseFloat(balance.balance || '0') * price);
     }, 0);
@@ -282,7 +283,7 @@ function TradingPage() {
 
   // Calculate active orders count (placeholder)
   const activeOrdersCount = 0; // Would need to implement orders API
-  
+
   // Debug logging
   console.log('[RENDER] Trade page rendering, isDataLoading:', isDataLoading);
   console.log('[RENDER] Data status:', {
@@ -296,38 +297,38 @@ function TradingPage() {
 
   // WebSocket integration for real-time updates
   const { ticker: wsTicker, orderbook: wsOrderBook, trades: wsTrades } = useMarketWebSocket(selectedMarket);
-  
+
   // HFT Error State Management
   const [hftError, setHftError] = useState<Error | null>(null);
   const [hftEnabled, setHftEnabled] = useState(true);
-  
+
   // Toast guard flags to prevent infinite loops
   const [hasShownAuthToast, setHasShownAuthToast] = useState(false);
   const [hasShownDataErrorToast, setHasShownDataErrorToast] = useState(false);
   const [hasShownHFTErrorToast, setHasShownHFTErrorToast] = useState(false);
-  
+
   // HFT WebSocket for high-frequency data - called unconditionally
   const hftWebSocket = useHFTWebSocket(hftEnabled ? selectedMarket : undefined);
   const hftConnected = hftWebSocket?.isConnected ?? false;
   const hftMarketData = hftWebSocket?.marketData ?? null;
   const hftOrderBook = hftWebSocket?.orderBook ?? null;
   const hftTrades = hftWebSocket?.trades ?? [];
-  
+
   // HFT Performance monitoring - called unconditionally
   const hftPerformance = useHFTPerformance();
   const metrics = hftPerformance?.metrics ?? { fps: 0, renderTime: 0, memoryUsage: 0, errorCount: 0 };
   const healthScore = hftPerformance?.healthScore ?? 0;
   const isHealthy = hftPerformance?.isHealthy ?? false;
   const measureRender = hftPerformance?.measureRender ?? ((fn: any) => fn());
-  const recordError = hftPerformance?.recordError ?? (() => {});
-  
+  const recordError = hftPerformance?.recordError ?? (() => { });
+
   // HFT Store integration - TEMPORARILY DISABLED to prevent infinite loop
   // TODO: Fix store selectors to use proper equality checks
   // const hftStore = useHFTStore();
   // const hftMarketDataStore = useMarketData(selectedMarket);
   // const hftOrderBookStore = useHFTOrderBook(selectedMarket);
   // const hftTradesStore = useTrades(selectedMarket);
-  
+
   // Handle HFT errors in useEffect
   useEffect(() => {
     // Validate HFT features are working
@@ -337,7 +338,7 @@ function TradingPage() {
       setHftEnabled(false);
     }
   }, [hftWebSocket, hftEnabled]);
-  
+
   // Separate toast effect for HFT errors - only shows once
   useEffect(() => {
     if (hftError && !hasShownHFTErrorToast) {
@@ -354,23 +355,23 @@ function TradingPage() {
     const checkAuth = () => {
       const currentUser = authService.getUser();
       const authenticated = authService.isAuthenticated();
-      
+
       setUser(currentUser);
       setIsAuthenticated(authenticated);
-      
+
       if (!authenticated) {
         setShowAuthWarning(true);
       }
     };
 
     checkAuth();
-    
+
     // Check auth status every 30 seconds
     const authInterval = setInterval(checkAuth, 30000);
-    
+
     return () => clearInterval(authInterval);
   }, []);
-  
+
   // Separate toast effect for auth warning - only shows once
   useEffect(() => {
     if (showAuthWarning && !isAuthenticated && !hasShownAuthToast) {
@@ -489,7 +490,7 @@ function TradingPage() {
     <div className="h-screen trading-layout flex flex-col trading-font overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
       {/* Navigation */}
       <Navigation user={user} />
-      
+
       {/* Enhanced Top Status Bar */}
       <div className="h-8 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))] flex items-center justify-between px-4 text-xs glass">
         <div className="flex items-center space-x-4">

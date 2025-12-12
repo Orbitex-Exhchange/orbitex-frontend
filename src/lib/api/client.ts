@@ -1,7 +1,7 @@
-import axios, { 
-  AxiosInstance, 
-  AxiosRequestConfig, 
-  AxiosResponse, 
+import axios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
   AxiosError
 } from 'axios';
 import { env } from '../env';
@@ -45,12 +45,12 @@ class RetryManager {
         return await fn();
       } catch (error) {
         lastError = error as Error;
-        
+
         // Don't retry on client errors (4xx)
         if (error instanceof AxiosError && error.response?.status && error.response.status >= 400 && error.response.status < 500) {
           throw error;
         }
-        
+
         if (attempt === maxRetries) {
           throw error;
         }
@@ -73,14 +73,20 @@ export class ApiClient {
 
   constructor(config?: Partial<ApiClientConfig>) {
     this.config = {
-      baseURL: env.NEXT_PUBLIC_API_URL,
+      baseURL: env?.NEXT_PUBLIC_API_URL || 'http://localhost:3333',
       timeout: 10000,
       retries: 3,
       retryDelay: 1000,
       enableLogging: true,
       ...config,
     };
-    console.log('API Client baseURL:', this.config.baseURL);
+    if (typeof window !== 'undefined') {
+      console.log('DEBUG: ApiClient initializing, env.NEXT_PUBLIC_API_URL:', env?.NEXT_PUBLIC_API_URL);
+    }
+    // Safe access to config
+    if (this.config.enableLogging && typeof console !== 'undefined') {
+      console.log('API Client baseURL:', this.config.baseURL);
+    }
 
     this.retryManager = new RetryManager();
     this.client = axios.create({
@@ -138,22 +144,22 @@ export class ApiClient {
           // Handle different error response formats
           let errorMessage = error.message;
           let errorCode = 'UNKNOWN_ERROR';
-          
+
           if (error.response?.data) {
             const data = error.response.data;
-            
+
             // Handle Peatio V2 error format: { "errors": ["error.code"] }
             if (data.errors && Array.isArray(data.errors)) {
               errorMessage = data.errors.join(', ');
               errorCode = data.errors[0] || errorCode;
-            } 
+            }
             // Handle standard error format: { "message": "...", "code": "..." }
             else if (data.message) {
               errorMessage = data.message;
               errorCode = data.code || errorCode;
             }
           }
-          
+
           throw new ApiError(
             errorMessage,
             error.response?.status || 0,
@@ -185,14 +191,14 @@ export class ApiClient {
           if (this.config.enableLogging) {
             // Log token presence (not the token itself for security)
             const tokenParts = token.split('.');
-            const tokenInfo: any = { 
-              method: config.method?.toUpperCase(), 
+            const tokenInfo: any = {
+              method: config.method?.toUpperCase(),
               url: config.url,
               hasToken: true,
               tokenLength: token.length,
               tokenParts: tokenParts.length
             };
-            
+
             // Decode token to verify it's valid
             try {
               if (tokenParts.length === 3 && tokenParts[1]) {
@@ -208,13 +214,13 @@ export class ApiClient {
             } catch (e) {
               console.warn('Failed to decode token for logging:', e);
             }
-            
+
             console.log('API Request:', tokenInfo);
           }
         } else {
           if (this.config.enableLogging) {
-            console.warn('API Request without token:', { 
-              method: config.method?.toUpperCase(), 
+            console.warn('API Request without token:', {
+              method: config.method?.toUpperCase(),
               url: config.url,
               endpoint: config.url?.includes('/account/') ? 'Account endpoint - requires auth' : ''
             });
@@ -245,7 +251,7 @@ export class ApiClient {
           if (error.response.status === 401 || error.response.status === 403) {
             const errorData = error.response.data;
             const errorMessage = errorData?.errors?.[0] || errorData?.error?.message || error.message;
-            
+
             console.error('API Auth Error:', {
               status: error.response.status,
               url: error.config?.url,
@@ -272,7 +278,7 @@ export class ApiClient {
                       level: payload.level !== undefined ? payload.level : 'MISSING',
                       hasAllFields: !!(payload.uid && payload.email && payload.role && payload.state && payload.level !== undefined)
                     });
-                    
+
                     // Clear invalid token if it's expired or missing required fields
                     if (payload.exp && Date.now() > payload.exp * 1000) {
                       console.error('Token is expired, clearing from localStorage');
@@ -294,7 +300,7 @@ export class ApiClient {
                 console.error('No token found in localStorage');
               }
             }
-            
+
             // Don't automatically logout on 403 - might be permission issue, not auth issue
             // But do clear token if it's clearly invalid (401 or expired)
             if (error.response.status === 401) {
@@ -345,7 +351,7 @@ export class ApiClient {
 
   updateConfig(config: Partial<ApiClientConfig>): void {
     this.config = { ...this.config, ...config };
-    
+
     // Update axios instance
     this.client.defaults.baseURL = this.config.baseURL;
     this.client.defaults.timeout = this.config.timeout;

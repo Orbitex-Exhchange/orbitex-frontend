@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { 
-  Clock, 
-  History, 
-  TrendingUp, 
+import {
+  Clock,
+  History,
+  TrendingUp,
   TrendingDown,
   RefreshCw,
   Settings,
@@ -68,8 +68,8 @@ export function OrdersTradesPanel({ market, compact = false }: OrdersTradesPanel
                 <Icon className="h-3 w-3 mr-1" />
                 {tab.label}
                 {tab.count > 0 && (
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className="ml-2 h-4 px-1 text-[10px] bg-[hsl(var(--trading-accent))]/10 text-[hsl(var(--trading-accent))] border-[hsl(var(--trading-accent))]/20"
                   >
                     {tab.count}
@@ -79,7 +79,7 @@ export function OrdersTradesPanel({ market, compact = false }: OrdersTradesPanel
             );
           })}
         </div>
-        
+
         <div className="flex items-center space-x-1">
           <Button
             variant="ghost"
@@ -156,10 +156,10 @@ export function OrdersTradesPanel({ market, compact = false }: OrdersTradesPanel
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 'orders' && (
-          <OrdersTable market={market} compact={compact} />
+          <OrdersTable {...(market ? { market } : {})} compact={compact} />
         )}
         {activeTab === 'trades' && (
-          <TradesTable market={market} compact={compact} />
+          <TradesTable {...(market ? { market } : {})} compact={compact} />
         )}
       </div>
 
@@ -168,7 +168,7 @@ export function OrdersTradesPanel({ market, compact = false }: OrdersTradesPanel
         <div className="flex items-center justify-between text-xs text-[hsl(var(--trading-text-muted))]">
           <div className="flex items-center space-x-4">
             <span>
-              {activeTab === 'orders' ? 'Open Orders' : 'Trade History'} • 
+              {activeTab === 'orders' ? 'Open Orders' : 'Trade History'} •
               {market ? `${market.toUpperCase()}` : 'All Markets'}
             </span>
             <div className="flex items-center space-x-2">

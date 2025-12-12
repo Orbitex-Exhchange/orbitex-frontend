@@ -35,7 +35,7 @@ export const useHFTPerformance = (): HFTPerformance => {
 
     if (deltaTime >= 1000) {
       const fps = Math.round((frameCountRef.current * 1000) / deltaTime);
-      
+
       setMetrics(prev => ({
         ...prev,
         fps,
@@ -53,13 +53,14 @@ export const useHFTPerformance = (): HFTPerformance => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       animationFrameRef.current = requestAnimationFrame(updateMetrics);
-      
+
       return () => {
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
         }
       };
     }
+    return undefined;
   }, [updateMetrics]);
 
   const measureRender = useCallback(<T,>(fn: () => T): T => {
@@ -67,7 +68,7 @@ export const useHFTPerformance = (): HFTPerformance => {
     try {
       const result = fn();
       const renderTime = performance.now() - start;
-      
+
       setMetrics(prev => ({
         ...prev,
         renderTime,
@@ -93,7 +94,7 @@ export const useHFTPerformance = (): HFTPerformance => {
   }, []);
 
   // Calculate health score (0-100)
-  const healthScore = Math.max(0, Math.min(100, 
+  const healthScore = Math.max(0, Math.min(100,
     100 - (metrics.errorCount * 10) - Math.max(0, (60 - metrics.fps))
   ));
 

@@ -6,28 +6,28 @@ const USER_ENDPOINTS = {
   // User profile
   profile: '/api/v2/resource/users/me',
   updateProfile: '/api/v2/resource/users/me',
-  
+
   // Documents
   documents: '/api/v2/resource/documents',
   document: '/api/v2/resource/documents/:id',
-  
+
   // Phones
   phones: '/api/v2/resource/phones',
   phone: '/api/v2/resource/phones/:id',
-  
+
   // OTP/2FA
   otpEnable: '/api/v2/resource/otp/enable',
   otpDisable: '/api/v2/resource/otp/disable',
   otpVerify: '/api/v2/resource/otp/verify',
-  
+
   // API Keys
   apiKeys: '/api/v2/resource/api_keys',
   apiKey: '/api/v2/resource/api_keys/:id',
-  
+
   // Labels
   labels: '/api/v2/resource/labels',
   label: '/api/v2/resource/labels/:id',
-  
+
   // Data Storage
   dataStorage: '/api/v2/resource/data_storage',
 } as const;
@@ -121,7 +121,7 @@ export interface OtpSecret {
 const orbisignerUserClient = {
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${env.NEXT_PUBLIC_AUTH_SERVICE_URL.replace('/api/v2/identity', '')}${endpoint}`;
-    
+
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ const orbisignerUserClient = {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -157,208 +157,205 @@ const orbisignerUserClient = {
   }
 };
 
-// User Resource API functions
-const userApi = {
-  // Profile
-  getProfile: async (): Promise<UserProfile> => {
-    return orbisignerUserClient.request<UserProfile>(USER_ENDPOINTS.profile, {
-      method: 'GET',
-    });
-  },
+// User Resource API functions - Standalone (No ObjectWrapper to avoid TDZ)
+export const getProfile = async (): Promise<UserProfile> => {
+  return orbisignerUserClient.request<UserProfile>(USER_ENDPOINTS.profile, {
+    method: 'GET',
+  });
+};
 
-  updateProfile: async (data: Partial<Profile>): Promise<UserProfile> => {
-    return orbisignerUserClient.request<UserProfile>(USER_ENDPOINTS.updateProfile, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+export const updateProfile = async (data: Partial<Profile>): Promise<UserProfile> => {
+  return orbisignerUserClient.request<UserProfile>(USER_ENDPOINTS.updateProfile, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
 
-  // Documents
-  getDocuments: async (): Promise<Document[]> => {
-    return orbisignerUserClient.request<Document[]>(USER_ENDPOINTS.documents, {
-      method: 'GET',
-    });
-  },
+// Documents
+export const getDocuments = async (): Promise<Document[]> => {
+  return orbisignerUserClient.request<Document[]>(USER_ENDPOINTS.documents, {
+    method: 'GET',
+  });
+};
 
-  createDocument: async (data: {
-    doc_type: string;
-    doc_number: string;
-    doc_expire?: string;
-    metadata?: any;
-  }): Promise<Document> => {
-    return orbisignerUserClient.request<Document>(USER_ENDPOINTS.documents, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+export const createDocument = async (data: {
+  doc_type: string;
+  doc_number: string;
+  doc_expire?: string;
+  metadata?: any;
+}): Promise<Document> => {
+  return orbisignerUserClient.request<Document>(USER_ENDPOINTS.documents, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
 
-  updateDocument: async (id: number, data: Partial<Document>): Promise<Document> => {
-    const url = USER_ENDPOINTS.document.replace(':id', id.toString());
-    return orbisignerUserClient.request<Document>(url, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+export const updateDocument = async (id: number, data: Partial<Document>): Promise<Document> => {
+  const url = USER_ENDPOINTS.document.replace(':id', id.toString());
+  return orbisignerUserClient.request<Document>(url, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
 
-  deleteDocument: async (id: number): Promise<{ message: string }> => {
-    const url = USER_ENDPOINTS.document.replace(':id', id.toString());
-    return orbisignerUserClient.request<{ message: string }>(url, {
-      method: 'DELETE',
-    });
-  },
+export const deleteDocument = async (id: number): Promise<{ message: string }> => {
+  const url = USER_ENDPOINTS.document.replace(':id', id.toString());
+  return orbisignerUserClient.request<{ message: string }>(url, {
+    method: 'DELETE',
+  });
+};
 
-  // Phones
-  getPhones: async (): Promise<Phone[]> => {
-    return orbisignerUserClient.request<Phone[]>(USER_ENDPOINTS.phones, {
-      method: 'GET',
-    });
-  },
+// Phones
+export const getPhones = async (): Promise<Phone[]> => {
+  return orbisignerUserClient.request<Phone[]>(USER_ENDPOINTS.phones, {
+    method: 'GET',
+  });
+};
 
-  createPhone: async (data: {
-    number: string;
-    country: string;
-  }): Promise<Phone> => {
-    return orbisignerUserClient.request<Phone>(USER_ENDPOINTS.phones, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+export const createPhone = async (data: {
+  number: string;
+  country: string;
+}): Promise<Phone> => {
+  return orbisignerUserClient.request<Phone>(USER_ENDPOINTS.phones, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
 
-  verifyPhone: async (id: number, code: string): Promise<Phone> => {
-    const url = USER_ENDPOINTS.phone.replace(':id', id.toString());
-    return orbisignerUserClient.request<Phone>(url, {
-      method: 'POST',
-      body: JSON.stringify({ code }),
-    });
-  },
+export const verifyPhone = async (id: number, code: string): Promise<Phone> => {
+  const url = USER_ENDPOINTS.phone.replace(':id', id.toString());
+  return orbisignerUserClient.request<Phone>(url, {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+};
 
-  deletePhone: async (id: number): Promise<{ message: string }> => {
-    const url = USER_ENDPOINTS.phone.replace(':id', id.toString());
-    return orbisignerUserClient.request<{ message: string }>(url, {
-      method: 'DELETE',
-    });
-  },
+export const deletePhone = async (id: number): Promise<{ message: string }> => {
+  const url = USER_ENDPOINTS.phone.replace(':id', id.toString());
+  return orbisignerUserClient.request<{ message: string }>(url, {
+    method: 'DELETE',
+  });
+};
 
-  // OTP/2FA
-  enableOtp: async (): Promise<OtpSecret> => {
-    return orbisignerUserClient.request<OtpSecret>(USER_ENDPOINTS.otpEnable, {
-      method: 'POST',
-    });
-  },
+// OTP/2FA
+export const enableOtp = async (): Promise<OtpSecret> => {
+  return orbisignerUserClient.request<OtpSecret>(USER_ENDPOINTS.otpEnable, {
+    method: 'POST',
+  });
+};
 
-  disableOtp: async (code: string): Promise<{ message: string }> => {
-    return orbisignerUserClient.request<{ message: string }>(USER_ENDPOINTS.otpDisable, {
-      method: 'POST',
-      body: JSON.stringify({ code }),
-    });
-  },
+export const disableOtp = async (code: string): Promise<{ message: string }> => {
+  return orbisignerUserClient.request<{ message: string }>(USER_ENDPOINTS.otpDisable, {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+};
 
-  verifyOtp: async (code: string): Promise<{ message: string }> => {
-    return orbisignerUserClient.request<{ message: string }>(USER_ENDPOINTS.otpVerify, {
-      method: 'POST',
-      body: JSON.stringify({ code }),
-    });
-  },
+export const verifyOtp = async (code: string): Promise<{ message: string }> => {
+  return orbisignerUserClient.request<{ message: string }>(USER_ENDPOINTS.otpVerify, {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+};
 
-  // API Keys
-  getApiKeys: async (): Promise<ApiKey[]> => {
-    return orbisignerUserClient.request<ApiKey[]>(USER_ENDPOINTS.apiKeys, {
-      method: 'GET',
-    });
-  },
+// API Keys
+export const getApiKeys = async (): Promise<ApiKey[]> => {
+  return orbisignerUserClient.request<ApiKey[]>(USER_ENDPOINTS.apiKeys, {
+    method: 'GET',
+  });
+};
 
-  createApiKey: async (data: {
-    algorithm: string;
-    scope: string[];
-  }): Promise<ApiKey> => {
-    return orbisignerUserClient.request<ApiKey>(USER_ENDPOINTS.apiKeys, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+export const createApiKey = async (data: {
+  algorithm: string;
+  scope: string[];
+}): Promise<ApiKey> => {
+  return orbisignerUserClient.request<ApiKey>(USER_ENDPOINTS.apiKeys, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
 
-  updateApiKey: async (id: number, data: {
-    state: string;
-  }): Promise<ApiKey> => {
-    const url = USER_ENDPOINTS.apiKey.replace(':id', id.toString());
-    return orbisignerUserClient.request<ApiKey>(url, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+export const updateApiKey = async (id: number, data: {
+  state: string;
+}): Promise<ApiKey> => {
+  const url = USER_ENDPOINTS.apiKey.replace(':id', id.toString());
+  return orbisignerUserClient.request<ApiKey>(url, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
 
-  deleteApiKey: async (id: number): Promise<{ message: string }> => {
-    const url = USER_ENDPOINTS.apiKey.replace(':id', id.toString());
-    return orbisignerUserClient.request<{ message: string }>(url, {
-      method: 'DELETE',
-    });
-  },
+export const deleteApiKey = async (id: number): Promise<{ message: string }> => {
+  const url = USER_ENDPOINTS.apiKey.replace(':id', id.toString());
+  return orbisignerUserClient.request<{ message: string }>(url, {
+    method: 'DELETE',
+  });
+};
 
-  // Labels
-  getLabels: async (): Promise<Label[]> => {
-    return orbisignerUserClient.request<Label[]>(USER_ENDPOINTS.labels, {
-      method: 'GET',
-    });
-  },
+// Labels
+export const getLabels = async (): Promise<Label[]> => {
+  return orbisignerUserClient.request<Label[]>(USER_ENDPOINTS.labels, {
+    method: 'GET',
+  });
+};
 
-  createLabel: async (data: {
-    key: string;
-    value: string;
-    scope: string;
-  }): Promise<Label> => {
-    return orbisignerUserClient.request<Label>(USER_ENDPOINTS.labels, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+export const createLabel = async (data: {
+  key: string;
+  value: string;
+  scope: string;
+}): Promise<Label> => {
+  return orbisignerUserClient.request<Label>(USER_ENDPOINTS.labels, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
 
-  updateLabel: async (id: number, data: Partial<Label>): Promise<Label> => {
-    const url = USER_ENDPOINTS.label.replace(':id', id.toString());
-    return orbisignerUserClient.request<Label>(url, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
+export const updateLabel = async (id: number, data: Partial<Label>): Promise<Label> => {
+  const url = USER_ENDPOINTS.label.replace(':id', id.toString());
+  return orbisignerUserClient.request<Label>(url, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
 
-  deleteLabel: async (id: number): Promise<{ message: string }> => {
-    const url = USER_ENDPOINTS.label.replace(':id', id.toString());
-    return orbisignerUserClient.request<{ message: string }>(url, {
-      method: 'DELETE',
-    });
-  },
+export const deleteLabel = async (id: number): Promise<{ message: string }> => {
+  const url = USER_ENDPOINTS.label.replace(':id', id.toString());
+  return orbisignerUserClient.request<{ message: string }>(url, {
+    method: 'DELETE',
+  });
+};
 
-  // Data Storage
-  getDataStorage: async (): Promise<DataStorage[]> => {
-    return orbisignerUserClient.request<DataStorage[]>(USER_ENDPOINTS.dataStorage, {
-      method: 'GET',
-    });
-  },
+// Data Storage
+export const getDataStorage = async (): Promise<DataStorage[]> => {
+  return orbisignerUserClient.request<DataStorage[]>(USER_ENDPOINTS.dataStorage, {
+    method: 'GET',
+  });
+};
 
-  setDataStorage: async (data: {
-    key: string;
-    value: any;
-  }): Promise<DataStorage> => {
-    return orbisignerUserClient.request<DataStorage>(USER_ENDPOINTS.dataStorage, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+export const setDataStorage = async (data: {
+  key: string;
+  value: any;
+}): Promise<DataStorage> => {
+  return orbisignerUserClient.request<DataStorage>(USER_ENDPOINTS.dataStorage, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 };
 
 // React Query hooks
 export const useUserProfile = () => {
   return useQuery({
     queryKey: ['user', 'profile'],
-    queryFn: userApi.getProfile,
+    queryFn: getProfile,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
 export const useUpdateProfile = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.updateProfile,
+    mutationFn: updateProfile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'profile'] });
     },
@@ -368,16 +365,16 @@ export const useUpdateProfile = () => {
 export const useUserDocuments = () => {
   return useQuery({
     queryKey: ['user', 'documents'],
-    queryFn: userApi.getDocuments,
+    queryFn: getDocuments,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
 export const useCreateDocument = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.createDocument,
+    mutationFn: createDocument,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'documents'] });
     },
@@ -386,10 +383,10 @@ export const useCreateDocument = () => {
 
 export const useUpdateDocument = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Document> }) => 
-      userApi.updateDocument(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Document> }) =>
+      updateDocument(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'documents'] });
     },
@@ -398,9 +395,9 @@ export const useUpdateDocument = () => {
 
 export const useDeleteDocument = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.deleteDocument,
+    mutationFn: deleteDocument,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'documents'] });
     },
@@ -410,16 +407,16 @@ export const useDeleteDocument = () => {
 export const useUserPhones = () => {
   return useQuery({
     queryKey: ['user', 'phones'],
-    queryFn: userApi.getPhones,
+    queryFn: getPhones,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
 export const useCreatePhone = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.createPhone,
+    mutationFn: createPhone,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'phones'] });
     },
@@ -428,10 +425,10 @@ export const useCreatePhone = () => {
 
 export const useVerifyPhone = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, code }: { id: number; code: string }) => 
-      userApi.verifyPhone(id, code),
+    mutationFn: ({ id, code }: { id: number; code: string }) =>
+      verifyPhone(id, code),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'phones'] });
     },
@@ -440,9 +437,9 @@ export const useVerifyPhone = () => {
 
 export const useDeletePhone = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.deletePhone,
+    mutationFn: deletePhone,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'phones'] });
     },
@@ -451,15 +448,15 @@ export const useDeletePhone = () => {
 
 export const useEnableOtp = () => {
   return useMutation({
-    mutationFn: userApi.enableOtp,
+    mutationFn: enableOtp,
   });
 };
 
 export const useDisableOtp = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.disableOtp,
+    mutationFn: disableOtp,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'profile'] });
     },
@@ -468,23 +465,23 @@ export const useDisableOtp = () => {
 
 export const useVerifyOtp = () => {
   return useMutation({
-    mutationFn: userApi.verifyOtp,
+    mutationFn: verifyOtp,
   });
 };
 
 export const useUserApiKeys = () => {
   return useQuery({
     queryKey: ['user', 'api_keys'],
-    queryFn: userApi.getApiKeys,
+    queryFn: getApiKeys,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
 export const useCreateApiKey = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.createApiKey,
+    mutationFn: createApiKey,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'api_keys'] });
     },
@@ -493,10 +490,10 @@ export const useCreateApiKey = () => {
 
 export const useUpdateApiKey = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { state: string } }) => 
-      userApi.updateApiKey(id, data),
+    mutationFn: ({ id, data }: { id: number; data: { state: string } }) =>
+      updateApiKey(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'api_keys'] });
     },
@@ -505,9 +502,9 @@ export const useUpdateApiKey = () => {
 
 export const useDeleteApiKey = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.deleteApiKey,
+    mutationFn: deleteApiKey,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'api_keys'] });
     },
@@ -517,16 +514,16 @@ export const useDeleteApiKey = () => {
 export const useUserLabels = () => {
   return useQuery({
     queryKey: ['user', 'labels'],
-    queryFn: userApi.getLabels,
+    queryFn: getLabels,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
 export const useCreateLabel = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.createLabel,
+    mutationFn: createLabel,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'labels'] });
     },
@@ -535,10 +532,10 @@ export const useCreateLabel = () => {
 
 export const useUpdateLabel = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Label> }) => 
-      userApi.updateLabel(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Label> }) =>
+      updateLabel(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'labels'] });
     },
@@ -547,9 +544,9 @@ export const useUpdateLabel = () => {
 
 export const useDeleteLabel = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.deleteLabel,
+    mutationFn: deleteLabel,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'labels'] });
     },
@@ -559,21 +556,21 @@ export const useDeleteLabel = () => {
 export const useUserDataStorage = () => {
   return useQuery({
     queryKey: ['user', 'data_storage'],
-    queryFn: userApi.getDataStorage,
+    queryFn: getDataStorage,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
 export const useSetDataStorage = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: userApi.setDataStorage,
+    mutationFn: setDataStorage,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'data_storage'] });
     },
   });
 };
 
-// Export the API functions for direct use
-export { userApi };
+// Export the API functions for backward compatibility (Deprecated)
+// Object export removed to prevent TDZ issues

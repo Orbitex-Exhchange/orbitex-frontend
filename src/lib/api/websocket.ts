@@ -11,13 +11,18 @@ class TradingWebSocket {
   private isConnected = false;
 
   constructor() {
-    // Disable auto-connect to prevent conflicts with HFT WebSocket service
-    // this.connect();
+    // Enable auto-connect
+    this.connect();
   }
 
   private connect() {
     try {
+      // Use client-side env variable safely
+      if (typeof window === 'undefined') return;
+
       const wsUrl = env.NEXT_PUBLIC_WS_URL;
+      if (!wsUrl) return;
+
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
@@ -55,7 +60,7 @@ class TradingWebSocket {
 
   private handleMessage(data: any) {
     const { channel, payload } = data;
-    
+
     if (channel && this.subscribers.has(channel)) {
       const callbacks = this.subscribers.get(channel);
       if (callbacks) {
@@ -89,7 +94,7 @@ class TradingWebSocket {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const delay = this.reconnectInterval * Math.pow(2, this.reconnectAttempts - 1);
-      
+
       setTimeout(() => {
         console.log(`Attempting to reconnect WebSocket (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
         this.connect();
@@ -125,10 +130,10 @@ class TradingWebSocket {
   public unsubscribe(channel: string, callback?: (data: any) => void) {
     if (callback && this.subscribers.has(channel)) {
       this.subscribers.get(channel)!.delete(callback);
-      
+
       if (this.subscribers.get(channel)!.size === 0) {
         this.subscribers.delete(channel);
-        
+
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({
             type: 'unsubscribe',
@@ -191,8 +196,8 @@ class TradingWebSocket {
 }
 
 // Singleton instance - disabled to prevent conflicts with HFT WebSocket service
-// export const tradingWebSocket = new TradingWebSocket();
-export const tradingWebSocket: TradingWebSocket | null = null;
+// Singleton instance
+export const tradingWebSocket = new TradingWebSocket();
 
 // React hook for WebSocket subscriptions
 export const useWebSocketSubscription = (channel: string, callback: (data: any) => void, deps: any[] = []) => {
@@ -212,9 +217,9 @@ export const useWebSocketSubscription = (channel: string, callback: (data: any) 
 
     const stableCallback = (data: any) => callbackRef.current(data);
     const ws = tradingWebSocket as TradingWebSocket;
-    
+
     ws.subscribe(channel, stableCallback);
-    
+
     return () => {
       ws.unsubscribe(channel, stableCallback);
     };

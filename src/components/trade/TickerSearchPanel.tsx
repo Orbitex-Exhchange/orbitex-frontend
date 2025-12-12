@@ -5,8 +5,8 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { useTheme } from '@/contexts/ThemeContext';
-import { usePublicMarkets, usePublicTickers } from '@/lib/api';
-import { 
+import { usePublicMarkets, usePublicTickers } from '@/lib/api/services/public';
+import {
   Search,
   Star,
   TrendingUp,
@@ -44,10 +44,10 @@ interface MarketData {
   tags: string[];
 }
 
-export default function TickerSearchPanel({ 
-  onMarketSelect, 
-  selectedMarket, 
-  compact = false 
+export default function TickerSearchPanel({
+  onMarketSelect,
+  selectedMarket,
+  compact = false
 }: TickerSearchPanelProps) {
   const { theme } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,7 +66,7 @@ export default function TickerSearchPanel({
 
     return marketsData.map(market => {
       const ticker = tickersData.find(t => t.market === market.id);
-      
+
       if (!ticker) {
         return {
           symbol: market.id,
@@ -110,11 +110,11 @@ export default function TickerSearchPanel({
   const filteredMarkets = useMemo(() => {
     let filtered = markets.filter(market => {
       const matchesSearch = market.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           market.baseAsset.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           market.quoteAsset.toLowerCase().includes(searchTerm.toLowerCase());
-      
+        market.baseAsset.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        market.quoteAsset.toLowerCase().includes(searchTerm.toLowerCase());
+
       const matchesCategory = selectedCategory === 'all' || market.category === selectedCategory;
-      
+
       return matchesSearch && matchesCategory;
     });
 
@@ -139,7 +139,7 @@ export default function TickerSearchPanel({
           break;
       }
 
-      return sortDirection === 'asc' 
+      return sortDirection === 'asc'
         ? aValue - bValue
         : bValue - aValue;
     });
@@ -190,7 +190,7 @@ export default function TickerSearchPanel({
             />
           </div>
         </div>
-        
+
         <div className="max-h-64 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center p-4 text-[hsl(var(--trading-text-muted))]">
@@ -242,8 +242,8 @@ export default function TickerSearchPanel({
                     </div>
                     <div className={cn(
                       "text-xs",
-                      market.priceChangePercent24h >= 0 
-                        ? "text-[hsl(var(--trading-success))]" 
+                      market.priceChangePercent24h >= 0
+                        ? "text-[hsl(var(--trading-success))]"
                         : "text-[hsl(var(--trading-error))]"
                     )}>
                       {market.priceChangePercent24h >= 0 ? '+' : ''}{market.priceChangePercent24h.toFixed(2)}%
@@ -368,7 +368,7 @@ export default function TickerSearchPanel({
             {filteredMarkets.map((market) => {
               const priceChange = market.priceChangePercent24h;
               const isPositive = priceChange >= 0;
-              
+
               return (
                 <div
                   key={market.symbol}
@@ -397,7 +397,7 @@ export default function TickerSearchPanel({
                         )}
                       />
                     </button>
-                    
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
                         <div className="font-medium text-[hsl(var(--trading-foreground))]">

@@ -1,7 +1,7 @@
 // Export all API services with specific exports to avoid conflicts
 
 // Public APIs (no authentication required)
-export { 
+export {
   usePublicMarkets,
   usePublicMarkets as useMarkets, // Alias for useMarkets
   usePublicCurrencies,
@@ -12,12 +12,11 @@ export {
   useWithdrawLimits,
   useServerTimestamp,
   useServerVersion,
-  useServerHealth,
-  publicApi
+  useServerHealth
 } from './services/public';
 
 // Trading APIs (authenticated)
-export { 
+export {
   useOrders,
   useOrder,
   useCreateOrder,
@@ -29,15 +28,14 @@ export {
   useOrderBook,
   useMarketTrades,
   useMarketTrades as usePublicMarketTrades, // Alias for public market trades
-  useKline,
-  tradingApi
+  useKline
 } from './services/trading';
 
 // Account APIs (authenticated)
-export { 
-  useAccountBalances, 
-  useAccountBalance, 
-  useAccountDeposits, 
+export {
+  useAccountBalances,
+  useAccountBalance,
+  useAccountDeposits,
   useAccountDeposit,
   useAccountWithdraws,
   useAccountWithdraw,
@@ -57,10 +55,10 @@ export {
 } from './services/account';
 
 // Identity APIs (authentication)
-export { 
-  useIdentityPing, 
-  useIdentityConfigs, 
-  useCreateSession, 
+export {
+  useIdentityPing,
+  useIdentityConfigs,
+  useCreateSession,
   useDeleteSession,
   useCreateUser,
   useGenerateEmailCode,
@@ -69,7 +67,7 @@ export {
 } from './services/identity';
 
 // User Resource APIs (Orbisigner - authenticated)
-export { 
+export {
   useUserProfile,
   useUpdateProfile,
   useUserDocuments,
@@ -92,14 +90,13 @@ export {
   useUpdateLabel,
   useDeleteLabel,
   useUserDataStorage,
-  useSetDataStorage,
-  userApi
+  useSetDataStorage
 } from './services/user';
 
 // Legacy exports for backward compatibility
-export { 
-  useMarketOrders, 
-  useMarketOrder, 
+export {
+  useMarketOrders,
+  useMarketOrder,
   useCreateOrder as useCreateMarketOrder,
   useCancelOrder as useCancelMarketOrder,
   useCancelAllOrders as useCancelAllMarketOrders,
@@ -110,8 +107,9 @@ export {
 export { useMarketWebSocket } from './websocket';
 
 // Export API client
-export { api, APIError } from '../api-client';
-export { apiConfig, getApiBaseUrl, getAuthHeaders } from '../api-client/config';
+// Export API client - Unified to use Axios client
+export { api, ApiError as APIError } from './client';
 
-// Export types
+// Legacy config exports - TODO: Refactor consumers to use @/lib/env directly
+export { apiConfig, getApiBaseUrl, getAuthHeaders } from '../api-client/config';
 export type { APIConfig } from '../api-client/config';

@@ -29,45 +29,44 @@ const ORDERS_ENDPOINTS = {
 } as const;
 
 // Real API functions - Connected to our backend
-const realApi = {
-  getOrders: async (authToken: string, market?: string): Promise<Order[]> => {
-    let url = ORDERS_ENDPOINTS.list;
-    if (market) {
-      url += `?market=${market}`;
-    }
-    const response = await api.get(url, { authToken });
-    return response;
-  },
-  
-  getOrder: async (id: number, authToken: string): Promise<Order | null> => {
-    const url = ORDERS_ENDPOINTS.get.replace(':id', id.toString());
-    const response = await api.get(url, { authToken });
-    return response;
-  },
-  
-  createOrder: async (orderData: {
-    market: string;
-    side: 'buy' | 'sell';
-    ord_type: 'limit' | 'market';
-    price?: string;
-    volume: string;
-  }, authToken: string): Promise<Order> => {
-    const response = await api.post(ORDERS_ENDPOINTS.create, orderData, { authToken });
-    return response;
-  },
-  
-  cancelOrder: async (id: number, authToken: string): Promise<Order> => {
-    const url = ORDERS_ENDPOINTS.cancel.replace(':id', id.toString());
-    const response = await api.post(url, {}, { authToken });
-    return response;
-  },
+// Real API functions - Connected to our backend (Standalone to avoid TDZ)
+export const getOrders = async (authToken: string, market?: string): Promise<Order[]> => {
+  let url = ORDERS_ENDPOINTS.list;
+  if (market) {
+    url += `?market=${market}`;
+  }
+  const response = await api.get(url, { authToken });
+  return response;
+};
+
+export const getOrder = async (id: number, authToken: string): Promise<Order | null> => {
+  const url = ORDERS_ENDPOINTS.get.replace(':id', id.toString());
+  const response = await api.get(url, { authToken });
+  return response;
+};
+
+export const createOrder = async (orderData: {
+  market: string;
+  side: 'buy' | 'sell';
+  ord_type: 'limit' | 'market';
+  price?: string;
+  volume: string;
+}, authToken: string): Promise<Order> => {
+  const response = await api.post(ORDERS_ENDPOINTS.create, orderData, { authToken });
+  return response;
+};
+
+export const cancelOrder = async (id: number, authToken: string): Promise<Order> => {
+  const url = ORDERS_ENDPOINTS.cancel.replace(':id', id.toString());
+  const response = await api.post(url, {}, { authToken });
+  return response;
 };
 
 // React Query hooks
 export const useOrders = (authToken?: string, market?: string) => {
   return useQuery({
     queryKey: ['orders', market],
-    queryFn: () => realApi.getOrders(authToken || '', market),
+    queryFn: () => getOrders(authToken || '', market),
     staleTime: 10 * 1000, // 10 seconds
     refetchInterval: 10 * 1000, // Refetch every 10 seconds
     enabled: !!authToken,
@@ -77,7 +76,7 @@ export const useOrders = (authToken?: string, market?: string) => {
 export const useOrder = (id: number, authToken?: string) => {
   return useQuery({
     queryKey: ['orders', id],
-    queryFn: () => realApi.getOrder(id, authToken || ''),
+    queryFn: () => getOrder(id, authToken || ''),
     staleTime: 10 * 1000, // 10 seconds
     enabled: !!id && !!authToken,
   });
@@ -85,10 +84,10 @@ export const useOrder = (id: number, authToken?: string) => {
 
 export const useCreateOrder = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ orderData, authToken }: { orderData: any; authToken: string }) => 
-      realApi.createOrder(orderData, authToken),
+    mutationFn: ({ orderData, authToken }: { orderData: any; authToken: string }) =>
+      createOrder(orderData, authToken),
     onSuccess: (newOrder) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
@@ -99,10 +98,10 @@ export const useCreateOrder = () => {
 
 export const useCancelOrder = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, authToken }: { id: number; authToken: string }) => 
-      realApi.cancelOrder(id, authToken),
+    mutationFn: ({ id, authToken }: { id: number; authToken: string }) =>
+      cancelOrder(id, authToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['wallets'] });

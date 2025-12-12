@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Navigation } from '@/components/layout/Navigation';
-import { 
+import {
   User,
   Mail,
   Phone,
@@ -30,7 +30,7 @@ import {
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useUserProfile, useUpdateProfile, useUserPhones, useCreatePhone, useVerifyPhone } from '@/lib/api';
+import { useUserProfile, useUpdateProfile, useUserPhones, useCreatePhone, useVerifyPhone } from '@/lib/api/services/user';
 
 interface UserProfile {
   id: string;
@@ -53,7 +53,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated, user, logout } = useAuth();
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>('');
@@ -130,7 +130,7 @@ export default function ProfilePage() {
       2: { label: 'Level 2', color: 'bg-green-100 text-green-800' },
       3: { label: 'Level 3', color: 'bg-purple-100 text-purple-800' }
     };
-    
+
     const levelInfo = levels[level as keyof typeof levels] || levels[0];
     return <Badge className={levelInfo.color}>{levelInfo.label}</Badge>;
   };
@@ -142,7 +142,7 @@ export default function ProfilePage() {
       'rejected': { label: 'Rejected', color: 'bg-red-100 text-red-800' },
       'under_review': { label: 'Under Review', color: 'bg-blue-100 text-blue-800' }
     };
-    
+
     const statusInfo = statuses[status as keyof typeof statuses] || statuses.pending;
     return <Badge className={statusInfo.color}>{statusInfo.label}</Badge>;
   };

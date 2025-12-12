@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { 
+import {
   Plus,
   Search,
   MoreHorizontal,
@@ -14,7 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import Link from 'next/link';
-import { useBeneficiaries } from '@/lib/api';
+import { useBeneficiaries } from '@/lib/api/services/account';
 
 interface AddressBookEntry {
   id: string;
@@ -39,7 +39,7 @@ export default function AddressBookPage() {
     hasRecipientInfo: beneficiary.state === 'active'
   })) : [];
 
-  const filteredAddresses = addresses.filter(address => 
+  const filteredAddresses = addresses.filter(address =>
     address.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     address.currency.toLowerCase().includes(searchTerm.toLowerCase()) ||
     address.address.toLowerCase().includes(searchTerm.toLowerCase())
@@ -83,7 +83,7 @@ export default function AddressBookPage() {
         </div>
       </div>
 
-              <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         {/* Search */}
         <div className="mb-6">
           <div className="relative">

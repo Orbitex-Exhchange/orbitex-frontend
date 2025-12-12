@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { 
-  History, 
-  Download, 
+import {
+  History,
+  Download,
   Filter,
   Search,
   Calendar,
@@ -23,7 +23,8 @@ import {
   EyeOff
 } from 'lucide-react';
 import { formatNumber, formatCurrency } from '@/lib/utils';
-import { useAccountTransactions, useAccountDeposits, useAccountWithdraws, useTrades } from '@/lib/api';
+import { useAccountTransactions, useAccountDeposits, useAccountWithdraws } from '@/lib/api/services/account';
+import { useTrades } from '@/lib/api/services/trading';
 import { useToast } from '@/hooks/use-toast';
 
 interface HistoryEntry {
@@ -141,8 +142,8 @@ export default function HistoryPage() {
       currency: deposit.currency,
       amount: deposit.amount,
       fee: deposit.fee || '0',
-      status: deposit.state === 'accepted' ? 'completed' as const : 
-              deposit.state === 'pending' ? 'pending' as const : 'failed' as const,
+      status: deposit.state === 'accepted' ? 'completed' as const :
+        deposit.state === 'pending' ? 'pending' as const : 'failed' as const,
       txid: deposit.txid,
       address: deposit.to_address,
       createdAt: deposit.created_at,
@@ -156,8 +157,8 @@ export default function HistoryPage() {
       currency: withdraw.currency,
       amount: withdraw.amount,
       fee: withdraw.fee || '0',
-      status: withdraw.state === 'accepted' ? 'completed' as const : 
-              withdraw.state === 'pending' ? 'pending' as const : 'failed' as const,
+      status: withdraw.state === 'accepted' ? 'completed' as const :
+        withdraw.state === 'pending' ? 'pending' as const : 'failed' as const,
       txid: withdraw.txid,
       address: withdraw.rid,
       createdAt: withdraw.created_at,
@@ -183,17 +184,17 @@ export default function HistoryPage() {
 
   const filteredHistory = allHistory.filter(entry => {
     const matchesType = activeTab === 'trades' ? entry.type === 'trade' : entry.type === activeTab.slice(0, -1) as 'deposit' | 'withdraw';
-    const matchesSearch = entry.currency.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         ('txid' in entry ? entry.txid?.toLowerCase().includes(searchTerm.toLowerCase()) : false) || 
-                         ('address' in entry ? entry.address?.toLowerCase().includes(searchTerm.toLowerCase()) : false);
+    const matchesSearch = entry.currency.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ('txid' in entry ? entry.txid?.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+      ('address' in entry ? entry.address?.toLowerCase().includes(searchTerm.toLowerCase()) : false);
     const matchesStatus = statusFilter === 'all' || entry.status === statusFilter;
-    
+
     return matchesType && matchesSearch && matchesStatus;
   });
 
   const sortedHistory = [...filteredHistory].sort((a, b) => {
     let aValue: any, bValue: any;
-    
+
     switch (sortBy) {
       case 'date':
         aValue = new Date(a.createdAt).getTime();
@@ -210,7 +211,7 @@ export default function HistoryPage() {
       default:
         return 0;
     }
-    
+
     if (sortOrder === 'asc') {
       return aValue > bValue ? 1 : -1;
     } else {
@@ -401,7 +402,7 @@ export default function HistoryPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge variant={entry.side === 'buy' ? "default" : "outline"}
-                             className={entry.side === 'buy' ? "bg-[#00ff88] text-black" : "border-[#ff4444] text-[#ff4444]"}>
+                        className={entry.side === 'buy' ? "bg-[#00ff88] text-black" : "border-[#ff4444] text-[#ff4444]"}>
                         {entry.side?.toUpperCase()}
                       </Badge>
                     </td>
@@ -491,11 +492,10 @@ export default function HistoryPage() {
             <button
               key={id}
               onClick={() => setActiveTab(id as any)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === id
+              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === id
                   ? 'bg-[#00ff88] text-black'
                   : 'text-[#888] hover:text-white hover:bg-[#333]'
-              }`}
+                }`}
             >
               <Icon className="w-4 h-4" />
               <span>{label}</span>

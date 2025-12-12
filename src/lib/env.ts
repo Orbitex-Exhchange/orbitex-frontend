@@ -31,23 +31,23 @@ export const env = createEnv({
     NEXT_PUBLIC_API_URL: z.string().url().default('http://localhost:3333'),
     // Point directly to Orbisigner v2 identity base for clean endpoint usage
     NEXT_PUBLIC_AUTH_SERVICE_URL: z.string().url().default('http://localhost:3330/api/v2/identity'),
-    
+
     // Frontend URLs
     NEXT_PUBLIC_FRONTEND_URL: z.string().url().default('http://localhost:3000'),
     NEXT_PUBLIC_ADMIN_DASHBOARD_URL: z.string().url().default('https://orbitex-admin-dashboard.vercel.app'),
-    
+
     // WebSocket URLs
-    NEXT_PUBLIC_WS_URL: z.string().default('ws://localhost:8081/public'),
-    
+    NEXT_PUBLIC_WS_URL: z.string().default('wss://socketeer-976099405307.us-central1.run.app/public'),
+
     // Feature flags - parse from strings
     NEXT_PUBLIC_ENABLE_2FA: booleanFromString.default(true),
     NEXT_PUBLIC_ENABLE_KYC: booleanFromString.default(true),
     NEXT_PUBLIC_ENABLE_WEBAUTHN: booleanFromString.default(false),
-    
+
     // Analytics
     NEXT_PUBLIC_GA_ID: optionalString,
     NEXT_PUBLIC_SENTRY_DSN: optionalUrl,
-    
+
     // External services
     NEXT_PUBLIC_KYC_AID_URL: optionalUrl,
   },

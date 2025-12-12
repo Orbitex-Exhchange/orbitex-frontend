@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { apiConfig } from '@/lib/api-client/config';
+
 
 // ===== TYPES =====
 
@@ -107,27 +107,18 @@ export const useHFTStore = create<HFTState & HFTActions>()(
     fetchMarketDepth: async (market: string, limit = 20) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await fetch(`${apiConfig.baseUrl}/api/api_v2/public/hft/market-depth/${market}?limit=${limit}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const { apiClient } = await import('@/lib/api/client');
+        const response = await apiClient.get<any>(`/api/api_v2/public/hft/market-depth/${market}?limit=${limit}`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        set({ 
-          marketDepth: data, 
-          isLoading: false, 
-          lastUpdated: Date.now() 
+        set({
+          marketDepth: response.data,
+          isLoading: false,
+          lastUpdated: Date.now()
         });
-      } catch (error) {
-        set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch market depth',
-          isLoading: false 
+      } catch (error: any) {
+        set({
+          error: error.message || 'Failed to fetch market depth',
+          isLoading: false
         });
       }
     },
@@ -135,27 +126,18 @@ export const useHFTStore = create<HFTState & HFTActions>()(
     fetchRealTimeTrades: async (market: string, limit = 50) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await fetch(`${apiConfig.baseUrl}/api/api_v2/public/hft/trades/${market}?limit=${limit}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const { apiClient } = await import('@/lib/api/client');
+        const response = await apiClient.get<any>(`/api/api_v2/public/hft/trades/${market}?limit=${limit}`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        set({ 
-          realTimeTrades: data.trades, 
-          isLoading: false, 
-          lastUpdated: Date.now() 
+        set({
+          realTimeTrades: response.data.trades,
+          isLoading: false,
+          lastUpdated: Date.now()
         });
-      } catch (error) {
-        set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch real-time trades',
-          isLoading: false 
+      } catch (error: any) {
+        set({
+          error: error.message || 'Failed to fetch real-time trades',
+          isLoading: false
         });
       }
     },
@@ -163,27 +145,18 @@ export const useHFTStore = create<HFTState & HFTActions>()(
     fetchVolumeProfile: async (market: string, period = 3600) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await fetch(`${apiConfig.baseUrl}/api/api_v2/public/hft/volume-profile/${market}?period=${period}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const { apiClient } = await import('@/lib/api/client');
+        const response = await apiClient.get<any>(`/api/api_v2/public/hft/volume-profile/${market}?period=${period}`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        set({ 
-          volumeProfile: data, 
-          isLoading: false, 
-          lastUpdated: Date.now() 
+        set({
+          volumeProfile: response.data,
+          isLoading: false,
+          lastUpdated: Date.now()
         });
-      } catch (error) {
-        set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch volume profile',
-          isLoading: false 
+      } catch (error: any) {
+        set({
+          error: error.message || 'Failed to fetch volume profile',
+          isLoading: false
         });
       }
     },
@@ -191,27 +164,18 @@ export const useHFTStore = create<HFTState & HFTActions>()(
     fetchPriceVelocity: async (market: string, period = 300) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await fetch(`${apiConfig.baseUrl}/api/api_v2/public/hft/price-velocity/${market}?period=${period}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const { apiClient } = await import('@/lib/api/client');
+        const response = await apiClient.get<any>(`/api/api_v2/public/hft/price-velocity/${market}?period=${period}`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        set({ 
-          priceVelocity: data, 
-          isLoading: false, 
-          lastUpdated: Date.now() 
+        set({
+          priceVelocity: response.data,
+          isLoading: false,
+          lastUpdated: Date.now()
         });
-      } catch (error) {
-        set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch price velocity',
-          isLoading: false 
+      } catch (error: any) {
+        set({
+          error: error.message || 'Failed to fetch price velocity',
+          isLoading: false
         });
       }
     },
@@ -219,27 +183,18 @@ export const useHFTStore = create<HFTState & HFTActions>()(
     fetchAllMarketData: async (market: string, depthLimit = 20, tradesLimit = 50) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await fetch(`${apiConfig.baseUrl}/api/api_v2/public/hft/market-data/${market}?depth_limit=${depthLimit}&trades_limit=${tradesLimit}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const { apiClient } = await import('@/lib/api/client');
+        const response = await apiClient.get<any>(`/api/api_v2/public/hft/market-data/${market}?depth_limit=${depthLimit}&trades_limit=${tradesLimit}`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        set({ 
-          marketData: data, 
-          isLoading: false, 
-          lastUpdated: Date.now() 
+        set({
+          marketData: response.data,
+          isLoading: false,
+          lastUpdated: Date.now()
         });
-      } catch (error) {
-        set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch market data',
-          isLoading: false 
+      } catch (error: any) {
+        set({
+          error: error.message || 'Failed to fetch market data',
+          isLoading: false
         });
       }
     },

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { apiConfig } from '@/lib/api-client/config';
+
 
 // ===== TYPES =====
 
@@ -65,17 +65,17 @@ export const useMarketStore = create<MarketState & MarketActions>()(
 
     // Actions
     setMarkets: (markets: Market[]) => {
-      set({ 
-        markets, 
-        error: null 
+      set({
+        markets,
+        error: null
       });
     },
 
     setTickers: (tickers: Ticker[]) => {
-      set({ 
-        tickers, 
+      set({
+        tickers,
         lastUpdated: Date.now(),
-        error: null 
+        error: null
       });
     },
 
@@ -93,76 +93,42 @@ export const useMarketStore = create<MarketState & MarketActions>()(
 
     fetchMarkets: async () => {
       set({ isLoading: true, error: null });
-      
+
       try {
-        const response = await fetch(`${apiConfig.baseUrl}/api/api_v2/public/markets`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch markets');
-        }
-
-        const data = await response.json();
-        set({ 
-          markets: data.data || data, 
+        const { getMarkets } = await import('@/lib/api/services/public');
+        const markets = await getMarkets();
+        set({
+          markets: (markets as unknown as Market[]) || [],
           isLoading: false,
           error: null
         });
-      } catch (error) {
-        set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch markets',
-          isLoading: false 
+      } catch (error: any) {
+        set({
+          error: error.message || 'Failed to fetch markets',
+          isLoading: false
         });
       }
     },
 
     fetchTickers: async () => {
       set({ isLoading: true, error: null });
-      
+
       try {
-        // Create an AbortController for timeout handling
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        const response = await fetch(`${apiConfig.baseUrl}/api/api_v2/public/markets/tickers`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          signal: controller.signal,
-        });
+        const { getTickers } = await import('@/lib/api/services/public');
+        const tickers = await getTickers();
 
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch tickers');
-        }
-
-        const data = await response.json();
-        set({ 
-          tickers: data.data || data, 
+        set({
+          tickers: (tickers as unknown as Ticker[]) || [],
           isLoading: false,
           error: null,
           lastUpdated: Date.now()
         });
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          set({ 
-            error: 'Tickers service is currently unavailable. Using cached data.',
-            isLoading: false 
-          });
-        } else {
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to fetch tickers',
-            isLoading: false 
-          });
-        }
+      } catch (error: any) {
+        // Handle abort error if implemented in service, otherwise generic error
+        set({
+          error: error.message || 'Failed to fetch tickers',
+          isLoading: false
+        });
       }
     },
 
@@ -183,13 +149,13 @@ export const useMarketLastUpdated = () => useMarketStore((state) => state.lastUp
 
 // ===== CONVENIENCE HOOKS =====
 
-export const useMarketById = (id: string) => 
+export const useMarketById = (id: string) =>
   useMarketStore((state) => state.markets.find(m => m.id === id));
 
-export const useTickerByMarket = (market: string) => 
+export const useTickerByMarket = (market: string) =>
   useMarketStore((state) => state.tickers.find(t => t.market === market));
 
-export const useActiveMarkets = () => 
+export const useActiveMarkets = () =>
   useMarketStore((state) => state.markets.filter(m => m.state === 'enabled'));
 
 // ===== ACTIONS =====

@@ -7,8 +7,8 @@ import { Badge } from '../ui/badge';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTradingStore, useOrderBookData, useRecentTrades, useOrderBookSettings } from '@/store/tradingStore';
 import { useWebSocket } from '@/services/websocketService';
-import { 
-  ChevronUp, 
+import {
+  ChevronUp,
   ChevronDown,
   Settings,
   MoreHorizontal,
@@ -65,24 +65,24 @@ const priceGroupings = [
   { value: 100, label: '100' }
 ];
 
-export const EnhancedOrderBook = React.memo(({ 
-  market = 'BTC-USDT', 
+export const EnhancedOrderBook = React.memo(({
+  market = 'BTC-USDT',
   onPriceClick,
   compact = false,
   orderBookData: propOrderBookData,
   marketTradesData: propMarketTradesData
 }: OrderBookProps) => {
   const { theme } = useTheme();
-  
+
   // Zustand store hooks
   const orderBookData = useOrderBookData();
   const recentTrades = useRecentTrades();
   const orderBookSettings = useOrderBookSettings();
   const { updateOrderBookSettings } = useTradingStore();
-  
+
   // WebSocket service
   const websocketService = useWebSocket();
-  
+
   const [activeTab, setActiveTab] = useState<'orderbook' | 'trades'>('orderbook');
   const [showSizePercent, setShowSizePercent] = useState(false);
   const [showDepthChart, setShowDepthChart] = useState(true);
@@ -97,57 +97,82 @@ export const EnhancedOrderBook = React.memo(({
 
   // Process order book data from API
   const processedOrderBookData = useMemo(() => {
-    console.log('Processing order book data:', { 
-      propOrderBookData, 
-      storeOrderBookData: orderBookData, 
+    console.log('Processing order book data:', {
+      propOrderBookData,
+      storeOrderBookData: orderBookData,
       hasPropData: !!propOrderBookData,
-      hasStoreData: !!orderBookData 
+      hasStoreData: !!orderBookData
     });
-    
+
     // Prioritize prop data (from parent), then store data, then fallback to mock
     const realOrderBookData = propOrderBookData || orderBookData;
-    
+
     if (realOrderBookData && (realOrderBookData.bids?.length > 0 || realOrderBookData.asks?.length > 0)) {
       console.log('Using real order book data:', realOrderBookData);
-      
+
       // Process API data format [price, amount] to component format
       let processedBids: OrderBookEntry[] = [];
       let processedAsks: OrderBookEntry[] = [];
-      
+
+      // Check if data is already in processed object format (from store) or raw array format (from API/props)
+      const isProcessed = (entries: any[]) => entries.length > 0 && typeof entries[0] === 'object' && !Array.isArray(entries[0]) && 'price' in entries[0];
+
       if (realOrderBookData.bids && Array.isArray(realOrderBookData.bids)) {
-        let runningBids = 0;
-        processedBids = realOrderBookData.bids.map(([price, amount]: [string, string]) => {
-          const priceNum = parseFloat(price);
-          const amountNum = parseFloat(amount);
-          runningBids += amountNum;
-          return {
-            price: priceNum,
-            size: amountNum,
-            total: runningBids,
-            percentage: 0 // Will be calculated later
-          };
-        });
+        if (isProcessed(realOrderBookData.bids)) {
+          processedBids = [...realOrderBookData.bids];
+        } else {
+          let runningBids = 0;
+          processedBids = realOrderBookData.bids.map((entry: any) => {
+            let priceStr, amountStr;
+            if (Array.isArray(entry)) {
+              [priceStr, amountStr] = entry;
+            } else {
+              priceStr = entry.price;
+              amountStr = entry.amount || entry.size;
+            }
+            const priceNum = parseFloat(priceStr);
+            const amountNum = parseFloat(amountStr);
+            runningBids += amountNum;
+            return {
+              price: priceNum,
+              size: amountNum,
+              total: runningBids,
+              percentage: 0
+            };
+          });
+        }
       }
-      
+
       if (realOrderBookData.asks && Array.isArray(realOrderBookData.asks)) {
-        let runningAsks = 0;
-        processedAsks = realOrderBookData.asks.map(([price, amount]: [string, string]) => {
-          const priceNum = parseFloat(price);
-          const amountNum = parseFloat(amount);
-          runningAsks += amountNum;
-          return {
-            price: priceNum,
-            size: amountNum,
-            total: runningAsks,
-            percentage: 0 // Will be calculated later
-          };
-        });
+        if (isProcessed(realOrderBookData.asks)) {
+          processedAsks = [...realOrderBookData.asks];
+        } else {
+          let runningAsks = 0;
+          processedAsks = realOrderBookData.asks.map((entry: any) => {
+            let priceStr, amountStr;
+            if (Array.isArray(entry)) {
+              [priceStr, amountStr] = entry;
+            } else {
+              priceStr = entry.price;
+              amountStr = entry.amount || entry.size;
+            }
+            const priceNum = parseFloat(priceStr);
+            const amountNum = parseFloat(amountStr);
+            runningAsks += amountNum;
+            return {
+              price: priceNum,
+              size: amountNum,
+              total: runningAsks,
+              percentage: 0
+            };
+          });
+        }
       }
-      
+
       // Sort: bids descending by price (highest first); asks ascending by price (lowest first)
-      processedBids = processedBids.sort((a, b) => b.price - a.price);
-      processedAsks = processedAsks.sort((a, b) => a.price - b.price);
-      
+      processedBids.sort((a, b) => b.price - a.price);
+      processedAsks.sort((a, b) => a.price - b.price);
+
       // Calculate percentages
       const maxTotal = Math.max(
         processedAsks[processedAsks.length - 1]?.total || 0,
@@ -156,14 +181,14 @@ export const EnhancedOrderBook = React.memo(({
       );
       processedAsks.forEach(ask => ask.percentage = (ask.total / maxTotal) * 100);
       processedBids.forEach(bid => bid.percentage = (bid.total / maxTotal) * 100);
-      
+
       // Calculate spread
       const bestBid = processedBids[0]?.price || 0;
       const bestAsk = processedAsks[0]?.price || 0;
       const spread = bestAsk && bestBid ? Math.max(0, bestAsk - bestBid) : 0;
       const mid = bestAsk && bestBid ? (bestAsk + bestBid) / 2 : (bestBid || bestAsk || lastPrice);
       const spreadPercentage = mid ? (spread / mid) * 100 : 0;
-      
+
       return {
         bids: processedBids,
         asks: processedAsks,
@@ -185,7 +210,7 @@ export const EnhancedOrderBook = React.memo(({
   const processedRecentTrades = useMemo(() => {
     // Prioritize prop data (from parent), then store data
     const realTradesData = propMarketTradesData || recentTrades;
-    
+
     if (realTradesData && realTradesData.length > 0) {
       // Transform API trade data to component format
       if (propMarketTradesData) {
@@ -263,8 +288,8 @@ export const EnhancedOrderBook = React.memo(({
 
   // Subscribe to market data
   useEffect(() => {
-    websocketService.subscribeToOrderBook(market, () => {});
-    websocketService.subscribeToTrades(market, () => {});
+    websocketService.subscribeToOrderBook(market, () => { });
+    websocketService.subscribeToTrades(market, () => { });
   }, [market, websocketService]);
 
   // Only fetch order book if not provided via props
@@ -285,27 +310,27 @@ export const EnhancedOrderBook = React.memo(({
         // Use /depth endpoint that returns simple [price, amount] arrays
         const url = `${apiBase}/api/api_v2/public/markets/${symbol}/depth?limit=${limit}`;
         console.log('Fetching order book from:', url);
-        
+
         const res = await fetch(url);
         if (!res.ok) {
           console.error('Order book request failed:', res.status, res.statusText);
           throw new Error('order-book request failed');
         }
-        
+
         const data = await res.json();
         console.log('Order book data received:', data);
-        
+
         // Check if data is inverted (bids higher than asks)
         const rawAsks = data.asks || [];
         const rawBids = data.bids || [];
-        
+
         // If bids are higher than asks, they might be swapped
         const firstBidPrice = rawBids[0] ? parseFloat(rawBids[0][0]) : 0;
         const firstAskPrice = rawAsks[0] ? parseFloat(rawAsks[0][0]) : 0;
-        
+
         let asksRaw: [string, string][];
         let bidsRaw: [string, string][];
-        
+
         if (firstBidPrice > firstAskPrice && firstBidPrice > 0 && firstAskPrice > 0) {
           console.log('Data appears inverted, swapping bids and asks');
           asksRaw = rawBids;
@@ -317,15 +342,29 @@ export const EnhancedOrderBook = React.memo(({
 
         let runningAsks = 0;
         let runningBids = 0;
-        let asks = asksRaw.map(([p, a]) => {
-          const price = parseFloat(p);
-          const size = parseFloat(a);
+        let asks = asksRaw.map((entry: any) => {
+          let priceStr, sizeStr;
+          if (Array.isArray(entry)) {
+            [priceStr, sizeStr] = entry;
+          } else {
+            priceStr = entry.price;
+            sizeStr = entry.amount || entry.volume || entry.size || '0';
+          }
+          const price = parseFloat(priceStr);
+          const size = parseFloat(sizeStr);
           runningAsks += size;
           return { price, size, total: runningAsks, percentage: 0 } as OrderBookEntry;
         });
-        let bids = bidsRaw.map(([p, a]) => {
-          const price = parseFloat(p);
-          const size = parseFloat(a);
+        let bids = bidsRaw.map((entry: any) => {
+          let priceStr, sizeStr;
+          if (Array.isArray(entry)) {
+            [priceStr, sizeStr] = entry;
+          } else {
+            priceStr = entry.price;
+            sizeStr = entry.amount || entry.volume || entry.size || '0';
+          }
+          const price = parseFloat(priceStr);
+          const size = parseFloat(sizeStr);
           runningBids += size;
           return { price, size, total: runningBids, percentage: 0 } as OrderBookEntry;
         });
@@ -333,7 +372,7 @@ export const EnhancedOrderBook = React.memo(({
         // Sort: bids descending by price (highest first); asks ascending by price (lowest first)
         bids = bids.sort((a, b) => b.price - a.price);
         asks = asks.sort((a, b) => a.price - b.price);
-        
+
         console.log('Sorted bids (highest first):', bids.slice(0, 3));
         console.log('Sorted asks (lowest first):', asks.slice(0, 3));
 
@@ -385,21 +424,21 @@ export const EnhancedOrderBook = React.memo(({
   }, [onPriceClick]);
 
   // Memoized order row component
-  const OrderRow = React.memo(({ 
-    entry, 
-    type, 
-    index 
-  }: { 
-    entry: OrderBookEntry; 
-    type: 'ask' | 'bid'; 
+  const OrderRow = React.memo(({
+    entry,
+    type,
+    index
+  }: {
+    entry: OrderBookEntry;
+    type: 'ask' | 'bid';
     index: number;
   }) => {
     const isAsk = type === 'ask';
     const priceColor = isAsk ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400';
     const depthColor = isAsk ? 'bg-red-500/15 dark:bg-red-500/20' : 'bg-green-500/15 dark:bg-green-500/20';
-    
+
     return (
-      <div 
+      <div
         className={cn(
           "relative group cursor-pointer transition-all duration-200 hover:bg-[hsl(var(--trading-bg-tertiary))] border-l-2 border-transparent hover:border-[hsl(var(--trading-accent))]/30",
           animate ? "hover:scale-[1.01]" : ""
@@ -409,26 +448,26 @@ export const EnhancedOrderBook = React.memo(({
       >
         {/* Depth visualization bar */}
         {showDepthChart && (
-          <div 
+          <div
             className={cn(
               "absolute inset-y-0 transition-all duration-300",
               depthColor,
               isAsk ? "right-0" : "left-0"
             )}
-            style={{ 
+            style={{
               width: `${entry.percentage}%`,
               [isAsk ? 'right' : 'left']: 0
             }}
           />
         )}
-        
+
         {/* Order data */}
         <div className="relative z-10 grid grid-cols-3 gap-2 py-1.5 px-3" style={{ fontSize: '12px' }}>
           <div className={cn("font-mono font-semibold", priceColor)}>
             {formatNumber(entry.price, 2)}
           </div>
           <div className="text-[hsl(var(--trading-text))] text-right font-mono font-medium">
-            {showSizePercent 
+            {showSizePercent
               ? `${((entry.size / (processedOrderBookData.asks[0]?.total || 1)) * 100).toFixed(1)}%`
               : formatNumber(entry.size, 4)
             }
@@ -451,7 +490,7 @@ export const EnhancedOrderBook = React.memo(({
     const isBuy = trade.side === 'buy';
     const priceColor = isBuy ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400';
     const timeAgo = Math.floor((Date.now() - trade.timestamp) / 1000);
-    
+
     const formatTimeAgo = (seconds: number) => {
       if (seconds < 60) return `${seconds}s`;
       if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
@@ -459,7 +498,7 @@ export const EnhancedOrderBook = React.memo(({
     };
 
     return (
-      <div 
+      <div
         className={cn(
           "group cursor-pointer transition-all duration-200 hover:bg-[hsl(var(--trading-bg-tertiary))] border-l-2 border-transparent hover:border-[hsl(var(--trading-accent))]/30",
           animate ? "hover:scale-[1.01]" : ""
@@ -478,7 +517,7 @@ export const EnhancedOrderBook = React.memo(({
             {formatTimeAgo(timeAgo)}
           </div>
         </div>
-        
+
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-[hsl(var(--trading-accent))]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
       </div>
@@ -532,10 +571,10 @@ export const EnhancedOrderBook = React.memo(({
             {market}
           </Badge>
         </div>
-        
+
         <div className="flex items-center gap-1">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => setShowDepthChart(!showDepthChart)}
             className={cn(
@@ -546,8 +585,8 @@ export const EnhancedOrderBook = React.memo(({
           >
             <BarChart3 className="h-4 w-4" />
           </Button>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => setShowSizePercent(!showSizePercent)}
             className={cn(
@@ -584,8 +623,8 @@ export const EnhancedOrderBook = React.memo(({
                     onClick={() => updateOrderBookSettings({ groupBy: group.value })}
                     className={cn(
                       "h-6 px-2 text-xs border-r border-[hsl(var(--trading-border))] last:border-r-0 font-medium",
-                      orderBookSettings.groupBy === group.value 
-                        ? "bg-[hsl(var(--trading-accent))] text-white dark:text-black" 
+                      orderBookSettings.groupBy === group.value
+                        ? "bg-[hsl(var(--trading-accent))] text-white dark:text-black"
                         : "text-[hsl(var(--trading-text-secondary))] hover:bg-[hsl(var(--trading-bg-tertiary))] hover:text-[hsl(var(--trading-text))]"
                     )}
                   >
@@ -617,9 +656,9 @@ export const EnhancedOrderBook = React.memo(({
                 >
                   {bidsVirtualizer.getVirtualItems().map((virtualRow) => {
                     const entry = processedOrderBookData.bids[virtualRow.index];
-                    
+
                     if (!entry) return null;
-                    
+
                     return (
                       <div
                         key={virtualRow.index}
@@ -632,9 +671,9 @@ export const EnhancedOrderBook = React.memo(({
                           transform: `translateY(${virtualRow.start}px)`,
                         }}
                       >
-                        <OrderRow 
-                          entry={entry} 
-                          type="bid" 
+                        <OrderRow
+                          entry={entry}
+                          type="bid"
                           index={virtualRow.index}
                         />
                       </div>
@@ -649,7 +688,7 @@ export const EnhancedOrderBook = React.memo(({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-[hsl(var(--trading-text-secondary))]">Spread:</span>
-                  <span 
+                  <span
                     className="font-mono font-bold text-[hsl(var(--trading-accent))] transition-colors duration-1000"
                     style={{ fontSize: '14px' }}
                   >
@@ -659,7 +698,7 @@ export const EnhancedOrderBook = React.memo(({
                     ({(processedOrderBookData.spreadPercentage || 0).toFixed(3)}%)
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-1">
                   <Zap className="h-3 w-3 text-[hsl(var(--trading-accent))] animate-pulse" />
                   <span className="text-xs text-[hsl(var(--trading-text-muted))]">Live</span>
@@ -679,9 +718,9 @@ export const EnhancedOrderBook = React.memo(({
                 >
                   {asksVirtualizer.getVirtualItems().map((virtualRow) => {
                     const entry = processedOrderBookData.asks[virtualRow.index];
-                    
+
                     if (!entry) return null;
-                    
+
                     return (
                       <div
                         key={virtualRow.index}
@@ -694,9 +733,9 @@ export const EnhancedOrderBook = React.memo(({
                           transform: `translateY(${virtualRow.start}px)`,
                         }}
                       >
-                        <OrderRow 
-                          entry={entry} 
-                          type="ask" 
+                        <OrderRow
+                          entry={entry}
+                          type="ask"
                           index={virtualRow.index}
                         />
                       </div>
@@ -723,20 +762,20 @@ export const EnhancedOrderBook = React.memo(({
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <span className="text-[hsl(var(--trading-text-secondary))] font-medium">Depth: {orderBookSettings.depth}</span>
               <div className="flex gap-1">
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => updateOrderBookSettings({ depth: Math.max(5, orderBookSettings.depth - 5) })}
                   className="h-5 w-5 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
                 >
                   <ChevronDown className="h-3 w-3" />
                 </Button>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => updateOrderBookSettings({ depth: Math.min(50, orderBookSettings.depth + 5) })}
                   className="h-5 w-5 p-0 text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]"
@@ -777,9 +816,9 @@ export const EnhancedOrderBook = React.memo(({
                 >
                   {tradesVirtualizer.getVirtualItems().map((virtualRow) => {
                     const trade = processedRecentTrades[virtualRow.index];
-                    
+
                     if (!trade) return null;
-                    
+
                     return (
                       <div
                         key={virtualRow.index}
@@ -817,7 +856,7 @@ export const EnhancedOrderBook = React.memo(({
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-1">
               <Zap className="h-3 w-3 text-[hsl(var(--trading-accent))] animate-pulse" />
               <span className="text-[hsl(var(--trading-text-muted))]">Live</span>

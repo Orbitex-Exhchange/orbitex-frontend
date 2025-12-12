@@ -6,9 +6,10 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { QueryClientWrapper } from '@/components/QueryClientWrapper';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { env } from '@/lib/env';
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
@@ -116,17 +117,18 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="//fonts.gstatic.com" />
       </head>
       <body className={`${inter.className} antialiased`}>
-        <QueryClientWrapper>
-          <AuthProvider>
-            <ThemeProvider>
-              <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
-                {children}
-              </div>
-              <Toaster />
-            </ThemeProvider>
-          </AuthProvider>
-          {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
-        </QueryClientWrapper>
+        <ErrorBoundary>
+          <QueryClientWrapper>
+            <AuthProvider>
+              <ThemeProvider>
+                <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
+                  {children}
+                </div>
+                <Toaster />
+              </ThemeProvider>
+            </AuthProvider>
+          </QueryClientWrapper>
+        </ErrorBoundary>
       </body>
     </html>
   );

@@ -10,8 +10,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Navigation } from '@/components/layout/Navigation';
-import { 
-  Wallet, 
+import {
+  Wallet,
   ArrowUpRight,
   Copy,
   RefreshCw,
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWallets } from '@/lib/api';
+import { useWallets } from '@/lib/api/services/account';
 
 interface WithdrawForm {
   currency: string;
@@ -36,7 +36,7 @@ export default function WithdrawPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { authToken, isAuthenticated, user } = useAuth();
-  
+
   const [form, setForm] = useState<WithdrawForm>({
     currency: '',
     amount: '',
@@ -118,12 +118,12 @@ export default function WithdrawPage() {
     try {
       // Mock withdrawal - in real app this would call the API
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       toast({
         title: "Withdrawal Submitted",
         description: `Your withdrawal of ${form.amount} ${form.currency} has been submitted for processing`,
       });
-      
+
       // Reset form
       setForm({
         currency: '',
@@ -184,7 +184,7 @@ export default function WithdrawPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
       <Navigation user={user} />
-      
+
       <div className="container mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">

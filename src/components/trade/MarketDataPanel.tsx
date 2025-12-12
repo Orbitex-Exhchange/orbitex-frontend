@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { 
+import {
   TrendingUp,
   TrendingDown,
   BarChart3,
@@ -16,7 +16,7 @@ import {
   Rocket
 } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
-import { usePublicTickers } from '@/lib/api';
+import { usePublicTickers } from '@/lib/api/services/public';
 
 interface MarketDataPanelProps {
   market: string;
@@ -25,18 +25,18 @@ interface MarketDataPanelProps {
   tickerData?: any;
 }
 
-export function MarketDataPanel({ 
-  market, 
+export function MarketDataPanel({
+  market,
   onPriceClick,
   compact = false,
   tickerData: propTickerData
 }: MarketDataPanelProps) {
   // Real API data
   const { data: tickersData, isLoading: tickersLoading } = usePublicTickers();
-  
+
   // Get current market ticker data - prioritize prop data
   const currentTicker = propTickerData || tickersData?.find(ticker => ticker.market === market);
-  
+
   const marketData = {
     lastPrice: currentTicker ? parseFloat(currentTicker.ticker.last) : 43250.50,
     change24h: currentTicker ? parseFloat(currentTicker.ticker.price_change_percent) : 2.45,

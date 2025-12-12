@@ -33,7 +33,7 @@ export class HighFrequencyTradingService {
       };
 
       this.orderQueue.push(order);
-      
+
       // Process immediately if queue is getting full
       if (this.orderQueue.length >= this.batchSize && !this.isProcessingQueue) {
         this.processBatch();
@@ -44,7 +44,7 @@ export class HighFrequencyTradingService {
   // Batch order processing for optimal throughput
   private async processBatch() {
     if (this.isProcessingQueue || this.orderQueue.length === 0) return;
-    
+
     this.isProcessingQueue = true;
     const batch = this.orderQueue.splice(0, this.batchSize);
     const startTime = Date.now();
@@ -53,15 +53,15 @@ export class HighFrequencyTradingService {
       // Process orders in parallel for maximum speed
       const promises = batch.map(order => this.executeSingleOrder(order));
       await Promise.allSettled(promises);
-      
+
       const processingTime = Date.now() - startTime;
       this.updatePerformanceMetrics(batch.length, processingTime);
-      
+
     } catch (error) {
       console.error('Batch processing error:', error);
     } finally {
       this.isProcessingQueue = false;
-      
+
       // Continue processing if more orders are queued
       if (this.orderQueue.length > 0) {
         setTimeout(() => this.processBatch(), 1);
@@ -71,7 +71,7 @@ export class HighFrequencyTradingService {
 
   private async executeSingleOrder(order: any): Promise<void> {
     const startTime = Date.now();
-    
+
     try {
       const result = await socketIOClient.placeOrder({
         market: order.market,
@@ -81,17 +81,17 @@ export class HighFrequencyTradingService {
         price: order.price,
         timestamp: order.timestamp
       });
-      
+
       const latency = Date.now() - startTime;
       this.performanceMetrics.totalOrders++;
       this.performanceMetrics.successfulOrders++;
-      
+
       order.resolve({
-        ...result,
+        ...(result && typeof result === 'object' ? result : {}),
         latency,
         orderId: order.id
       });
-      
+
     } catch (error) {
       this.performanceMetrics.totalOrders++;
       this.performanceMetrics.failedOrders++;
@@ -114,14 +114,14 @@ export class HighFrequencyTradingService {
     const timeSinceReset = now - this.performanceMetrics.lastResetTime;
 
     if (timeSinceReset > 0) {
-      this.performanceMetrics.ordersPerSecond = 
+      this.performanceMetrics.ordersPerSecond =
         (this.performanceMetrics.totalOrders / timeSinceReset) * 1000;
     }
 
     this.performanceMetrics.averageLatency = processingTime / batchSize;
-    
+
     if (this.performanceMetrics.totalOrders > 0) {
-      this.performanceMetrics.successRate = 
+      this.performanceMetrics.successRate =
         (this.performanceMetrics.successfulOrders / this.performanceMetrics.totalOrders) * 100;
     }
   }

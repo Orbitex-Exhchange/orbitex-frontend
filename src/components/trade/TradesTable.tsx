@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  TrendingUp,
+  TrendingDown,
   RefreshCw,
   AlertTriangle,
   Clock,
@@ -13,7 +13,7 @@ import {
   Lock
 } from 'lucide-react';
 import { cn, formatNumber, formatCurrency } from '../../lib/utils';
-import { useTrades } from '@/lib/api';
+import { useTrades } from '@/lib/api/services/trading';
 import { useToast } from '@/hooks/use-toast';
 
 interface TradesTableProps {
@@ -35,7 +35,7 @@ export function TradesTable({ market, compact = false }: TradesTableProps) {
       order_by: 'desc'
     }
   );
-  
+
   // Transform API data to expected format - authenticated trades already have correct structure
   const trades = Array.isArray(tradesData) ? tradesData.map((trade: any) => ({
     id: trade.id,
@@ -51,9 +51,9 @@ export function TradesTable({ market, compact = false }: TradesTableProps) {
 
   const formatTradeTime = (createdAt: string) => {
     const date = new Date(createdAt);
-    return date.toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     });
@@ -61,8 +61,8 @@ export function TradesTable({ market, compact = false }: TradesTableProps) {
 
   const formatTradeDate = (createdAt: string) => {
     const date = new Date(createdAt);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric'
     });
   };
@@ -90,10 +90,10 @@ export function TradesTable({ market, compact = false }: TradesTableProps) {
 
   if (error) {
     const errorMessage = error?.message || String(error);
-    const isAuthError = errorMessage.toLowerCase().includes('401') || 
-                       errorMessage.toLowerCase().includes('unauthorized') ||
-                       errorMessage.toLowerCase().includes('authentication');
-    
+    const isAuthError = errorMessage.toLowerCase().includes('401') ||
+      errorMessage.toLowerCase().includes('unauthorized') ||
+      errorMessage.toLowerCase().includes('authentication');
+
     return (
       <div className="flex flex-col items-center justify-center h-32 text-center">
         {isAuthError ? (
@@ -253,7 +253,7 @@ export function TradesTable({ market, compact = false }: TradesTableProps) {
       <div className="p-3 border-t border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg-secondary))]">
         <div className="flex items-center justify-between text-xs text-[hsl(var(--trading-text-muted))]">
           <span>
-            {trades.length} trade{trades.length !== 1 ? 's' : ''} • 
+            {trades.length} trade{trades.length !== 1 ? 's' : ''} •
             Total Volume: {formatCurrency(
               trades.reduce((sum, trade) => sum + parseFloat(trade.total || '0'), 0)
             )}

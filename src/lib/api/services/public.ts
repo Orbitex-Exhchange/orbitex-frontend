@@ -10,7 +10,7 @@ const PUBLIC_ENDPOINTS = {
   tradingFees: '/api/api_v2/public/trading_fees',
   memberLevels: '/api/api_v2/public/member_levels',
   withdrawLimits: '/api/api_v2/public/withdraw_limits',
-  
+
   // Tools
   timestamp: '/api/api_v2/public/timestamp',
   version: '/api/api_v2/public/version',
@@ -93,69 +93,66 @@ export interface VersionInfo {
   version: string;
 }
 
-// Public API functions
-const publicApi = {
-  // Market data
-  getMarkets: async (): Promise<PublicMarket[]> => {
-    const response = await apiClient.get<PublicMarket[]>(PUBLIC_ENDPOINTS.markets);
-    return response.data;
-  },
+// Public API functions - Standalone (No ObjectWrapper to avoid TDZ)
+export const getMarkets = async (): Promise<PublicMarket[]> => {
+  const response = await apiClient.get<PublicMarket[]>(PUBLIC_ENDPOINTS.markets);
+  return response.data;
+};
 
-  getCurrencies: async (): Promise<PublicCurrency[]> => {
-    const response = await apiClient.get<{ data: PublicCurrency[] }>(PUBLIC_ENDPOINTS.currencies);
-    return response.data.data;
-  },
+export const getCurrencies = async (): Promise<PublicCurrency[]> => {
+  const response = await apiClient.get<{ data: PublicCurrency[] }>(PUBLIC_ENDPOINTS.currencies);
+  return response.data.data;
+};
 
-  getTradingFees: async (): Promise<TradingFee[]> => {
-    const response = await apiClient.get<{ data: TradingFee[] }>(PUBLIC_ENDPOINTS.tradingFees);
-    return response.data.data;
-  },
+export const getTradingFees = async (): Promise<TradingFee[]> => {
+  const response = await apiClient.get<{ data: TradingFee[] }>(PUBLIC_ENDPOINTS.tradingFees);
+  return response.data.data;
+};
 
-  getMemberLevels: async (): Promise<MemberLevel[]> => {
-    const response = await apiClient.get<{ data: MemberLevel[] }>(PUBLIC_ENDPOINTS.memberLevels);
-    return response.data.data;
-  },
+export const getMemberLevels = async (): Promise<MemberLevel[]> => {
+  const response = await apiClient.get<{ data: MemberLevel[] }>(PUBLIC_ENDPOINTS.memberLevels);
+  return response.data.data;
+};
 
-  getWithdrawLimits: async (): Promise<WithdrawLimit[]> => {
-    const response = await apiClient.get<{ data: WithdrawLimit[] }>(PUBLIC_ENDPOINTS.withdrawLimits);
-    return response.data.data;
-  },
+export const getWithdrawLimits = async (): Promise<WithdrawLimit[]> => {
+  const response = await apiClient.get<{ data: WithdrawLimit[] }>(PUBLIC_ENDPOINTS.withdrawLimits);
+  return response.data.data;
+};
 
-  // Tools
-  getTimestamp: async (): Promise<string> => {
-    const response = await apiClient.get<string>(PUBLIC_ENDPOINTS.timestamp);
-    return response.data;
-  },
+// Tools
+export const getTimestamp = async (): Promise<string> => {
+  const response = await apiClient.get<string>(PUBLIC_ENDPOINTS.timestamp);
+  return response.data;
+};
 
-  getVersion: async (): Promise<VersionInfo> => {
-    const response = await apiClient.get<{ data: VersionInfo }>(PUBLIC_ENDPOINTS.version);
-    return response.data.data;
-  },
+export const getVersion = async (): Promise<VersionInfo> => {
+  const response = await apiClient.get<{ data: VersionInfo }>(PUBLIC_ENDPOINTS.version);
+  return response.data.data;
+};
 
-  getHealth: async (): Promise<{ status: string; timestamp: string }> => {
-    const response = await apiClient.get<{ status: string; timestamp: string }>(PUBLIC_ENDPOINTS.health);
-    return response.data;
-  },
+export const getHealth = async (): Promise<{ status: string; timestamp: string }> => {
+  const response = await apiClient.get<{ status: string; timestamp: string }>(PUBLIC_ENDPOINTS.health);
+  return response.data;
+};
 
-  getTickers: async (): Promise<any[]> => {
-    const response = await apiClient.get<any>('/api/api_v2/public/markets/tickers');
-    // The API returns a hash of market_id -> ticker_data, convert to array
-    const tickersHash = response.data;
-    if (typeof tickersHash === 'object' && tickersHash !== null) {
-      return Object.entries(tickersHash).map(([market, ticker]) => ({
-        market,
-        ticker
-      }));
-    }
-    return [];
-  },
+export const getTickers = async (): Promise<any[]> => {
+  const response = await apiClient.get<any>('/api/api_v2/public/markets/tickers');
+  // The API returns a hash of market_id -> ticker_data, convert to array
+  const tickersHash = response.data;
+  if (typeof tickersHash === 'object' && tickersHash !== null) {
+    return Object.entries(tickersHash).map(([market, ticker]) => ({
+      market,
+      ticker
+    }));
+  }
+  return [];
 };
 
 // React Query hooks for public data
 export const usePublicMarkets = () => {
   return useQuery({
     queryKey: ['public', 'markets'],
-    queryFn: publicApi.getMarkets,
+    queryFn: getMarkets,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
@@ -164,7 +161,7 @@ export const usePublicMarkets = () => {
 export const usePublicCurrencies = () => {
   return useQuery({
     queryKey: ['public', 'currencies'],
-    queryFn: publicApi.getCurrencies,
+    queryFn: getCurrencies,
     staleTime: 10 * 60 * 1000, // 10 minutes
     refetchInterval: 10 * 60 * 1000, // Refetch every 10 minutes
   });
@@ -173,7 +170,7 @@ export const usePublicCurrencies = () => {
 export const useTradingFees = () => {
   return useQuery({
     queryKey: ['public', 'trading_fees'],
-    queryFn: publicApi.getTradingFees,
+    queryFn: getTradingFees,
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
 };
@@ -181,7 +178,7 @@ export const useTradingFees = () => {
 export const useMemberLevels = () => {
   return useQuery({
     queryKey: ['public', 'member_levels'],
-    queryFn: publicApi.getMemberLevels,
+    queryFn: getMemberLevels,
     staleTime: 60 * 60 * 1000, // 1 hour
   });
 };
@@ -189,7 +186,7 @@ export const useMemberLevels = () => {
 export const useWithdrawLimits = () => {
   return useQuery({
     queryKey: ['public', 'withdraw_limits'],
-    queryFn: publicApi.getWithdrawLimits,
+    queryFn: getWithdrawLimits,
     staleTime: 60 * 60 * 1000, // 1 hour
   });
 };
@@ -197,7 +194,7 @@ export const useWithdrawLimits = () => {
 export const useServerTimestamp = () => {
   return useQuery({
     queryKey: ['public', 'timestamp'],
-    queryFn: publicApi.getTimestamp,
+    queryFn: getTimestamp,
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 30 * 1000, // Refetch every 30 seconds
   });
@@ -206,7 +203,7 @@ export const useServerTimestamp = () => {
 export const useServerVersion = () => {
   return useQuery({
     queryKey: ['public', 'version'],
-    queryFn: publicApi.getVersion,
+    queryFn: getVersion,
     staleTime: 60 * 60 * 1000, // 1 hour
   });
 };
@@ -214,7 +211,7 @@ export const useServerVersion = () => {
 export const useServerHealth = () => {
   return useQuery({
     queryKey: ['public', 'health'],
-    queryFn: publicApi.getHealth,
+    queryFn: getHealth,
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 30 * 1000, // Refetch every 30 seconds
   });
@@ -223,7 +220,7 @@ export const useServerHealth = () => {
 export const usePublicTickers = () => {
   return useQuery({
     queryKey: ['public', 'tickers'],
-    queryFn: publicApi.getTickers,
+    queryFn: getTickers,
     staleTime: 1 * 1000, // 1 second for real-time data
     refetchInterval: 5 * 1000, // Refetch every 5 seconds
   });
@@ -246,5 +243,5 @@ export const getWithdrawLimitForLevel = (limits: WithdrawLimit[], kycLevel: numb
   return limits.find(limit => limit.kyc_level === kycLevel && limit.group === group);
 };
 
-// Export the API functions for direct use
-export { publicApi };
+// Backward compatibility export (Deprecated, try to use direct imports)
+// Object export removed to prevent TDZ issues

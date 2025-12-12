@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '@/lib/api-client/config';
+import { env } from '@/lib/env';
 
 export interface WebSocketMessage {
   type: string;
@@ -22,8 +22,8 @@ class WebSocketService {
   private config: WebSocketConfig;
 
   constructor(config?: Partial<WebSocketConfig>) {
-    const baseUrl = getApiBaseUrl().replace('https://', 'wss://').replace('http://', 'ws://');
-    
+    const baseUrl = (env.NEXT_PUBLIC_API_URL || 'http://localhost:3333').replace('https://', 'wss://').replace('http://', 'ws://');
+
     this.config = {
       url: `${baseUrl}/ws`,
       reconnectInterval: 5000,
@@ -49,7 +49,7 @@ class WebSocketService {
           try {
             const message: WebSocketMessage = JSON.parse(event.data);
             this.handleMessage(message);
-    } catch (error) {
+          } catch (error) {
             console.error('Failed to parse WebSocket message:', error);
           }
         };

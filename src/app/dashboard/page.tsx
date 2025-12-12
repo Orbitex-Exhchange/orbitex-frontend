@@ -9,9 +9,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Navigation } from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { authService } from '@/lib/auth';
-import { useAccountBalances, useAccountStats } from '@/lib/api';
-import { usePublicTickers } from '@/lib/api';
-import { 
+import { useAccountBalances, useAccountStats } from '@/lib/api/services/account';
+import { usePublicTickers } from '@/lib/api/services/public';
+import {
   User,
   Mail,
   Shield,
@@ -53,14 +53,25 @@ export default function DashboardPage() {
 
   useEffect(() => {
     console.log('Dashboard auth check:', { isAuthenticated, user, isLoading });
-    
+
     // Add delay to allow auth state to initialize after redirect
     const checkAuth = () => {
       // Check localStorage directly as well, in case context hasn't updated
       const token = localStorage.getItem('access_token');
       const currentUser = authService.getUser();
-      
+
       if (!isAuthenticated && !token && !currentUser) {
+        // DEBUG: Show why we would redirect instead of redirecting
+        const debugInfo = `
+            Auth State: ${isAuthenticated}
+            Token in LS: ${!!token} (${token ? token.substring(0, 10) + '...' : 'none'})
+            User in Service: ${!!currentUser}
+            Time: ${new Date().toISOString()}
+          `;
+        console.error('Would redirect to signin:', debugInfo);
+        setError('Authentication check failed but redirect disabled for debugging. ' + debugInfo);
+
+        /* 
         // Only redirect if we're sure there's no auth after a delay
         setTimeout(() => {
           const finalToken = localStorage.getItem('access_token');
@@ -72,16 +83,18 @@ export default function DashboardPage() {
             setIsLoading(false);
           }
         }, 500);
+        */
+        setIsLoading(false);
         return;
       }
-      
+
       console.log('Authenticated, setting loading to false');
       setIsLoading(false);
     };
 
     // Wait a moment for auth state to initialize
     const timeout = setTimeout(checkAuth, 100);
-    
+
     return () => clearTimeout(timeout);
   }, [isAuthenticated, router, user, isLoading]);
 
@@ -101,7 +114,7 @@ export default function DashboardPage() {
       2: { label: 'Level 2', color: 'bg-green-500 text-white' },
       3: { label: 'Level 3', color: 'bg-purple-500 text-white' }
     };
-    
+
     const levelInfo = levels[level as keyof typeof levels] || levels[0];
     return <Badge className={levelInfo.color}>{levelInfo.label}</Badge>;
   };
@@ -110,7 +123,7 @@ export default function DashboardPage() {
   const { data: balances, error: balancesError, isLoading: balancesLoading } = useAccountBalances();
   const { data: stats, error: statsError } = useAccountStats();
   const { data: tickersData, error: tickersError } = usePublicTickers();
-  
+
   // Check for errors
   const hasError = balancesError || statsError || tickersError;
 
@@ -128,24 +141,24 @@ export default function DashboardPage() {
     let totalValue = 0;
     const assets = balances.map(balance => {
       const balanceAmount = parseFloat(balance.balance) + parseFloat(balance.locked);
-      
+
       // Find ticker for this currency
       let price = 1;
       let change24h = 0;
-      
-      const ticker = tickersData.find(t => 
-        t.market.endsWith('USDT') && 
+
+      const ticker = tickersData.find(t =>
+        t.market.endsWith('USDT') &&
         t.market.startsWith(balance.currency.toUpperCase())
       );
-      
+
       if (ticker) {
         price = parseFloat(ticker.ticker.last);
         change24h = parseFloat(ticker.ticker.price_change_percent);
       }
-      
+
       const value = balanceAmount * price;
       totalValue += value;
-      
+
       return {
         currency: balance.currency,
         balance: balanceAmount,
@@ -201,6 +214,24 @@ export default function DashboardPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
+          <Alert variant="destructive" className="border-red-500 bg-red-900/20">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-red-300 whitespace-pre-wrap font-mono text-xs">
+              {error}
+            </AlertDescription>
+          </Alert>
+          <div className="mt-4 text-center">
+            <Button onClick={() => router.push('/auth/signin')} variant="outline">Back to Sign In</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] flex items-center justify-center">
@@ -218,8 +249,8 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
       <Navigation user={user} />
-      
-      <motion.div 
+
+      <motion.div
         className="container mx-auto p-6 space-y-6"
         initial="hidden"
         animate="visible"
@@ -307,7 +338,7 @@ export default function DashboardPage() {
                     <p className="text-[hsl(var(--trading-text-secondary))] text-sm">Member since {new Date().getFullYear()}</p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[hsl(var(--trading-text-secondary))]">Email</span>
@@ -389,22 +420,20 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   {recentActivity.map((activity, index) => (
                     <div key={index} className="flex items-center space-x-3 p-3 border border-[hsl(var(--trading-border))] rounded-lg">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                        activity.type === 'trade' ? 'bg-blue-500' :
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center ${activity.type === 'trade' ? 'bg-blue-500' :
                         activity.type === 'deposit' ? 'bg-green-500' : 'bg-orange-500'
-                      }`}>
+                        }`}>
                         {activity.type === 'trade' ? <TrendingUp className="h-4 w-4 text-white" /> :
-                         activity.type === 'deposit' ? <CheckCircle className="h-4 w-4 text-white" /> :
-                         <AlertCircle className="h-4 w-4 text-white" />}
+                          activity.type === 'deposit' ? <CheckCircle className="h-4 w-4 text-white" /> :
+                            <AlertCircle className="h-4 w-4 text-white" />}
                       </div>
                       <div className="flex-1">
                         <p className="text-white text-sm font-medium">{activity.description}</p>
                         <p className="text-[hsl(var(--trading-text-secondary))] text-xs">{activity.time}</p>
                       </div>
                       <div className="text-right">
-                        <p className={`text-sm font-medium ${
-                          activity.amount.startsWith('+') ? 'text-green-400' : 'text-red-400'
-                        }`}>
+                        <p className={`text-sm font-medium ${activity.amount.startsWith('+') ? 'text-green-400' : 'text-red-400'
+                          }`}>
                           {activity.amount}
                         </p>
                         <Badge className="bg-green-500 text-white text-xs">
@@ -462,8 +491,8 @@ export default function DashboardPage() {
                           <div className="flex items-center">
                             <div className="h-8 w-8 bg-gradient-to-r from-slate-600 to-slate-500 rounded-full flex items-center justify-center">
                               {asset.currency === 'BTC' ? <Bitcoin className="h-4 w-4 text-white" /> :
-                               asset.currency === 'ETH' ? <Activity className="h-4 w-4 text-white" /> :
-                               <DollarSign className="h-4 w-4 text-white" />}
+                                asset.currency === 'ETH' ? <Activity className="h-4 w-4 text-white" /> :
+                                  <DollarSign className="h-4 w-4 text-white" />}
                             </div>
                             <div className="ml-3">
                               <div className="text-sm font-medium text-white">{asset.currency}</div>

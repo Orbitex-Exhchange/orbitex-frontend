@@ -5,11 +5,11 @@ import { createChart, ColorType } from 'lightweight-charts';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useTheme } from '@/contexts/ThemeContext';
-import { 
-  BarChart3, 
-  LineChart, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  BarChart3,
+  LineChart,
+  TrendingUp,
+  TrendingDown,
   Settings,
   Fullscreen,
   Download,
@@ -41,7 +41,8 @@ import {
   RefreshCw
 } from 'lucide-react';
 import TickerSearchPanel from './TickerSearchPanel';
-import { usePublicTickers, useKline } from '@/lib/api';
+import { usePublicTickers } from '@/lib/api/services/public';
+import { useKline } from '@/lib/api/services/trading';
 
 interface TradingViewChartProps {
   symbol: string;
@@ -95,18 +96,18 @@ const drawingTools = [
 // Memoized chart configuration
 const getChartConfig = (theme: 'light' | 'dark', timeframe: string) => ({
   layout: {
-    background: { 
+    background: {
       type: ColorType.Solid,
       color: theme === 'dark' ? '#0a0a0a' : '#ffffff'
     },
     textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
   },
   grid: {
-    vertLines: { 
+    vertLines: {
       color: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
       visible: true
     },
-    horzLines: { 
+    horzLines: {
       color: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
       visible: true
     },
@@ -172,11 +173,11 @@ const getSeriesConfig = (chartType: string, theme: 'light' | 'dark') => {
   }
 };
 
-export const TradingViewChart = React.memo(({ 
-  symbol, 
-  interval, 
-  theme: propTheme, 
-  width = '100%', 
+export const TradingViewChart = React.memo(({
+  symbol,
+  interval,
+  theme: propTheme,
+  width = '100%',
   height = '100%',
   data = [],
   onMarketSelect,
@@ -185,12 +186,12 @@ export const TradingViewChart = React.memo(({
 }: TradingViewChartProps) => {
   const { theme: contextTheme } = useTheme();
   const theme = propTheme || contextTheme;
-  
+
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const candlestickSeriesRef = useRef<any>(null);
   const volumeSeriesRef = useRef<any>(null);
-  
+
   const [selectedTimeframe, setSelectedTimeframe] = useState('1h');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedDrawingTool, setSelectedDrawingTool] = useState('cursor');
@@ -203,14 +204,14 @@ export const TradingViewChart = React.memo(({
   // Real API data hooks
   const { data: tickersData, isLoading: tickersLoading } = usePublicTickers();
   const { data: klinesData, isLoading: klinesLoading, refetch: refetchKlines } = useKline(
-    symbol, 
-    selectedTimeframe, 
+    symbol,
+    selectedTimeframe,
     200
   );
-  
+
   // Use prop kline data if available, otherwise use API data
   const finalKlineData = propKlineData || klinesData;
-  
+
   // Refetch klines when timeframe changes
   useEffect(() => {
     if (!propKlineData) {
@@ -228,7 +229,7 @@ export const TradingViewChart = React.memo(({
     volume: currentTicker ? parseFloat(currentTicker.ticker.vol) : 2847.65,
     openInterest: 125000000
   }), [currentTicker]);
-  
+
   // Memoized indicators
   const indicators = useMemo(() => [
     { id: 'sma-20', name: 'SMA 20', type: 'sma' as const, enabled: false, params: { period: 20 }, color: '#FF6B35' },
@@ -305,7 +306,7 @@ export const TradingViewChart = React.memo(({
       console.error('Error processing kline data:', error);
       chartData = generateFallbackData();
     }
-      
+
     if (chartType === 'candlestick') {
       mainSeries.setData(chartData.candlesticks);
     } else {
@@ -315,7 +316,7 @@ export const TradingViewChart = React.memo(({
       }));
       mainSeries.setData(lineData);
     }
-    
+
     if (volumeSeries) {
       volumeSeries.setData(chartData.volumes);
     }
@@ -390,8 +391,8 @@ export const TradingViewChart = React.memo(({
   }), [resetChart, zoomIn, zoomOut]);
 
   return (
-    <div 
-      className={`tradingview-chart ${isFullscreen ? 'fixed inset-0 z-50 bg-[hsl(var(--trading-bg))]' : 'relative'} shadow-lg overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] to-[hsl(var(--trading-bg-secondary))] h-full`} 
+    <div
+      className={`tradingview-chart ${isFullscreen ? 'fixed inset-0 z-50 bg-[hsl(var(--trading-bg))]' : 'relative'} shadow-lg overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] to-[hsl(var(--trading-bg-secondary))] h-full`}
       style={{ width, height }}
     >
       {/* Left Control Panel */}
@@ -416,11 +417,10 @@ export const TradingViewChart = React.memo(({
                 variant="ghost"
                 size="sm"
                 onClick={() => setChartType(type.value as any)}
-                className={`w-full justify-start px-2 py-1 text-xs ${
-                  chartType === type.value 
-                    ? 'bg-[hsl(var(--trading-accent))] text-black' 
+                className={`w-full justify-start px-2 py-1 text-xs ${chartType === type.value
+                    ? 'bg-[hsl(var(--trading-accent))] text-black'
                     : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
-                }`}
+                  }`}
               >
                 <type.icon className="h-3 w-3 mr-1" />
                 {type.label}
@@ -447,11 +447,10 @@ export const TradingViewChart = React.memo(({
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedDrawingTool(tool.value)}
-                className={`w-full justify-start px-2 py-1 text-xs ${
-                  selectedDrawingTool === tool.value 
-                    ? 'bg-[hsl(var(--trading-accent))] text-black' 
+                className={`w-full justify-start px-2 py-1 text-xs ${selectedDrawingTool === tool.value
+                    ? 'bg-[hsl(var(--trading-accent))] text-black'
                     : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
-                }`}
+                  }`}
               >
                 <tool.icon className="h-3 w-3 mr-1" />
                 {tool.label}
@@ -481,13 +480,12 @@ export const TradingViewChart = React.memo(({
                   // Toggle indicator
                   console.log('Toggle indicator:', indicator.id);
                 }}
-                className={`w-full justify-start px-2 py-1 text-xs ${
-                  indicator.enabled 
-                    ? 'bg-[hsl(var(--trading-accent))] text-black' 
+                className={`w-full justify-start px-2 py-1 text-xs ${indicator.enabled
+                    ? 'bg-[hsl(var(--trading-accent))] text-black'
                     : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
-                }`}
+                  }`}
               >
-                <span 
+                <span
                   className="w-1.5 h-1.5 rounded-full mr-1"
                   style={{ backgroundColor: indicator.enabled ? 'currentColor' : indicator.color }}
                 />
@@ -555,9 +553,8 @@ export const TradingViewChart = React.memo(({
               variant="ghost"
               size="sm"
               onClick={() => setShowVolume(!showVolume)}
-              className={`w-full justify-start px-2 py-1 text-xs ${
-                showVolume ? 'bg-[hsl(var(--trading-accent))] text-black' : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
-              }`}
+              className={`w-full justify-start px-2 py-1 text-xs ${showVolume ? 'bg-[hsl(var(--trading-accent))] text-black' : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
+                }`}
             >
               <Volume2 className="h-3 w-3 mr-1" />
               Volume
@@ -566,9 +563,8 @@ export const TradingViewChart = React.memo(({
               variant="ghost"
               size="sm"
               onClick={() => setShowGrid(!showGrid)}
-              className={`w-full justify-start px-2 py-1 text-xs ${
-                showGrid ? 'bg-[hsl(var(--trading-accent))] text-black' : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
-              }`}
+              className={`w-full justify-start px-2 py-1 text-xs ${showGrid ? 'bg-[hsl(var(--trading-accent))] text-black' : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
+                }`}
             >
               <Layers className="h-3 w-3 mr-1" />
               Grid
@@ -577,9 +573,8 @@ export const TradingViewChart = React.memo(({
               variant="ghost"
               size="sm"
               onClick={() => setAutoScale(!autoScale)}
-              className={`w-full justify-start px-2 py-1 text-xs ${
-                autoScale ? 'bg-[hsl(var(--trading-accent))] text-black' : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
-              }`}
+              className={`w-full justify-start px-2 py-1 text-xs ${autoScale ? 'bg-[hsl(var(--trading-accent))] text-black' : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]'
+                }`}
             >
               <Target className="h-3 w-3 mr-1" />
               Auto Scale
@@ -618,7 +613,7 @@ export const TradingViewChart = React.memo(({
               </span>
               <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${marketDropdownOpen ? 'rotate-180' : ''}`} />
             </Button>
-            
+
             {/* Market Dropdown Popup */}
             {marketDropdownOpen && (
               <div className="absolute top-full left-0 mt-1 w-[500px] bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl z-[9999] max-h-[700px] overflow-hidden">
@@ -633,7 +628,7 @@ export const TradingViewChart = React.memo(({
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
-                
+
                 {/* TickerSearchPanel Integration */}
                 <div className="h-[600px] overflow-hidden">
                   <TickerSearchPanel
@@ -645,11 +640,11 @@ export const TradingViewChart = React.memo(({
               </div>
             )}
           </div>
-          
+
           <Badge variant="outline" className="bg-[hsl(var(--trading-bg-tertiary))] text-[hsl(var(--trading-accent))] border-[hsl(var(--trading-accent))]/30 text-xs px-2 py-0.5">
             {interval}
           </Badge>
-          
+
           {/* Market Stats */}
           <div className="hidden md:flex items-center gap-3 text-xs">
             <div className="bg-[hsl(var(--trading-bg-tertiary))]/50 px-2 py-1 rounded border border-[hsl(var(--trading-border))]">
@@ -685,11 +680,10 @@ export const TradingViewChart = React.memo(({
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedTimeframe(tf.value)}
-                className={`h-6 px-2 text-xs font-medium border-r border-[hsl(var(--trading-border))] last:border-r-0 transition-all duration-200 hover:scale-105 ${
-                  selectedTimeframe === tf.value 
-                    ? 'bg-[hsl(var(--trading-accent))] text-black hover:bg-[hsl(var(--trading-accent-secondary))] shadow-inner' 
+                className={`h-6 px-2 text-xs font-medium border-r border-[hsl(var(--trading-border))] last:border-r-0 transition-all duration-200 hover:scale-105 ${selectedTimeframe === tf.value
+                    ? 'bg-[hsl(var(--trading-accent))] text-black hover:bg-[hsl(var(--trading-accent-secondary))] shadow-inner'
                     : 'text-[hsl(var(--trading-text-secondary))] hover:text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-secondary))] hover:shadow-md'
-                }`}
+                  }`}
               >
                 {tf.label}
               </Button>
@@ -699,8 +693,8 @@ export const TradingViewChart = React.memo(({
       </div>
 
       {/* Chart Area - Fixed positioning and proper sizing */}
-      <div 
-        className="absolute top-12 left-10 right-0 bottom-0 bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] chart-area" 
+      <div
+        className="absolute top-12 left-10 right-0 bottom-0 bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] chart-area"
         ref={chartContainerRef}
         style={{ width: 'calc(100% - 40px)', height: 'calc(100% - 48px)' }}
       >
@@ -724,11 +718,11 @@ TradingViewChart.displayName = 'TradingViewChart';
 const processKlineData = (klines: any[], theme: 'light' | 'dark' = 'dark') => {
   const candlesticks = [];
   const volumes = [];
-  
+
   for (const kline of klines) {
     // Handle both array format [time, open, high, low, close, volume] and object format
     let time, open, high, low, close, volume;
-    
+
     if (Array.isArray(kline)) {
       time = Math.floor(new Date(kline[0]).getTime() / 1000);
       open = parseFloat(kline[1]);
@@ -745,7 +739,7 @@ const processKlineData = (klines: any[], theme: 'light' | 'dark' = 'dark') => {
       close = parseFloat(kline.close);
       volume = parseFloat(kline.volume);
     }
-    
+
     candlesticks.push({
       time: time as any,
       open,
@@ -753,14 +747,14 @@ const processKlineData = (klines: any[], theme: 'light' | 'dark' = 'dark') => {
       low,
       close,
     });
-    
+
     volumes.push({
       time: time as any,
       value: volume,
       color: close >= open ? (theme === 'dark' ? '#00ff88' : '#10b981') : (theme === 'dark' ? '#ff4444' : '#ef4444'),
     });
   }
-  
+
   return { candlesticks, volumes };
 };
 
@@ -770,7 +764,7 @@ const generateFallbackData = () => {
   const volumes = [];
   const basePrice = 43250.50;
   const now = Math.floor(Date.now() / 1000);
-  
+
   // Generate 24 hours of hourly data
   for (let i = 0; i < 24; i++) {
     const time = now - (24 - i) * 3600;
@@ -780,7 +774,7 @@ const generateFallbackData = () => {
     const high = Math.max(open, close) + Math.random() * 50;
     const low = Math.min(open, close) - Math.random() * 50;
     const volume = Math.random() * 100 + 10;
-    
+
     candlesticks.push({
       time: time as any,
       open,
@@ -788,14 +782,14 @@ const generateFallbackData = () => {
       low,
       close,
     });
-    
+
     volumes.push({
       time: time as any,
       value: volume,
       color: close >= open ? '#00ff88' : '#ff4444',
     });
   }
-  
+
   return { candlesticks, volumes };
 };
 

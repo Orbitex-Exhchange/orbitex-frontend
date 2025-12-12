@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { apiConfig } from '@/lib/api-client/config';
+
 
 // ===== TYPES =====
 
@@ -40,10 +40,10 @@ export const useWalletStore = create<WalletState & WalletActions>()(
 
     // Actions
     setBalances: (balances: WalletBalance[]) => {
-      set({ 
-        balances, 
+      set({
+        balances,
         lastUpdated: Date.now(),
-        error: null 
+        error: null
       });
     },
 
@@ -57,34 +57,32 @@ export const useWalletStore = create<WalletState & WalletActions>()(
 
     fetchBalances: async () => {
       set({ isLoading: true, error: null });
-      
+
       try {
-        // Try the V2 API first
-        const response = await fetch(`${apiConfig.baseUrl}/api/api_v2/account/balances`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
+        // Use unified API service
+        const { getBalances } = await import('@/lib/api/services/account');
+        const rawBalances = await getBalances();
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch balances');
-        }
+        // Map V2Account to WalletBalance (add derived fields)
+        const balances: WalletBalance[] = (rawBalances || []).map(b => ({
+          currency: b.currency,
+          balance: b.balance,
+          locked: b.locked,
+          available: (parseFloat(b.balance) - parseFloat(b.locked)).toString(),
+          total: b.balance // Assuming total represents the full balance
+        }));
 
-        const data = await response.json();
-        set({ 
-          balances: data.data || data, 
+        set({
+          balances,
           isLoading: false,
           error: null,
           lastUpdated: Date.now()
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching balances:', error);
-        set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch balances',
-          isLoading: false 
+        set({
+          error: error.message || 'Failed to fetch balances',
+          isLoading: false
         });
       }
     },
@@ -95,15 +93,15 @@ export const useWalletStore = create<WalletState & WalletActions>()(
 
     updateBalance: (currency: string, balance: string, locked: string) => {
       set((state) => ({
-        balances: state.balances.map(b => 
-          b.currency === currency 
-            ? { 
-                ...b, 
-                balance, 
-                locked, 
-                available: (parseFloat(balance) - parseFloat(locked)).toString(),
-                total: balance
-              }
+        balances: state.balances.map(b =>
+          b.currency === currency
+            ? {
+              ...b,
+              balance,
+              locked,
+              available: (parseFloat(balance) - parseFloat(locked)).toString(),
+              total: balance
+            }
             : b
         )
       }));
@@ -120,11 +118,11 @@ export const useLastUpdated = () => useWalletStore((state) => state.lastUpdated)
 
 // ===== CONVENIENCE HOOKS =====
 
-export const useBalanceByCurrency = (currency: string) => 
+export const useBalanceByCurrency = (currency: string) =>
   useWalletStore((state) => state.balances.find(b => b.currency === currency));
 
-export const useTotalBalance = () => 
-  useWalletStore((state) => 
+export const useTotalBalance = () =>
+  useWalletStore((state) =>
     state.balances.reduce((total, balance) => total + parseFloat(balance.total || '0'), 0)
   );
 

@@ -113,16 +113,18 @@ const tradingTools = [
   },
 ];
 
-export function Navigation({ user }: NavigationProps) {
+export function Navigation({ user: propUser }: NavigationProps) {
   const pathname = usePathname();
   const { theme } = useTheme();
   const { toast } = useToast();
-  const { logout } = useAuth();
-  
+  const { user: contextUser, logout } = useAuth();
+
+  const user = propUser || contextUser;
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isTradingToolsOpen, setIsTradingToolsOpen] = useState(false);
-  
+
   const userMenuRef = useRef<HTMLDivElement>(null);
   const tradingToolsRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -141,12 +143,12 @@ export function Navigation({ user }: NavigationProps) {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      
+
       // Check if click is inside any of the dropdown menus
       const isInsideUserMenu = userMenuRef.current?.contains(target);
       const isInsideTradingTools = tradingToolsRef.current?.contains(target);
       const isInsideMobileMenu = mobileMenuRef.current?.contains(target);
-      
+
       // Only close if click is outside all menus
       if (!isInsideUserMenu && !isInsideTradingTools && !isInsideMobileMenu) {
         setIsUserMenuOpen(false);
@@ -157,7 +159,7 @@ export function Navigation({ user }: NavigationProps) {
 
     // Use mousedown instead of click for better responsiveness
     document.addEventListener('mousedown', handleClickOutside);
-    
+
     // Also close on escape key
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -166,9 +168,9 @@ export function Navigation({ user }: NavigationProps) {
         setIsMobileMenuOpen(false);
       }
     };
-    
+
     document.addEventListener('keydown', handleEscape);
-    
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
@@ -249,9 +251,9 @@ export function Navigation({ user }: NavigationProps) {
 
               {/* Trading Tools Dropdown Menu */}
               {isTradingToolsOpen && (
-                <div 
+                <div
                   className="absolute top-full left-0 mt-2 w-64 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl z-[9999] backdrop-blur-sm"
-                  style={{ 
+                  style={{
                     position: 'absolute',
                     top: '100%',
                     left: '0',
@@ -329,9 +331,9 @@ export function Navigation({ user }: NavigationProps) {
 
                 {/* User Dropdown Menu */}
                 {isUserMenuOpen && (
-                  <div 
+                  <div
                     className="absolute top-full right-0 mt-2 w-64 bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg shadow-xl z-[9999] backdrop-blur-sm"
-                    style={{ 
+                    style={{
                       position: 'absolute',
                       top: '100%',
                       right: '0',

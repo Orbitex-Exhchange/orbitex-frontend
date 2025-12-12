@@ -14,7 +14,7 @@ const IDENTITY_ENDPOINTS = {
 const orbisignerClient = {
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${env.NEXT_PUBLIC_AUTH_SERVICE_URL}${endpoint}`;
-    
+
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
@@ -25,7 +25,7 @@ const orbisignerClient = {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -40,96 +40,105 @@ const orbisignerClient = {
 };
 
 // Orbisigner API functions
-const orbisignerApi = {
-  ping: async (): Promise<{ message: string }> => {
-    return orbisignerClient.request<{ message: string }>(IDENTITY_ENDPOINTS.ping, {
-      method: 'GET',
-    });
-  },
+// Orbisigner API functions - Standalone (No ObjectWrapper to avoid TDZ)
+export const ping = async (): Promise<{ message: string }> => {
+  return orbisignerClient.request<{ message: string }>(IDENTITY_ENDPOINTS.ping, {
+    method: 'GET',
+  });
+};
 
-  getConfigs: async (): Promise<any> => {
-    return orbisignerClient.request<any>(IDENTITY_ENDPOINTS.configs, {
-      method: 'GET',
-    });
-  },
+export const getConfigs = async (): Promise<any> => {
+  return orbisignerClient.request<any>(IDENTITY_ENDPOINTS.configs, {
+    method: 'GET',
+  });
+};
 
-         createSession: async (credentials: {
-           email: string;
-           password: string;
-           otp_code?: string;
-           recaptcha_response?: string;
-         }): Promise<AuthResponse> => {
-           const user = await orbisignerClient.request<OrbisignerUser>(IDENTITY_ENDPOINTS.sessions, {
-             method: 'POST',
-             body: JSON.stringify(credentials),
-           });
-           
-           // Generate JWT token for Orbitex-Clean API access
-           const jwtToken = await generateJWTToken(user);
-           
-           return {
-             user,
-             jwt_token: jwtToken
-           };
-         },
+export const createSession = async (credentials: {
+  email: string;
+  password: string;
+  otp_code?: string;
+  recaptcha_response?: string;
+}): Promise<AuthResponse> => {
+  // Orbisigner returns jwt_token in the response
+  const response = await orbisignerClient.request<OrbisignerUser & { jwt_token?: string }>(IDENTITY_ENDPOINTS.sessions, {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
 
-  deleteSession: async (token: string): Promise<void> => {
-    await orbisignerClient.request(IDENTITY_ENDPOINTS.sessions, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-  },
+  // Use the JWT token from Orbisigner directly (RS256 signed)
+  // instead of generating our own HS256 token
+  const jwtToken = response.jwt_token;
 
-         createUser: async (userData: {
-           email: string;
-           password: string;
-           password_confirmation: string;
-           recaptcha_response?: string;
-           refid?: string;
-         }): Promise<AuthResponse> => {
-           const user = await orbisignerClient.request<OrbisignerUser>(IDENTITY_ENDPOINTS.users, {
-             method: 'POST',
-             body: JSON.stringify(userData),
-           });
-           
-           // Generate JWT token for Orbitex-Clean API access
-           const jwtToken = await generateJWTToken(user);
-           
-           return {
-             user,
-             jwt_token: jwtToken
-           };
-         },
+  if (!jwtToken) {
+    console.error('No jwt_token in Orbisigner response');
+    throw new Error('Authentication failed: No token received');
+  }
 
-  generateEmailCode: async (email: string): Promise<{ message: string }> => {
-    return orbisignerClient.request<{ message: string }>(`${IDENTITY_ENDPOINTS.users}/email_code`, {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  },
+  return {
+    user: response,
+    jwt_token: jwtToken
+  };
+};
 
-  generatePasswordCode: async (email: string): Promise<{ message: string }> => {
-    return orbisignerClient.request<{ message: string }>(`${IDENTITY_ENDPOINTS.users}/password_code`, {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  },
+export const deleteSession = async (token: string): Promise<void> => {
+  await orbisignerClient.request(IDENTITY_ENDPOINTS.sessions, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+};
 
-  confirmPasswordCode: async (data: {
-    email: string;
-    code: string;
-  }): Promise<{ message: string }> => {
-    return orbisignerClient.request<{ message: string }>(`${IDENTITY_ENDPOINTS.users}/confirm_password_code`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+export const createUser = async (userData: {
+  email: string;
+  password: string;
+  password_confirmation?: string;
+  recaptcha_response?: string;
+  refid?: string;
+}): Promise<AuthResponse> => {
+  // Orbisigner returns user data but may not include jwt_token for pending users
+  const response = await orbisignerClient.request<OrbisignerUser & { jwt_token?: string }>(IDENTITY_ENDPOINTS.users, {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  });
+
+  // For registration, jwt_token may not be present if email verification is required
+  // User will get token after email confirmation via login
+  const jwtToken = response.jwt_token || '';
+
+  return {
+    user: response,
+    jwt_token: jwtToken
+  };
+};
+
+export const generateEmailCode = async (email: string): Promise<{ message: string }> => {
+  return orbisignerClient.request<{ message: string }>(`${IDENTITY_ENDPOINTS.users}/email_code`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+};
+
+export const generatePasswordCode = async (email: string): Promise<{ message: string }> => {
+  return orbisignerClient.request<{ message: string }>(`${IDENTITY_ENDPOINTS.users}/password_code`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+};
+
+export const confirmPasswordCode = async (data: {
+  email: string;
+  code: string;
+}): Promise<{ message: string }> => {
+  return orbisignerClient.request<{ message: string }>(`${IDENTITY_ENDPOINTS.users}/confirm_password_code`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 };
 
 // Generate JWT token for Orbitex-Clean API access
-async function generateJWTToken(user: OrbisignerUser): Promise<string> {
+// Exporting this as a standalone function too
+export async function generateJWTToken(user: OrbisignerUser): Promise<string> {
   const payload = {
     uid: user.uid,
     email: user.email,
@@ -148,7 +157,7 @@ async function generateJWTToken(user: OrbisignerUser): Promise<string> {
   // Use jose library for browser-compatible JWT signing
   const { SignJWT } = await import('jose');
   const secret = new TextEncoder().encode('6d69b7b372c13d635ed4abd69b7a7b30edcaa7eeda14e3970c5f1b4ae24b9258542476e3b4a01550a44d1e5d948f4ac0d44ebc2e2b36cb691504516fd0ab508e');
-  
+
   const jwt = await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -158,7 +167,7 @@ async function generateJWTToken(user: OrbisignerUser): Promise<string> {
     .setSubject('session')
     .setJti(payload.jti)
     .sign(secret);
-  
+
   return jwt;
 }
 
@@ -166,7 +175,7 @@ async function generateJWTToken(user: OrbisignerUser): Promise<string> {
 export const useIdentityPing = () => {
   return useQuery({
     queryKey: ['identity', 'ping'],
-    queryFn: orbisignerApi.ping,
+    queryFn: ping,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -174,16 +183,16 @@ export const useIdentityPing = () => {
 export const useIdentityConfigs = () => {
   return useQuery({
     queryKey: ['identity', 'configs'],
-    queryFn: orbisignerApi.getConfigs,
+    queryFn: getConfigs,
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 };
 
 export const useCreateSession = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: orbisignerApi.createSession,
+    mutationFn: createSession,
     onSuccess: (response) => {
       // Store tokens in localStorage
       if (typeof window !== 'undefined') {
@@ -191,7 +200,7 @@ export const useCreateSession = () => {
         localStorage.setItem('refresh_token', response.user.csrf_token);
         localStorage.setItem('user', JSON.stringify(response.user));
       }
-      
+
       // Invalidate and refetch user-related queries
       queryClient.invalidateQueries({ queryKey: ['user'] });
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
@@ -202,9 +211,9 @@ export const useCreateSession = () => {
 
 export const useDeleteSession = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (token: string) => orbisignerApi.deleteSession(token),
+    mutationFn: (token: string) => deleteSession(token),
     onSuccess: () => {
       // Clear tokens from localStorage
       if (typeof window !== 'undefined') {
@@ -212,7 +221,7 @@ export const useDeleteSession = () => {
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
       }
-      
+
       // Clear all queries
       queryClient.clear();
     },
@@ -221,24 +230,24 @@ export const useDeleteSession = () => {
 
 export const useCreateUser = () => {
   return useMutation({
-    mutationFn: orbisignerApi.createUser,
+    mutationFn: createUser,
   });
 };
 
 export const useGenerateEmailCode = () => {
   return useMutation({
-    mutationFn: orbisignerApi.generateEmailCode,
+    mutationFn: generateEmailCode,
   });
 };
 
 export const useGeneratePasswordCode = () => {
   return useMutation({
-    mutationFn: orbisignerApi.generatePasswordCode,
+    mutationFn: generatePasswordCode,
   });
 };
 
 export const useConfirmPasswordCode = () => {
   return useMutation({
-    mutationFn: orbisignerApi.confirmPasswordCode,
+    mutationFn: confirmPasswordCode,
   });
 };

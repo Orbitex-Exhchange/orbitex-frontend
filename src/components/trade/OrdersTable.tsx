@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { 
-  X, 
-  Clock, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  X,
+  Clock,
+  TrendingUp,
+  TrendingDown,
   MoreHorizontal,
   AlertTriangle,
   CheckCircle,
@@ -15,7 +15,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { cn, formatNumber, formatCurrency } from '../../lib/utils';
-import { useOrders, useCancelOrder, useCancelAllOrders } from '@/lib/api';
+import { useOrders, useCancelOrder, useCancelAllOrders } from '@/lib/api/services/trading';
 import { useToast } from '@/hooks/use-toast';
 
 interface OrdersTableProps {
@@ -29,7 +29,7 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
 
   // API hooks
   const { data: orders = [], isLoading, error, refetch } = useOrders({
-    market,
+    ...(market ? { market } : {}),
     state: 'wait', // Only show open orders
     limit: 100,
     order_by: 'desc'
@@ -49,14 +49,13 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
       toast({
         title: "Cancellation Failed",
         description: error.message || "Failed to cancel order. Please try again.",
-        variant: "destructive"
       });
     }
   };
 
   const handleCancelAllOrders = async () => {
     try {
-      await cancelAllOrdersMutation.mutateAsync({ market });
+      await cancelAllOrdersMutation.mutateAsync(market ? { market } : {});
       toast({
         title: "All Orders Cancelled",
         description: "All open orders have been cancelled successfully.",
@@ -65,7 +64,6 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
       toast({
         title: "Cancellation Failed",
         description: error.message || "Failed to cancel all orders. Please try again.",
-        variant: "destructive"
       });
     }
   };
@@ -98,9 +96,9 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
 
   const formatOrderTime = (createdAt: string) => {
     const date = new Date(createdAt);
-    return date.toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     });
@@ -118,10 +116,10 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
   if (error) {
     // Check if it's an authentication error
     const errorMessage = error?.message || String(error);
-    const isAuthError = errorMessage.includes('not_permitted') || 
-                        errorMessage.includes('unauthorized') ||
-                        errorMessage.includes('401');
-    
+    const isAuthError = errorMessage.includes('not_permitted') ||
+      errorMessage.includes('unauthorized') ||
+      errorMessage.includes('401');
+
     if (isAuthError) {
       return (
         <div className="flex flex-col items-center justify-center h-32 text-center">
@@ -143,7 +141,7 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
         </div>
       );
     }
-    
+
     return (
       <div className="flex flex-col items-center justify-center h-32 text-center">
         <AlertTriangle className="h-8 w-8 text-red-400 mb-2" />
@@ -268,8 +266,8 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
                       )}>
                         {order.side?.toUpperCase()}
                       </span>
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className={cn("text-xs", getOrderStatusColor(order.state))}
                       >
                         {order.ord_type?.toUpperCase()}
@@ -285,17 +283,17 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
                         {formatNumber(parseFloat(order.executed_volume || '0'), 4)}
                       </div>
                       <div className="text-[hsl(var(--trading-text))] font-mono">
-                        {formatNumber(parseFloat(order.origin_volume || '0'), 4)}
+                        {formatNumber(parseFloat((order as any).origin_volume || order.volume || '0'), 4)}
                       </div>
                     </div>
                   </td>
                   <td className="p-2 text-right text-xs text-[hsl(var(--trading-text))] font-mono">
-                    {formatCurrency(parseFloat(order.price || '0') * parseFloat(order.origin_volume || '0'))}
+                    {formatCurrency(parseFloat(order.price || '0') * parseFloat((order as any).origin_volume || order.volume || '0'))}
                   </td>
                   <td className="p-2 text-center">
                     <div className="flex items-center justify-center space-x-1">
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className={cn("text-xs flex items-center space-x-1", getOrderStatusColor(order.state))}
                       >
                         {getOrderStatusIcon(order.state)}
@@ -325,10 +323,10 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
       <div className="p-3 border-t border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg-secondary))]">
         <div className="flex items-center justify-between text-xs text-[hsl(var(--trading-text-muted))]">
           <span>
-            {orders.length} order{orders.length !== 1 ? 's' : ''} • 
+            {orders.length} order{orders.length !== 1 ? 's' : ''} •
             Total Value: {formatCurrency(
-              orders.reduce((sum, order) => 
-                sum + (parseFloat(order.price || '0') * parseFloat(order.origin_volume || '0')), 0
+              orders.reduce((sum, order) =>
+                sum + (parseFloat(order.price || '0') * parseFloat((order as any).origin_volume || order.volume || '0')), 0
               )
             )}
           </span>

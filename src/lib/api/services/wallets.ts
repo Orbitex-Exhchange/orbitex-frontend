@@ -18,46 +18,44 @@ const WALLETS_ENDPOINTS = {
   depositAddress: '/api/api_v2/account/deposit_address/:currency',
 } as const;
 
-// Real V2 API functions
-const v2Api = {
-  getWallets: async (): Promise<Wallet[]> => {
-    const response = await apiClient.get<ApiResponse<V2Account[]>>(WALLETS_ENDPOINTS.list);
-    return response.data.data.map(account => ({
+// Real V2 API functions - Standalone (No ObjectWrapper to avoid TDZ)
+export const getWallets = async (): Promise<Wallet[]> => {
+  const response = await apiClient.get<ApiResponse<V2Account[]>>(WALLETS_ENDPOINTS.list);
+  return response.data.data.map(account => ({
+    currency: account.currency,
+    balance: account.balance,
+    locked: account.locked,
+    updated_at: account.updated_at,
+  }));
+};
+
+export const getWallet = async (currency: string): Promise<Wallet | null> => {
+  try {
+    const url = WALLETS_ENDPOINTS.balance.replace(':currency', currency);
+    const response = await apiClient.get<{ data: V2Account }>(url);
+    const account = response.data.data;
+    return {
       currency: account.currency,
       balance: account.balance,
       locked: account.locked,
       updated_at: account.updated_at,
-    }));
-  },
-  
-  getWallet: async (currency: string): Promise<Wallet | null> => {
-    try {
-      const url = WALLETS_ENDPOINTS.balance.replace(':currency', currency);
-      const response = await apiClient.get<{ data: V2Account }>(url);
-      const account = response.data.data;
-      return {
-        currency: account.currency,
-        balance: account.balance,
-        locked: account.locked,
-        updated_at: account.updated_at,
-      };
-    } catch (error) {
-      return null;
-    }
-  },
-  
-  getDepositAddress: async (currency: string): Promise<{ currency: string; address: string; state: string }> => {
-    const url = WALLETS_ENDPOINTS.depositAddress.replace(':currency', currency);
-    const response = await apiClient.post<{ data: { currency: string; address: string; state: string } }>(url);
-    return response.data.data;
-  },
+    };
+  } catch (error) {
+    return null;
+  }
+};
+
+export const getDepositAddress = async (currency: string): Promise<{ currency: string; address: string; state: string }> => {
+  const url = WALLETS_ENDPOINTS.depositAddress.replace(':currency', currency);
+  const response = await apiClient.post<{ data: { currency: string; address: string; state: string } }>(url);
+  return response.data.data;
 };
 
 // React Query hooks
 export const useWallets = () => {
   return useQuery({
     queryKey: ['wallets'],
-    queryFn: v2Api.getWallets,
+    queryFn: getWallets,
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 30 * 1000, // Refetch every 30 seconds
   });
@@ -66,7 +64,7 @@ export const useWallets = () => {
 export const useWallet = (currency: string) => {
   return useQuery({
     queryKey: ['wallets', currency],
-    queryFn: () => v2Api.getWallet(currency),
+    queryFn: () => getWallet(currency),
     staleTime: 30 * 1000, // 30 seconds
     enabled: !!currency,
   });
@@ -74,9 +72,9 @@ export const useWallet = (currency: string) => {
 
 export const useDepositAddress = (currency: string) => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: () => v2Api.getDepositAddress(currency),
+    mutationFn: () => getDepositAddress(currency),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
     },

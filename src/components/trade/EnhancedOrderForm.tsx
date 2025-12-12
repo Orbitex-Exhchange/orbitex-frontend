@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
-import { 
+import {
   DollarSign,
   Percent,
   Zap,
@@ -22,7 +22,8 @@ import {
 import { cn, formatNumber, formatCurrency } from '../../lib/utils';
 import { env } from '@/lib/env';
 import { authService } from '@/lib/auth';
-import { useCreateOrder, useAccountBalances } from '@/lib/api';
+import { useCreateOrder } from '@/lib/api/services/trading';
+import { useAccountBalances } from '@/lib/api/services/account';
 import { useToast } from '@/hooks/use-toast';
 
 interface EnhancedOrderFormProps {
@@ -72,8 +73,8 @@ const orderTypes = [
 
 const percentageButtons = [10, 25, 50, 75, 100];
 
-export function EnhancedOrderForm({ 
-  market, 
+export function EnhancedOrderForm({
+  market,
   currentPrice,
   onPriceClick,
   compact = false,
@@ -103,7 +104,7 @@ export function EnhancedOrderForm({
   const { toast } = useToast();
   const createOrderMutation = useCreateOrder();
   const { data: balancesData, isLoading: balancesLoading } = useAccountBalances();
-  
+
   // Use prop balances data if available, otherwise use API data
   const finalBalancesData = propBalancesData || balancesData;
 
@@ -160,12 +161,12 @@ export function EnhancedOrderForm({
     const [baseCurrency, quoteCurrency] = market.split('-');
     const baseBalance = balances[baseCurrency?.toUpperCase() || ''] || 0;
     const quoteBalance = balances[quoteCurrency?.toUpperCase() || ''] || 0;
-    
+
     const availableBalance = orderData.side === 'buy' ? quoteBalance : baseBalance;
-    const maxAmount = orderData.side === 'buy' 
+    const maxAmount = orderData.side === 'buy'
       ? (availableBalance * (percentage / 100)) / parseFloat(orderData.price || '1')
       : availableBalance * (percentage / 100);
-    
+
     setOrderData(prev => ({ ...prev, size: maxAmount.toFixed(4) }));
   };
 
@@ -227,7 +228,7 @@ export function EnhancedOrderForm({
 
   const handleSubmitOrder = async () => {
     if (!validateOrder()) return;
-    
+
     // Check if user is authenticated
     if (!authService.isAuthenticated()) {
       toast({
@@ -236,11 +237,11 @@ export function EnhancedOrderForm({
       });
       return;
     }
-    
+
     try {
       // Convert market format from BTC-USDT to btcusdt
       const marketId = market.replace('-', '').toLowerCase();
-      
+
       const orderPayload: any = {
         market: marketId,
         side: orderData.side,
@@ -260,7 +261,7 @@ export function EnhancedOrderForm({
 
       console.log('Submitting order:', orderPayload);
       await createOrderMutation.mutateAsync(orderPayload);
-      
+
       toast({
         title: "Order Submitted",
         description: `${orderData.side.toUpperCase()} order for ${orderData.size} ${market.split('-')[0]} has been submitted successfully.`,
@@ -278,7 +279,6 @@ export function EnhancedOrderForm({
       toast({
         title: "Order Failed",
         description: error.message || "Failed to submit order. Please try again.",
-        variant: "destructive"
       });
     }
   };

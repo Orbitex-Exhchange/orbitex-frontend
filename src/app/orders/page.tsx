@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Clock, 
-  X, 
+import {
+  Clock,
+  X,
   Check,
   AlertTriangle,
   Search,
@@ -22,7 +22,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { formatNumber, formatCurrency } from '@/lib/utils';
-import { useOrders, useCancelOrder } from '@/lib/api';
+import { useOrders, useCancelOrder } from '@/lib/api/services/trading';
 import { useToast } from '@/hooks/use-toast';
 
 interface Order {
@@ -188,17 +188,17 @@ export default function OrdersPage() {
 
   const filteredOrders = orders.filter(order => {
     const matchesTab = activeTab === 'all' || order.state === 'wait';
-    const matchesSearch = order.market.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         order.id.toString().includes(searchTerm.toLowerCase());
+    const matchesSearch = order.market.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.id.toString().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.state === statusFilter;
     const matchesMarket = marketFilter === 'all' || order.market === marketFilter;
-    
+
     return matchesTab && matchesSearch && matchesStatus && matchesMarket;
   });
 
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     let aValue: any, bValue: any;
-    
+
     switch (sortBy) {
       case 'date':
         aValue = new Date(a.created_at).getTime();
@@ -219,7 +219,7 @@ export default function OrdersPage() {
       default:
         return 0;
     }
-    
+
     if (sortOrder === 'asc') {
       return aValue > bValue ? 1 : -1;
     } else {
@@ -273,8 +273,8 @@ export default function OrdersPage() {
   };
 
   const getSideIcon = (side: string) => {
-    return side === 'buy' ? 
-      <TrendingUp className="w-4 h-4 text-[#00ff88]" /> : 
+    return side === 'buy' ?
+      <TrendingUp className="w-4 h-4 text-[#00ff88]" /> :
       <TrendingDown className="w-4 h-4 text-[#ff4444]" />;
   };
 
@@ -363,7 +363,7 @@ export default function OrdersPage() {
                     <div className="flex items-center space-x-2">
                       {getSideIcon(order.side)}
                       <Badge variant={order.side === 'buy' ? "default" : "outline"}
-                             className={order.side === 'buy' ? "bg-[#00ff88] text-black" : "border-[#ff4444] text-[#ff4444]"}>
+                        className={order.side === 'buy' ? "bg-[#00ff88] text-black" : "border-[#ff4444] text-[#ff4444]"}>
                         {order.side.toUpperCase()}
                       </Badge>
                     </div>
@@ -512,11 +512,10 @@ export default function OrdersPage() {
             <button
               key={id}
               onClick={() => setActiveTab(id as any)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === id
+              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === id
                   ? 'bg-[#00ff88] text-black'
                   : 'text-[#888] hover:text-white hover:bg-[#333]'
-              }`}
+                }`}
             >
               <Icon className="w-4 h-4" />
               <span>{label}</span>

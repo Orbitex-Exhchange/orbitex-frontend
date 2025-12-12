@@ -2,53 +2,35 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+// Replaced Input/Badge with standard HTML to avoid potential circular deps
+// import { Input } from '@/components/ui/input';
+// import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Navigation } from '@/components/layout/Navigation';
-import { 
-  Wallet, 
-  TrendingUp, 
-  Eye, 
-  EyeOff,
+import {
+  Wallet,
+  TrendingUp,
+  Search,
+  RefreshCw,
   Plus,
   Minus,
-  Search,
-  Filter,
-  ArrowUpDown,
   MoreHorizontal,
-  ArrowLeft,
-  Bitcoin,
-  DollarSign,
-  Percent,
-  Clock,
-  Target,
-  Rocket,
-  Star,
-  Award,
-  Lock,
-  RefreshCw,
   ChevronRight,
+  ArrowUpDown,
   Download,
   Upload,
   Settings,
-  BarChart3,
-  Activity,
-  Zap,
-  Shield,
-  Users,
-  Globe,
-  Cpu,
-  Database
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { formatNumber, formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+// Internal imports
 import { useAuth } from '@/contexts/AuthContext';
-import { useAccountBalances, useTickers } from '@/lib/api';
-import { useToast } from '@/hooks/use-toast';
+import { useAccountBalances } from '@/lib/api/services/account';
+import { usePublicTickers as useTickers } from '@/lib/api/services/public';
 
-interface Wallet {
+interface WalletData {
   currency: string;
   balance: string;
   locked: string;
@@ -65,8 +47,7 @@ interface Wallet {
 
 export default function WalletsPage() {
   const { authToken, isAuthenticated, user } = useAuth();
-  const { toast } = useToast();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'crypto' | 'fiat'>('all');
   const [sortBy, setSortBy] = useState<'currency' | 'balance' | 'value' | 'change24h'>('currency');
@@ -79,10 +60,10 @@ export default function WalletsPage() {
 
   const isLoading = balancesLoading || tickersLoading;
   const error = balancesError || tickersError;
-  
+
   // Extract error message for better display
-  const errorMessage = error instanceof Error 
-    ? error.message 
+  const errorMessage = error instanceof Error
+    ? error.message
     : (error as any)?.message || (error as any)?.code || 'Failed to load wallet data';
 
   // Refetch function for refresh button
@@ -91,7 +72,7 @@ export default function WalletsPage() {
       refetchBalances();
       refetchTickers();
     } else {
-      toast({
+      console.log("Action:", {
         title: "Authentication Required",
         description: "Please log in to view your wallet balances.",
       });
@@ -99,23 +80,23 @@ export default function WalletsPage() {
   };
 
   // Transform API data to match our interface
-  const wallets: Wallet[] = balances && balances.length > 0 ? balances.map((balance: any) => {
+  const wallets: WalletData[] = balances && balances.length > 0 ? balances.map((balance: any) => {
     const balanceAmount = parseFloat(balance.balance);
     const lockedAmount = parseFloat(balance.locked);
     const availableAmount = balanceAmount + lockedAmount;
-    
+
     // Get real price data from tickers
     let price = 1;
     let change24h = 0;
-    
+
     if (tickersData && tickersData.length > 0) {
       // Find ticker for this currency (look for markets like BTCUSDT, ETHUSDT, etc.)
       const ticker = tickersData.find((t: any) => {
         const market = t.market || t.id;
-        return market?.endsWith('USDT') && 
-               market?.startsWith(balance.currency.toUpperCase());
+        return market?.endsWith('USDT') &&
+          market?.startsWith(balance.currency.toUpperCase());
       });
-      
+
       if (ticker) {
         const tickerData = ticker.ticker || ticker;
         price = parseFloat(tickerData?.last || tickerData?.last || '0') || 1;
@@ -133,9 +114,9 @@ export default function WalletsPage() {
         }
       }
     }
-    
+
     const value = availableAmount * price;
-    
+
     return {
       currency: balance.currency,
       balance: balance.balance,
@@ -150,30 +131,9 @@ export default function WalletsPage() {
     };
   }) : [];
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.5
-      }
-    }
-  };
-
   const filteredWallets = wallets.filter(wallet => {
     const matchesSearch = wallet.currency.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         wallet.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      wallet.name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'all' || wallet.type === filterType;
     return matchesSearch && matchesFilter;
   });
@@ -181,12 +141,12 @@ export default function WalletsPage() {
   const sortedWallets = [...filteredWallets].sort((a, b) => {
     let aValue: any = a[sortBy];
     let bValue: any = b[sortBy];
-    
+
     if (sortBy === 'balance' || sortBy === 'value') {
       aValue = parseFloat(aValue || '0');
       bValue = parseFloat(bValue || '0');
     }
-    
+
     if (sortOrder === 'asc') {
       return aValue > bValue ? 1 : -1;
     } else {
@@ -205,47 +165,30 @@ export default function WalletsPage() {
     }
   };
 
-  const handleDeposit = (wallet: Wallet) => {
-    toast({
+  const handleDeposit = (wallet: WalletData) => {
+    console.log("Action:", {
       title: "Deposit",
       description: `Deposit ${wallet.currency} feature coming soon!`,
     });
   };
 
-  const handleWithdraw = (wallet: Wallet) => {
-    toast({
+  const handleWithdraw = (wallet: WalletData) => {
+    console.log("Action:", {
       title: "Withdraw",
       description: `Withdraw ${wallet.currency} feature coming soon!`,
     });
   };
 
-  const handleTrade = (wallet: Wallet) => {
-    toast({
+  const handleTrade = (wallet: WalletData) => {
+    console.log("Action:", {
       title: "Trade",
       description: `Trade ${wallet.currency} feature coming soon!`,
     });
   };
 
   const getCurrencyIcon = (currency: string) => {
-    const icons: { [key: string]: any } = {
-      'BTC': Bitcoin,
-      'ETH': Activity,
-      'ZAR': DollarSign,
-      'TRX': Zap,
-      'ONDO': Star,
-      'BONK': Award,
-      'BNB': BarChart3,
-      'SOL': Rocket,
-      'OP': Target,
-      'USDT': DollarSign,
-      'USDC': DollarSign,
-      'ADA': Shield,
-      'DOT': Globe,
-      'LINK': Cpu,
-      'UNI': Users,
-      'MATIC': Database
-    };
-    return icons[currency] || Wallet;
+    // Simplify icons to avoid huge import list and potential TDZ
+    return Wallet;
   };
 
   const getCurrencyName = (currency: string) => {
@@ -275,21 +218,21 @@ export default function WalletsPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
         <Navigation user={user} />
-      <div className="container mx-auto p-6">
-        <Card className="border-yellow-500 bg-yellow-900/20">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <Wallet className="h-12 w-12 mx-auto text-yellow-400 mb-4" />
-              <h3 className="text-lg font-medium text-white mb-2">Authentication Required</h3>
-              <p className="text-yellow-200 mb-4">
-                Please sign in to view your wallet balances and manage your funds.
-              </p>
-              <Button variant="outline" onClick={() => window.location.href = '/auth/signin'}>
-                Sign In
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="container mx-auto p-6">
+          <Card className="border-yellow-500 bg-yellow-900/20">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <Wallet className="h-12 w-12 mx-auto text-yellow-400 mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">Authentication Required</h3>
+                <p className="text-yellow-200 mb-4">
+                  Please sign in to view your wallet balances and manage your funds.
+                </p>
+                <Button variant="outline" onClick={() => window.location.href = '/auth/signin'}>
+                  Sign In
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -299,79 +242,79 @@ export default function WalletsPage() {
     <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] trading-font">
       {/* Navigation */}
       <Navigation user={user} />
-      
+
       {/* Enhanced Page Header */}
-      <motion.div 
+      <div
         className="bg-gradient-to-r from-[hsl(var(--trading-bg))] to-[hsl(var(--trading-bg-secondary))] border-b border-[hsl(var(--trading-border))] glass"
-        initial="hidden"
-        animate="visible"
-        variants={containerVariants}
+
+
+
       >
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <motion.div className="flex items-center" variants={itemVariants}>
+            <div className="flex items-center">
               <h1 className="text-xl font-bold text-gradient-primary">Wallets</h1>
-            </motion.div>
-            <motion.div className="flex items-center space-x-4" variants={itemVariants}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isLoading}
+            </div>
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isLoading}
                 className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))] hover:bg-[hsl(var(--trading-bg-tertiary))] hover:border-[hsl(var(--trading-accent))] transition-all duration-300"
-          >
+              >
                 <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+                Refresh
+              </Button>
               <Button variant="outline" size="sm" className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text-secondary))] hover:bg-[hsl(var(--trading-bg-tertiary))] hover:border-[hsl(var(--trading-accent))] transition-all duration-300">
                 <Plus className="h-4 w-4 mr-2" />
                 Add new address
               </Button>
-            </motion.div>
+            </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div 
+      <div
         className="w-full px-4 sm:px-6 lg:px-8 py-8"
-        initial="hidden"
-        animate="visible"
-        variants={containerVariants}
+
+
+
       >
         {/* Enhanced Page Header */}
-        <motion.div className="mb-8" variants={itemVariants}>
+        <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">
             <span className="text-gradient-primary">Wallets</span>
           </h1>
           <p className="text-xl text-[#d1d5db]">Manage your cryptocurrency and fiat balances</p>
-        </motion.div>
+        </div>
 
-      {/* Error State */}
-      {error && (
-          <motion.div className="mb-6" variants={itemVariants}>
-        <Card className="border-red-500 bg-red-900/20">
-          <CardContent className="pt-6">
-            <div className="text-red-300">
-              <p className="font-semibold mb-2">Error loading wallets:</p>
-              <p className="text-sm">{errorMessage}</p>
-              {errorMessage.includes('not_permitted') && (
-                <p className="text-xs text-red-400 mt-2">
-                  This may be an authentication issue. Please try logging out and logging back in.
-                </p>
-              )}
-              {isAuthenticated && !authToken && (
-                <p className="text-xs text-red-400 mt-2">
-                  No authentication token found. Please log in again.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-          </motion.div>
+        {/* Error State */}
+        {error && (
+          <div className="mb-6">
+            <Card className="border-red-500 bg-red-900/20">
+              <CardContent className="pt-6">
+                <div className="text-red-300">
+                  <p className="font-semibold mb-2">Error loading wallets:</p>
+                  <p className="text-sm">{errorMessage}</p>
+                  {errorMessage.includes('not_permitted') && (
+                    <p className="text-xs text-red-400 mt-2">
+                      This may be an authentication issue. Please try logging out and logging back in.
+                    </p>
+                  )}
+                  {isAuthenticated && !authToken && (
+                    <p className="text-xs text-red-400 mt-2">
+                      No authentication token found. Please log in again.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Enhanced Portfolio Summary Card */}
-        <motion.div className="mb-8" variants={itemVariants}>
+        <div className="mb-8">
           <Card className="card-gradient-primary shadow-2xl">
             <CardHeader>
               <CardTitle className="text-white flex items-center">
@@ -383,9 +326,9 @@ export default function WalletsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-3xl font-bold text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold text-white">
                     {showBalances ? formatCurrency(totalValue) : '****'}
                   </p>
                   <div className="flex items-center text-gradient-primary mt-2">
@@ -406,9 +349,9 @@ export default function WalletsPage() {
                       <EyeOff className="h-4 w-4" />
                     )}
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => refetch()}
                     disabled={isLoading}
                     className="text-gray-400 hover:text-white transition-colors duration-300"
@@ -419,21 +362,21 @@ export default function WalletsPage() {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
         {/* Enhanced Search and Filters */}
-        <motion.div className="mb-6" variants={itemVariants}>
+        <div className="mb-6">
           <Card className="card-gradient-primary shadow-xl">
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
+                    <input
                       placeholder="Search wallets..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 trading-input focus-ring"
+                      className="pl-10 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -462,28 +405,28 @@ export default function WalletsPage() {
                   >
                     Fiat
                   </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-        </motion.div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Loading State */}
-      {isLoading && (
-          <motion.div className="text-center py-8" variants={itemVariants}>
-          <RefreshCw className="h-8 w-8 mx-auto animate-spin text-blue-400 mb-4" />
-          <p className="text-gray-300">Loading wallets...</p>
-          </motion.div>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="text-center py-8">
+            <RefreshCw className="h-8 w-8 mx-auto animate-spin text-blue-400 mb-4" />
+            <p className="text-gray-300">Loading wallets...</p>
+          </div>
         )}
 
         {/* Enhanced Wallets List */}
         {!isLoading && (
-          <motion.div 
+          <div
             className="card-gradient-primary overflow-hidden shadow-2xl"
-            variants={itemVariants}
+
           >
             <div className="px-6 py-4 border-b border-[#2a2a2a] bg-gradient-to-r from-[#1a1a1a] to-[#0f0f0f]">
-                  <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gradient-primary">Your Assets</h2>
                 <div className="flex items-center space-x-2">
                   <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white transition-colors duration-300">
@@ -496,8 +439,8 @@ export default function WalletsPage() {
                     <Settings className="h-4 w-4" />
                   </Button>
                 </div>
-                  </div>
-                        </div>
+              </div>
+            </div>
 
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-[#2a2a2a]">
@@ -506,25 +449,25 @@ export default function WalletsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-[#888888] uppercase tracking-wider">
                       Asset
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-left text-xs font-medium text-[#888888] uppercase tracking-wider cursor-pointer hover:text-white transition-colors duration-300"
                       onClick={() => handleSort('change24h')}
                     >
                       <div className="flex items-center">
                         24hr Change
                         <ArrowUpDown className="h-3 w-3 ml-1" />
-                        </div>
+                      </div>
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-left text-xs font-medium text-[#888888] uppercase tracking-wider cursor-pointer hover:text-white transition-colors duration-300"
                       onClick={() => handleSort('balance')}
                     >
                       <div className="flex items-center">
                         Balance
                         <ArrowUpDown className="h-3 w-3 ml-1" />
-                        </div>
+                      </div>
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-left text-xs font-medium text-[#888888] uppercase tracking-wider cursor-pointer hover:text-white transition-colors duration-300"
                       onClick={() => handleSort('value')}
                     >
@@ -542,12 +485,9 @@ export default function WalletsPage() {
                   {sortedWallets.map((wallet, index) => {
                     const IconComponent = getCurrencyIcon(wallet.currency);
                     return (
-                      <motion.tr 
-                        key={wallet.currency} 
+                      <tr
+                        key={wallet.currency}
                         className="hover:bg-[#2a2a2a]/50 transition-all duration-300"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Link href={`/wallets/${wallet.currency}`} className="flex items-center group">
@@ -625,37 +565,37 @@ export default function WalletsPage() {
                             </Button>
                           </div>
                         </td>
-                      </motion.tr>
-            );
-          })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-        </div>
-          </motion.div>
-      )}
+            </div>
+          </div>
+        )}
 
-      {/* Empty State */}
+        {/* Empty State */}
         {!isLoading && sortedWallets.length === 0 && (
-          <motion.div className="text-center py-12" variants={itemVariants}>
+          <div className="text-center py-12">
             <Card className="border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg-secondary))]">
-          <CardContent className="text-center py-12">
-            <Wallet className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-white mb-2">No Wallets Found</h3>
-            <p className="text-gray-400 mb-4">
-                  {searchTerm || filterType !== 'all' 
+              <CardContent className="text-center py-12">
+                <Wallet className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">No Wallets Found</h3>
+                <p className="text-gray-400 mb-4">
+                  {searchTerm || filterType !== 'all'
                     ? 'No wallets match your current search or filter criteria.'
                     : 'You don\'t have any cryptocurrency wallets yet.'
                   }
-            </p>
+                </p>
                 <Button variant="outline" className="border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))]">
                   <Plus className="h-4 w-4 mr-2" />
-              Get Started
-            </Button>
-          </CardContent>
-        </Card>
-          </motion.div>
+                  Get Started
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 }

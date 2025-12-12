@@ -16,77 +16,75 @@ const MARKET_ENDPOINTS = {
   trade: '/api/api_v2/market/trades/:id',
 } as const;
 
-// Real V2 API functions
-const v2Api = {
-  getOrders: async (params?: {
-    market?: string;
-    state?: string;
-    limit?: number;
-    page?: number;
-    order_by?: string;
-  }): Promise<V2Order[]> => {
-    const response = await apiClient.get<V2Order[]>(MARKET_ENDPOINTS.orders, {
-      params
-    });
+// Real V2 API functions - Standalone to avoid TDZ
+export const getOrders = async (params?: {
+  market?: string;
+  state?: string;
+  limit?: number;
+  page?: number;
+  order_by?: string;
+}): Promise<V2Order[]> => {
+  const response = await apiClient.get<V2Order[]>(MARKET_ENDPOINTS.orders, {
+    params
+  });
+  return response.data;
+};
+
+export const getOrder = async (id: number): Promise<V2Order | null> => {
+  try {
+    const url = MARKET_ENDPOINTS.order.replace(':id', id.toString());
+    const response = await apiClient.get<V2Order>(url);
     return response.data;
-  },
+  } catch (error) {
+    return null;
+  }
+};
 
-  getOrder: async (id: number): Promise<V2Order | null> => {
-    try {
-      const url = MARKET_ENDPOINTS.order.replace(':id', id.toString());
-      const response = await apiClient.get<V2Order>(url);
-      return response.data;
-    } catch (error) {
-      return null;
-    }
-  },
+export const createOrder = async (data: {
+  market: string;
+  side: 'buy' | 'sell';
+  volume: string;
+  ord_type?: 'limit' | 'market';
+  price?: string;
+}): Promise<V2Order> => {
+  const response = await apiClient.post<V2Order>(MARKET_ENDPOINTS.orders, data);
+  return response.data;
+};
 
-  createOrder: async (data: {
-    market: string;
-    side: 'buy' | 'sell';
-    volume: string;
-    ord_type?: 'limit' | 'market';
-    price?: string;
-  }): Promise<V2Order> => {
-    const response = await apiClient.post<V2Order>(MARKET_ENDPOINTS.orders, data);
+export const cancelOrder = async (id: number): Promise<V2Order> => {
+  const url = MARKET_ENDPOINTS.cancelOrder.replace(':id', id.toString());
+  const response = await apiClient.post<V2Order>(url);
+  return response.data;
+};
+
+export const cancelAllOrders = async (params?: {
+  market?: string;
+  side?: string;
+}): Promise<V2Order[]> => {
+  const response = await apiClient.post<V2Order[]>(MARKET_ENDPOINTS.cancelAllOrders, params);
+  return response.data;
+};
+
+export const getTrades = async (params?: {
+  market?: string;
+  limit?: number;
+  page?: number;
+  order_by?: string;
+}): Promise<V2Trade[]> => {
+  const response = await apiClient.get<V2Trade[]>(MARKET_ENDPOINTS.trades, {
+    params
+  });
+  return response.data;
+};
+
+export const getTrade = async (id: number): Promise<V2Trade | null> => {
+  try {
+    const url = MARKET_ENDPOINTS.trade.replace(':id', id.toString());
+    const response = await apiClient.get<V2Trade>(url);
     return response.data;
-  },
-
-  cancelOrder: async (id: number): Promise<V2Order> => {
-    const url = MARKET_ENDPOINTS.cancelOrder.replace(':id', id.toString());
-    const response = await apiClient.post<V2Order>(url);
-    return response.data;
-  },
-
-  cancelAllOrders: async (params?: {
-    market?: string;
-    side?: string;
-  }): Promise<V2Order[]> => {
-    const response = await apiClient.post<V2Order[]>(MARKET_ENDPOINTS.cancelAllOrders, params);
-    return response.data;
-  },
-
-  getTrades: async (params?: {
-    market?: string;
-    limit?: number;
-    page?: number;
-    order_by?: string;
-  }): Promise<V2Trade[]> => {
-    const response = await apiClient.get<V2Trade[]>(MARKET_ENDPOINTS.trades, {
-      params
-    });
-    return response.data;
-  },
-
-  getTrade: async (id: number): Promise<V2Trade | null> => {
-    try {
-      const url = MARKET_ENDPOINTS.trade.replace(':id', id.toString());
-      const response = await apiClient.get<V2Trade>(url);
-      return response.data;
-    } catch (error) {
-      return null;
-    }
-  },
+  } catch (error) {
+    return null;
+  }
 };
 
 // React Query hooks
@@ -99,7 +97,7 @@ export const useMarketOrders = (params?: {
 }) => {
   return useQuery({
     queryKey: ['market', 'orders', params],
-    queryFn: () => v2Api.getOrders(params),
+    queryFn: () => getOrders(params),
     staleTime: 10 * 1000, // 10 seconds
     refetchInterval: 10 * 1000, // Refetch every 10 seconds
   });
@@ -108,7 +106,7 @@ export const useMarketOrders = (params?: {
 export const useMarketOrder = (id: number) => {
   return useQuery({
     queryKey: ['market', 'order', id],
-    queryFn: () => v2Api.getOrder(id),
+    queryFn: () => getOrder(id),
     enabled: !!id,
     staleTime: 10 * 1000, // 10 seconds
   });
@@ -116,9 +114,9 @@ export const useMarketOrder = (id: number) => {
 
 export const useCreateOrder = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: v2Api.createOrder,
+    mutationFn: createOrder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['market', 'orders'] });
       queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
@@ -128,9 +126,9 @@ export const useCreateOrder = () => {
 
 export const useCancelOrder = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: v2Api.cancelOrder,
+    mutationFn: cancelOrder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['market', 'orders'] });
       queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
@@ -140,9 +138,9 @@ export const useCancelOrder = () => {
 
 export const useCancelAllOrders = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: v2Api.cancelAllOrders,
+    mutationFn: cancelAllOrders,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['market', 'orders'] });
       queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
@@ -158,7 +156,7 @@ export const useMarketTrades = (params?: {
 }) => {
   return useQuery({
     queryKey: ['market', 'trades', params],
-    queryFn: () => v2Api.getTrades(params),
+    queryFn: () => getTrades(params),
     staleTime: 10 * 1000, // 10 seconds
     refetchInterval: 10 * 1000, // Refetch every 10 seconds
   });
@@ -167,8 +165,11 @@ export const useMarketTrades = (params?: {
 export const useMarketTrade = (id: number) => {
   return useQuery({
     queryKey: ['market', 'trade', id],
-    queryFn: () => v2Api.getTrade(id),
+    queryFn: () => getTrade(id),
     enabled: !!id,
     staleTime: 10 * 1000, // 10 seconds
   });
 };
+
+// Export the API functions for backward compatibility (Deprecated)
+// Object export removed to prevent TDZ issues
