@@ -2,20 +2,34 @@
 const nextConfig = {
   // Enable React strict mode for better development experience
   reactStrictMode: true,
-  
+
+  // Standalone output for Docker
+  output: 'standalone',
+
   // Image configuration
   images: {
-    domains: [
-      'localhost',
-      'orbitex-frontend.vercel.app',
-      'orbitex-admin-dashboard.vercel.app',
-      'orbitex-backend-976099405307.us-central1.run.app',
-      'orbitex-auth-service-976099405307.us-central1.run.app'
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'https',
+        hostname: 'orbitex-frontend.vercel.app',
+      },
+      {
+        protocol: 'https',
+        hostname: 'orbitex-admin-dashboard.vercel.app',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.run.app',
+      },
     ],
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60,
   },
-  
+
   // Webpack configuration
   webpack: (config, { dev, isServer }) => {
     // Fallback for Node.js modules
@@ -25,7 +39,7 @@ const nextConfig = {
       net: false,
       tls: false,
     };
-    
+
     // Optimize bundle size
     if (!dev && !isServer) {
       config.optimization.splitChunks = {
@@ -39,10 +53,10 @@ const nextConfig = {
         },
       };
     }
-    
+
     return config;
   },
-  
+
   // Experimental features for Next.js 15
   experimental: {
     // Enable server actions
@@ -50,7 +64,7 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
   },
-  
+
   // Turbopack configuration (stable in Next.js 15)
   turbopack: {
     rules: {
@@ -60,16 +74,16 @@ const nextConfig = {
       },
     },
   },
-  
+
   // Environment variables validation
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
-  
+
   // Headers for security
   async headers() {
     const isDev = process.env.NODE_ENV === 'development';
-    
+
     return [
       {
         source: '/(.*)',
@@ -90,13 +104,13 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: isDev
               ? "default-src 'self' 'unsafe-eval' 'unsafe-inline' localhost:* 127.0.0.1:* ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline' localhost:* 127.0.0.1:*; connect-src 'self' localhost:* 127.0.0.1:* ws: wss:; img-src 'self' data: blob: localhost:* 127.0.0.1:*; style-src 'self' 'unsafe-inline';"
-              : "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline';",
+              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' wss://*.run.app https://*.run.app https://*.googleapis.com; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;",
           },
         ],
       },
     ];
   },
-  
+
   // Redirects
   async redirects() {
     return [
@@ -107,38 +121,32 @@ const nextConfig = {
       },
     ];
   },
-  
+
   // Rewrites for API proxying (if needed)
   async rewrites() {
     return [
       // Add API rewrites here if needed
     ];
   },
-  
+
   // Compiler configuration
   compiler: {
     // Remove console logs in production
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  
+
   // TypeScript configuration
   typescript: {
     // Don't run TypeScript during build in CI/CD
     ignoreBuildErrors: process.env.CI === 'true',
   },
-  
-  // ESLint configuration
-  eslint: {
-    // Don't run ESLint during build in CI/CD
-    ignoreDuringBuilds: process.env.CI === 'true',
-  },
-  
+
   // Output configuration
   output: 'standalone',
-  
+
   // Trailing slash configuration
   trailingSlash: false,
-  
+
   // Powered by header
   poweredByHeader: false,
 };
