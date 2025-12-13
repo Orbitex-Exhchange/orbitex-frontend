@@ -3,8 +3,5 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "env": {
-    "NODE_ENV": "production"
-  }
+  "installCommand": "npm install --include=dev"
 }
