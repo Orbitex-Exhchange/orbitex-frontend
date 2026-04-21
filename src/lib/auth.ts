@@ -11,13 +11,17 @@ export interface AuthUser {
 }
 
 export interface DecodedToken {
-  sub: string;
-  email: string;
-  role: string;
-  kyc_level: number;
-  email_verified: boolean;
-  phone_verified: boolean;
-  two_factor_enabled: boolean;
+  sub?: string;
+  uid?: string;
+  email?: string;
+  role?: string;
+  kyc_level?: number;
+  level?: number | string;
+  email_verified?: boolean;
+  phone_verified?: boolean;
+  two_factor_enabled?: boolean;
+  otp?: boolean;
+  state?: string;
   exp: number;
   iat: number;
 }
@@ -33,7 +37,7 @@ class AuthService {
     if (typeof window !== 'undefined') {
       this.accessToken = localStorage.getItem('access_token');
       this.refreshToken = localStorage.getItem('refresh_token');
-      this.user = this.getUserFromToken();
+      this.user = this.getStoredUser() || this.getUserFromToken();
       
       // Also set cookie if token exists (for middleware access)
       if (this.accessToken) {
@@ -49,41 +53,48 @@ class AuthService {
     return AuthService.instance;
   }
 
+  private getStoredUser(): AuthUser | null {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      const storedUser = localStorage.getItem('user');
+      return storedUser ? JSON.parse(storedUser) as AuthUser : null;
+    } catch (error) {
+      console.error('Failed to parse stored user:', error);
+      return null;
+    }
+  }
+
   private getUserFromToken(): AuthUser | null {
     if (!this.accessToken) return null;
 
     try {
-      // Try to decode JWT token
       const decoded = jwtDecode<DecodedToken>(this.accessToken);
+      const kycLevel = Number(decoded.kyc_level ?? decoded.level ?? 0);
       
       return {
-        id: decoded.sub,
-        email: decoded.email,
-        role: decoded.role,
-        kyc_level: decoded.kyc_level,
-        email_verified: decoded.email_verified,
-        phone_verified: decoded.phone_verified,
-        two_factor_enabled: decoded.two_factor_enabled,
+        id: decoded.uid || decoded.sub || decoded.email || 'unknown',
+        email: decoded.email || '',
+        role: decoded.role || 'member',
+        kyc_level: Number.isFinite(kycLevel) ? kycLevel : 0,
+        email_verified: decoded.email_verified ?? decoded.state === 'active',
+        phone_verified: decoded.phone_verified ?? false,
+        two_factor_enabled: decoded.two_factor_enabled ?? decoded.otp ?? false,
       };
     } catch (error) {
       console.error('Failed to decode token:', error);
-      // Fallback to default user if token decoding fails
-      return {
-        id: 'default',
-        email: 'user@example.com',
-        role: 'member',
-        kyc_level: 0,
-        email_verified: false,
-        phone_verified: false,
-        two_factor_enabled: false,
-      };
+      return this.getStoredUser();
     }
   }
 
   private isTokenExpired(token: string): boolean {
-    // For now, since we're using simple tokens, we'll assume they don't expire
-    // In the future, this should properly decode JWT tokens
-    return false;
+    try {
+      const decoded = jwtDecode<DecodedToken>(token);
+      return !decoded.exp || decoded.exp * 1000 <= Date.now() + 30_000;
+    } catch (error) {
+      console.error('Failed to inspect token expiry:', error);
+      return true;
+    }
   }
 
   // Helper to set cookie for middleware access

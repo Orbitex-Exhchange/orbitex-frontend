@@ -29,16 +29,19 @@ const ACCOUNT_ENDPOINTS = {
 } as const;
 
 // Real V2 API functions - Standalone (No ObjectWrapper to avoid TDZ)
+const unwrapData = <T>(payload: T | { data?: T }): T =>
+  ((payload as { data?: T })?.data ?? payload) as T;
+
 export const getBalances = async (): Promise<V2Account[]> => {
   const response = await apiClient.get<V2Account[]>(ACCOUNT_ENDPOINTS.balances);
-  return response.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getBalance = async (currency: string): Promise<V2Account | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.balance.replace(':currency', currency);
     const response = await apiClient.get<{ data: V2Account }>(url);
-    return response.data.data;
+    return unwrapData(response.data);
   } catch (error) {
     return null;
   }
@@ -53,14 +56,14 @@ export const getDeposits = async (params?: {
   const response = await apiClient.get<V2Deposit[]>(ACCOUNT_ENDPOINTS.deposits, {
     params
   });
-  return response.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getDeposit = async (txid: string): Promise<V2Deposit | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.deposit.replace(':txid', txid);
     const response = await apiClient.get<{ data: V2Deposit }>(url);
-    return response.data.data;
+    return unwrapData(response.data);
   } catch (error) {
     return null;
   }
@@ -73,7 +76,7 @@ export const createDepositAddress = async (currency: string): Promise<{
 }> => {
   const url = ACCOUNT_ENDPOINTS.depositAddress.replace(':currency', currency);
   const response = await apiClient.post<{ data: { currency: string; address: string; state: string } }>(url);
-  return response.data.data;
+  return unwrapData(response.data);
 };
 
 export const getWithdraws = async (params?: {
@@ -85,14 +88,14 @@ export const getWithdraws = async (params?: {
   const response = await apiClient.get<V2Withdraw[]>(ACCOUNT_ENDPOINTS.withdraws, {
     params
   });
-  return response.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getWithdraw = async (txid: string): Promise<V2Withdraw | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.withdraw.replace(':txid', txid);
     const response = await apiClient.get<{ data: V2Withdraw }>(url);
-    return response.data.data;
+    return unwrapData(response.data);
   } catch (error) {
     return null;
   }
@@ -123,7 +126,7 @@ export const createWithdraw = async (data: {
       created_at: number;
     }
   }>(ACCOUNT_ENDPOINTS.withdraws, data);
-  return response.data.data;
+  return unwrapData(response.data);
 };
 
 export const getTransactions = async (params?: {
@@ -135,14 +138,14 @@ export const getTransactions = async (params?: {
   const response = await apiClient.get<V2Transaction[]>(ACCOUNT_ENDPOINTS.transactions, {
     params
   });
-  return response.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getTransaction = async (txid: string): Promise<V2Transaction | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.transaction.replace(':txid', txid);
     const response = await apiClient.get<{ data: V2Transaction }>(url);
-    return response.data.data;
+    return unwrapData(response.data);
   } catch (error) {
     return null;
   }
@@ -150,14 +153,14 @@ export const getTransaction = async (txid: string): Promise<V2Transaction | null
 
 export const getBeneficiaries = async (): Promise<V2Beneficiary[]> => {
   const response = await apiClient.get<V2Beneficiary[]>(ACCOUNT_ENDPOINTS.beneficiaries);
-  return response.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getBeneficiary = async (id: number): Promise<V2Beneficiary | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.beneficiary.replace(':id', id.toString());
     const response = await apiClient.get<{ data: V2Beneficiary }>(url);
-    return response.data.data;
+    return unwrapData(response.data);
   } catch (error) {
     return null;
   }
@@ -169,7 +172,7 @@ export const createBeneficiary = async (data: {
   data: any;
 }): Promise<V2Beneficiary> => {
   const response = await apiClient.post<{ data: V2Beneficiary }>(ACCOUNT_ENDPOINTS.beneficiaries, data);
-  return response.data.data;
+  return unwrapData(response.data);
 };
 
 export const deleteBeneficiary = async (id: number): Promise<{ message: string }> => {
@@ -187,14 +190,14 @@ export const getInternalTransfers = async (params?: {
   const response = await apiClient.get<V2InternalTransfer[]>(ACCOUNT_ENDPOINTS.internalTransfers, {
     params
   });
-  return response.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getInternalTransfer = async (id: number): Promise<V2InternalTransfer | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.internalTransfer.replace(':id', id.toString());
     const response = await apiClient.get<{ data: V2InternalTransfer }>(url);
-    return response.data.data;
+    return unwrapData(response.data);
   } catch (error) {
     return null;
   }
@@ -221,12 +224,12 @@ export const createInternalTransfer = async (data: {
       created_at: number;
     }
   }>(ACCOUNT_ENDPOINTS.internalTransfers, data);
-  return response.data.data;
+  return unwrapData(response.data);
 };
 
 export const getStats = async (): Promise<V2Stats> => {
   const response = await apiClient.get<{ data: V2Stats }>(ACCOUNT_ENDPOINTS.stats);
-  return response.data.data;
+  return unwrapData(response.data);
 };
 
 // React Query hooks
@@ -422,10 +425,19 @@ export const useCreateInternalTransfer = () => {
 };
 
 export const useAccountStats = () => {
+  const isAuthenticated = typeof window !== 'undefined' ? !!localStorage.getItem('access_token') : false;
+
   return useQuery({
     queryKey: ['account', 'stats'],
     queryFn: getStats,
+    enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: (failureCount, error: any) => {
+      if (error?.status === 401 || error?.status === 403 || error?.code === 'user.ability.not_permitted') {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 };
 

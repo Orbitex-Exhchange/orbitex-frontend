@@ -46,7 +46,8 @@ import {
   useTicker,
   useOrderBook as useAPIOrderBook,
   useMarketTrades as usePublicMarketTrades,
-  useKline
+  useKline,
+  normalizeMarketSymbol
 } from '@/lib/api/services/trading';
 import {
   usePublicMarkets as useMarkets,
@@ -200,7 +201,7 @@ function TradingPage() {
   console.log("🔵 Trade Page: Component starting...");
 
   const router = useRouter();
-  const [selectedMarket, setSelectedMarket] = useState('btc-usdt');
+  const [selectedMarket, setSelectedMarket] = useState('');
   console.log("✅ Trade Page: useRouter initialized");
   const [currentPrice, setCurrentPrice] = useState(43250.50);
   const [priceChange24h, setPriceChange24h] = useState(2.45);
@@ -222,21 +223,38 @@ function TradingPage() {
   const { data: marketTradesData, isLoading: marketTradesLoading, error: marketTradesError } = usePublicMarketTrades(selectedMarket, 50);
   const { data: klineData, isLoading: klineLoading, error: klineError } = useKline(selectedMarket, '1h', 200);
 
-  // Combined loading and error states - only show loading for public data when not authenticated
-  const isDataLoading = marketsLoading || tickersLoading ||
-    tickerLoading || orderBookLoading || marketTradesLoading || klineLoading ||
-    (isAuthenticated && (balancesLoading || statsLoading));
-  const hasDataError = marketsError || tickersError ||
-    tickerError || orderBookError || marketTradesError || klineError ||
-    (isAuthenticated && (balancesError || statsError));
+  useEffect(() => {
+    if (selectedMarket || !marketsData?.length) {
+      return;
+    }
+
+    const preferredMarket =
+      marketsData.find((market: any) => ['btcusdt', 'btcusd', 'ethusdt'].includes(String(market.id).toLowerCase()))?.id ||
+      marketsData[0]?.id;
+
+    if (preferredMarket) {
+      setSelectedMarket(preferredMarket);
+    }
+  }, [marketsData, selectedMarket]);
+
+  // Keep the page responsive even if authenticated account endpoints are slow or unavailable.
+  const publicDataError = marketsError || tickersError ||
+    tickerError || orderBookError || marketTradesError || klineError;
+  const accountDataError = isAuthenticated ? (balancesError || statsError) : null;
+  const isPublicDataLoading = marketsLoading || tickersLoading ||
+    tickerLoading || orderBookLoading || marketTradesLoading || klineLoading;
+  const isAccountDataLoading = isAuthenticated && (balancesLoading || statsLoading);
+  const isDataLoading = isPublicDataLoading;
+  const hasDataError = publicDataError || accountDataError;
 
   // Memoized data processing for performance
   const processedMarketData = useMemo(() => {
     // Add early return if data is still loading
-    if (isDataLoading && !currentTickerData && !tickersData) return null;
+    if (isPublicDataLoading && !currentTickerData && !tickersData) return null;
     if (!currentTickerData && !tickersData) return null;
 
-    const ticker = currentTickerData || tickersData?.find((t: any) => t.market === selectedMarket);
+    const normalizedMarket = normalizeMarketSymbol(selectedMarket);
+    const ticker = currentTickerData || tickersData?.find((t: any) => normalizeMarketSymbol(t.market) === normalizedMarket);
     if (!ticker) return null;
 
     // Safely parse values with fallbacks
@@ -248,14 +266,14 @@ function TradingPage() {
       low24h: parseFloat(tickerData?.low || '0') || 0,
       volume: parseFloat(tickerData?.vol || '0') || 0,
     };
-  }, [currentTickerData, tickersData, selectedMarket, isDataLoading]);
+  }, [currentTickerData, tickersData, selectedMarket, isPublicDataLoading]);
 
   // Memoized balance calculation
   const totalBalance = useMemo(() => {
     if (!isAuthenticated || !balancesData || !processedMarketData) return 0;
 
     return balancesData.reduce((sum: number, balance: any) => {
-      const price = selectedMarket === `${balance.currency}-usdt` ?
+      const price = normalizeMarketSymbol(selectedMarket) === normalizeMarketSymbol(`${balance.currency}usdt`) ?
         processedMarketData.lastPrice : 1;
       return sum + (parseFloat(balance.balance || '0') * price);
     }, 0);
@@ -275,7 +293,8 @@ function TradingPage() {
   }
 
   // Get current market ticker data - prioritize real-time ticker data
-  const currentTicker = currentTickerData || tickersData?.find((ticker: any) => ticker.market === selectedMarket);
+  const normalizedSelectedMarket = normalizeMarketSymbol(selectedMarket);
+  const currentTicker = currentTickerData || tickersData?.find((ticker: any) => normalizeMarketSymbol(ticker.market) === normalizedSelectedMarket);
   const currentPriceFromAPI = currentTicker ? parseFloat(currentTicker.ticker?.last || currentTicker.last || '0') : currentPrice;
   const priceChangeFromAPI = currentTicker ? parseFloat(currentTicker.ticker?.price_change_percent || currentTicker.price_change_percent || '0') : priceChange24h;
 
@@ -313,6 +332,11 @@ function TradingPage() {
   const hftMarketData = hftWebSocket?.marketData ?? null;
   const hftOrderBook = hftWebSocket?.orderBook ?? null;
   const hftTrades = hftWebSocket?.trades ?? [];
+  const accountDataErrorMessage = accountDataError instanceof Error
+    ? accountDataError.message
+    : accountDataError
+      ? 'Account data is temporarily unavailable'
+      : null;
 
   // HFT Performance monitoring - called unconditionally
   const hftPerformance = useHFTPerformance();
@@ -412,14 +436,14 @@ function TradingPage() {
 
   // Handle API errors - only show toast once
   useEffect(() => {
-    if (hasDataError && !hasShownDataErrorToast) {
+    if (publicDataError && !hasShownDataErrorToast) {
       toast({
         title: "Data Loading Error",
         description: "Failed to load some market data. Please refresh the page.",
       });
       setHasShownDataErrorToast(true);
     }
-  }, [hasDataError, hasShownDataErrorToast]);
+  }, [publicDataError, hasShownDataErrorToast, toast]);
 
   // Optimized event handlers with useCallback
   const handleMarketSelect = useCallback((market: string) => {
@@ -477,19 +501,25 @@ function TradingPage() {
   };
 
   // Early return for initial loading state (when no data is loaded yet)
-  if (isDataLoading && !marketsData && !tickersData) {
+  if (!selectedMarket && (marketsLoading || tickersLoading) && !marketsData?.length) {
     return <LoadingState />;
   }
 
   // Early return for error state
-  if (hasDataError && !marketsData) {
-    return <ErrorState error={hasDataError} />;
+  if (publicDataError && !marketsData?.length && !tickersData?.length) {
+    return <ErrorState error={publicDataError} />;
   }
 
   return (
     <div className="h-screen trading-layout flex flex-col trading-font overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
       {/* Navigation */}
       <Navigation user={user} />
+
+      {accountDataErrorMessage && (
+        <div className="mx-4 mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          Account services are degraded right now. Market data is still live, but balances or stats may be stale: {accountDataErrorMessage}
+        </div>
+      )}
 
       {/* Enhanced Top Status Bar */}
       <div className="h-8 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] border-b border-[hsl(var(--trading-border))] flex items-center justify-between px-4 text-xs glass">
@@ -563,7 +593,7 @@ function TradingPage() {
       {/* Enhanced Main Content */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Loading Overlay */}
-        {isDataLoading && (
+        {isPublicDataLoading && (
           <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
             <div className="bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg p-6 shadow-xl">
               <div className="flex items-center space-x-3">
@@ -660,9 +690,15 @@ function TradingPage() {
       {/* Enhanced Bottom Status Bar */}
       <div className="h-6 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] border-t border-[hsl(var(--trading-border))] flex items-center justify-between px-4 text-xs glass">
         <div className="flex items-center space-x-4">
-          <span className="text-[hsl(var(--trading-text-muted))]">Connection: <span className="text-[#00ff88] font-medium">Stable</span></span>
+          <span className="text-[hsl(var(--trading-text-muted))]">Connection: <span className={`font-medium ${hftConnected ? 'text-[#00ff88]' : 'text-[#ffb020]'}`}>{hftConnected ? 'Realtime' : 'Polling only'}</span></span>
           <span className="text-[hsl(var(--trading-text-muted))]">Orders: <span className="text-[hsl(var(--trading-text))] font-medium">{activeOrdersCount} Active</span></span>
           <span className="text-[hsl(var(--trading-text-muted))]">Balance: <span className="text-[hsl(var(--trading-text))] font-medium">${formatNumber(totalBalance, 2)}</span></span>
+          {isAuthenticated && isAccountDataLoading && (
+            <span className="text-[hsl(var(--trading-text-muted))]">Account data: <span className="text-yellow-400 font-medium">Refreshing</span></span>
+          )}
+          {isAuthenticated && accountDataErrorMessage && (
+            <span className="text-[hsl(var(--trading-text-muted))]">Account data: <span className="text-[#ffb020] font-medium">Unavailable</span></span>
+          )}
           {user && (
             <>
               <span className="text-[hsl(var(--trading-text-muted))]">KYC: <span className={`font-medium ${user.kyc_level >= 2 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>Level {user.kyc_level || 0}</span></span>

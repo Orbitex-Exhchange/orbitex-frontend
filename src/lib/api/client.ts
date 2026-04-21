@@ -131,7 +131,7 @@ export class ApiClient {
 
     const executeRequest = async (): Promise<ApiResponse<T>> => {
       try {
-        const response = await this.client.request<T>(config);
+        const response = await this.requestWithFallbacks<T>(config);
         return {
           data: response.data,
           status: response.status,
@@ -175,6 +175,103 @@ export class ApiClient {
     }
 
     return executeRequest();
+  }
+
+  private async requestWithFallbacks<T>(config: ApiRequestConfig) {
+    const candidateRequests = this.buildRequestCandidates(config);
+    let lastError: unknown = null;
+
+    for (const candidate of candidateRequests) {
+      try {
+        return await this.client.request<T>(candidate);
+      } catch (error) {
+        lastError = error;
+
+        if (!(error instanceof AxiosError) || !this.shouldTryFallback(config, error)) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
+  private buildRequestCandidates(config: ApiRequestConfig): AxiosRequestConfig[] {
+    const urls = this.getCandidateUrls(config.url);
+    const baseURLs = this.getCandidateBaseURLs();
+    const candidates: AxiosRequestConfig[] = [];
+    const seen = new Set<string>();
+
+    for (const baseURL of baseURLs) {
+      for (const url of urls) {
+        const key = `${baseURL}::${url}`;
+        if (seen.has(key)) continue;
+
+        seen.add(key);
+        candidates.push({
+          ...config,
+          baseURL,
+          url,
+        });
+      }
+    }
+
+    return candidates;
+  }
+
+  private getCandidateBaseURLs(): string[] {
+    const primary = this.config.baseURL.replace(/\/$/, '');
+    const fallback = env?.NEXT_PUBLIC_API_FALLBACK_URL?.replace(/\/$/, '');
+    const derivedBackend = primary.includes('orbitex-') && !primary.includes('orbitex-backend-')
+      ? primary.replace('://orbitex-', '://orbitex-backend-')
+      : undefined;
+
+    return Array.from(new Set([primary, fallback, derivedBackend].filter(Boolean) as string[]));
+  }
+
+  private getCandidateUrls(url?: string): string[] {
+    if (!url) return [''];
+
+    const normalized = url.endsWith('/') ? url.slice(0, -1) : url;
+    const candidates = new Set<string>([normalized]);
+
+    if (normalized.includes('/api/api_v2/')) {
+      candidates.add(normalized.replace('/api/api_v2/', '/api/v2/'));
+    }
+
+    if (normalized.includes('/api/v2/')) {
+      candidates.add(normalized.replace('/api/v2/', '/api/api_v2/'));
+    }
+
+    if (normalized.includes('/api/api_v2/public/')) {
+      candidates.add(normalized.replace('/api/api_v2/public/', '/api/v2/public/'));
+    }
+
+    if (normalized.includes('/api/v2/public/')) {
+      candidates.add(normalized.replace('/api/v2/public/', '/api/api_v2/public/'));
+    }
+
+    if (normalized.endsWith('/ticker')) {
+      candidates.add(normalized.replace(/\/ticker$/, '/tickers'));
+      candidates.add(normalized.replace(/\/ticker$/, '/tickers/'));
+    }
+
+    if (normalized.endsWith('/tickers')) {
+      candidates.add(`${normalized}/`);
+    }
+
+    return Array.from(candidates);
+  }
+
+  private shouldTryFallback(config: ApiRequestConfig, error: AxiosError): boolean {
+    const method = (config.method || 'GET').toUpperCase();
+    const url = config.url || '';
+    const status = error.response?.status;
+
+    if (method !== 'GET') return false;
+    if (!url.includes('/api/')) return false;
+
+    return status === undefined || status === 404 || status === 500 || status === 502 || status === 503 || status === 504;
   }
 
   // ===== UTILITY METHODS =====
