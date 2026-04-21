@@ -29,11 +29,12 @@ export const env = createEnv({
   client: {
     // API URLs
     NEXT_PUBLIC_API_URL: z.string().url().default('https://orbitex-976099405307.us-central1.run.app'),
+    NEXT_PUBLIC_API_FALLBACK_URL: z.string().url().default('https://orbitex-backend-976099405307.us-central1.run.app'),
     // Point directly to Orbisigner v2 identity base for clean endpoint usage
     NEXT_PUBLIC_AUTH_SERVICE_URL: z.string().url().default('https://orbisigner-976099405307.us-central1.run.app/api/v2/identity'),
 
     // Frontend URLs
-    NEXT_PUBLIC_FRONTEND_URL: z.string().url().default('https://orbitex-frontend.vercel.app'),
+    NEXT_PUBLIC_FRONTEND_URL: z.string().url().default('https://orbitex-frontend-976099405307.us-central1.run.app'),
     NEXT_PUBLIC_ADMIN_DASHBOARD_URL: z.string().url().default('https://orbitex-admin-dashboard.vercel.app'),
 
     // WebSocket URLs
@@ -54,6 +55,7 @@ export const env = createEnv({
   runtimeEnv: {
     // Client variables only (matching the client schema above)
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_API_FALLBACK_URL: process.env.NEXT_PUBLIC_API_FALLBACK_URL,
     NEXT_PUBLIC_AUTH_SERVICE_URL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL,
     NEXT_PUBLIC_FRONTEND_URL: process.env.NEXT_PUBLIC_FRONTEND_URL,
     NEXT_PUBLIC_ADMIN_DASHBOARD_URL: process.env.NEXT_PUBLIC_ADMIN_DASHBOARD_URL,

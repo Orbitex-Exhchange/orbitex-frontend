@@ -94,29 +94,32 @@ export interface VersionInfo {
 }
 
 // Public API functions - Standalone (No ObjectWrapper to avoid TDZ)
+const unwrapData = <T>(payload: T | { data?: T }): T =>
+  ((payload as { data?: T })?.data ?? payload) as T;
+
 export const getMarkets = async (): Promise<PublicMarket[]> => {
   const response = await apiClient.get<PublicMarket[]>(PUBLIC_ENDPOINTS.markets);
-  return response.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getCurrencies = async (): Promise<PublicCurrency[]> => {
   const response = await apiClient.get<{ data: PublicCurrency[] }>(PUBLIC_ENDPOINTS.currencies);
-  return response.data.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getTradingFees = async (): Promise<TradingFee[]> => {
   const response = await apiClient.get<{ data: TradingFee[] }>(PUBLIC_ENDPOINTS.tradingFees);
-  return response.data.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getMemberLevels = async (): Promise<MemberLevel[]> => {
   const response = await apiClient.get<{ data: MemberLevel[] }>(PUBLIC_ENDPOINTS.memberLevels);
-  return response.data.data;
+  return unwrapData(response.data) || [];
 };
 
 export const getWithdrawLimits = async (): Promise<WithdrawLimit[]> => {
   const response = await apiClient.get<{ data: WithdrawLimit[] }>(PUBLIC_ENDPOINTS.withdrawLimits);
-  return response.data.data;
+  return unwrapData(response.data) || [];
 };
 
 // Tools
@@ -127,7 +130,7 @@ export const getTimestamp = async (): Promise<string> => {
 
 export const getVersion = async (): Promise<VersionInfo> => {
   const response = await apiClient.get<{ data: VersionInfo }>(PUBLIC_ENDPOINTS.version);
-  return response.data.data;
+  return unwrapData(response.data);
 };
 
 export const getHealth = async (): Promise<{ status: string; timestamp: string }> => {

@@ -16,11 +16,31 @@ const TRADING_ENDPOINTS = {
   trade: '/api/api_v2/market/trades/:id',
 
   // Market data (real-time)
-  ticker: '/api/api_v2/public/markets/:market/ticker',
+  ticker: '/api/api_v2/public/markets/:market/tickers/',
   orderbook: '/api/api_v2/public/markets/:market/order-book',
   marketTrades: '/api/api_v2/public/markets/:market/trades',
   kline: '/api/api_v2/public/markets/:market/k-line'
 } as const;
+
+const KLINE_PERIOD_MAP: Record<string, number> = {
+  '1m': 1,
+  '5m': 5,
+  '15m': 15,
+  '30m': 30,
+  '1h': 60,
+  '2h': 120,
+  '4h': 240,
+  '6h': 360,
+  '12h': 720,
+  '1d': 1440,
+  '3d': 4320,
+  '1w': 10080,
+};
+
+export const normalizeMarketSymbol = (market: string): string =>
+  market.replace(/[-_/]/g, '').toLowerCase();
+
+const resolveKlinePeriod = (period: string): number => KLINE_PERIOD_MAP[period] || 60;
 
 // Types for trading API responses
 export interface Order {
@@ -100,6 +120,9 @@ export interface CreateOrderRequest {
 }
 
 // Trading API functions - Standalone (No ObjectWrapper to avoid TDZ)
+const unwrapData = <T>(payload: T | { data?: T }): T =>
+  ((payload as { data?: T })?.data ?? payload) as T;
+
 // Order management
 export const getOrders = async (params?: {
   market?: string;
@@ -111,29 +134,28 @@ export const getOrders = async (params?: {
   const response = await apiClient.get<any>(TRADING_ENDPOINTS.orders, {
     params
   });
-  // Handle both { data: [...] } and [...] response formats
-  return response.data?.data || response.data || [];
+  return unwrapData(response.data) || [];
 };
 
 export const getOrder = async (id: number): Promise<Order | null> => {
   try {
     const url = TRADING_ENDPOINTS.order.replace(':id', id.toString());
-    const response = await apiClient.get<{ data: Order }>(url);
-    return response.data.data;
+    const response = await apiClient.get<Order | { data: Order }>(url);
+    return unwrapData(response.data);
   } catch (error) {
     return null;
   }
 };
 
 export const createOrder = async (data: CreateOrderRequest): Promise<Order> => {
-  const response = await apiClient.post<{ data: Order }>(TRADING_ENDPOINTS.orders, data);
-  return response.data.data;
+  const response = await apiClient.post<Order | { data: Order }>(TRADING_ENDPOINTS.orders, data);
+  return unwrapData(response.data);
 };
 
 export const cancelOrder = async (id: number): Promise<Order> => {
   const url = TRADING_ENDPOINTS.cancelOrder.replace(':id', id.toString());
-  const response = await apiClient.post<{ data: Order }>(url);
-  return response.data.data;
+  const response = await apiClient.post<Order | { data: Order }>(url);
+  return unwrapData(response.data);
 };
 
 export const cancelAllOrders = async (params?: {
@@ -153,14 +175,14 @@ export const getTrades = async (params?: {
   const response = await apiClient.get<any>(TRADING_ENDPOINTS.trades, {
     params
   });
-  return response.data?.data || response.data || [];
+  return unwrapData(response.data) || [];
 };
 
 export const getTrade = async (id: number): Promise<Trade | null> => {
   try {
     const url = TRADING_ENDPOINTS.trade.replace(':id', id.toString());
-    const response = await apiClient.get<{ data: Trade }>(url);
-    return response.data.data;
+    const response = await apiClient.get<Trade | { data: Trade }>(url);
+    return unwrapData(response.data);
   } catch (error) {
     return null;
   }
@@ -168,8 +190,7 @@ export const getTrade = async (id: number): Promise<Trade | null> => {
 
 // Market data
 export const getTicker = async (market: string): Promise<Ticker> => {
-  // Convert BTC-USDT to btcusdt format for API
-  const symbol = market.replace('-', '').toLowerCase();
+  const symbol = normalizeMarketSymbol(market);
   const url = TRADING_ENDPOINTS.ticker.replace(':market', symbol);
   const response = await apiClient.get<Ticker>(url);
   // Handle wrapper if present
@@ -178,8 +199,7 @@ export const getTicker = async (market: string): Promise<Ticker> => {
 };
 
 export const getOrderBook = async (market: string, limit?: number): Promise<OrderBook> => {
-  // Convert BTC-USDT to btcusdt format for API
-  const symbol = market.replace('-', '').toLowerCase();
+  const symbol = normalizeMarketSymbol(market);
   const url = TRADING_ENDPOINTS.orderbook.replace(':market', symbol);
   const response = await apiClient.get<OrderBook>(url, {
     params: limit ? { limit } : undefined
@@ -190,23 +210,19 @@ export const getOrderBook = async (market: string, limit?: number): Promise<Orde
 };
 
 export const getMarketTrades = async (market: string, limit?: number): Promise<Trade[]> => {
-  // Convert BTC-USDT to btcusdt format for API
-  const symbol = market.replace('-', '').toLowerCase();
+  const symbol = normalizeMarketSymbol(market);
   const url = TRADING_ENDPOINTS.marketTrades.replace(':market', symbol);
-  const response = await apiClient.get<{ data: Trade[] }>(url, {
+  const response = await apiClient.get<Trade[] | { data: Trade[] }>(url, {
     params: limit ? { limit } : undefined
   });
-  // Handle wrapper if present
-  // Handle wrapper if present
-  return (response.data as any)?.data || (Array.isArray(response.data) ? response.data : []);
+  return unwrapData(response.data) || [];
 };
 
 export const getKline = async (market: string, period: string = '1m', limit?: number): Promise<Kline> => {
-  // Convert BTC-USDT to btcusdt format for API
-  const symbol = market.replace('-', '').toLowerCase();
+  const symbol = normalizeMarketSymbol(market);
   const url = TRADING_ENDPOINTS.kline.replace(':market', symbol);
   const response = await apiClient.get<Kline>(url, {
-    params: { period, ...(limit && { limit }) }
+    params: { period: resolveKlinePeriod(period), ...(limit && { limit }) }
   });
   // Handle wrapper if present
   // Handle wrapper if present

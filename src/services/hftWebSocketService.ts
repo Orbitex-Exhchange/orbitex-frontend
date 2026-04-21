@@ -15,22 +15,30 @@ export const useHFTWebSocket = (market?: string): HFTWebSocketData | null => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Stub implementation that mirrors tradingWebSocket status if available
-    // In a real HFT scenario, this would be a separate socket
     const checkConnection = () => {
       // @ts-ignore
       const ws = window.tradingWebSocket;
       if (ws) {
         setIsConnected(ws.getConnectionState());
       } else {
-        // Fallback if window global not set, check via import side-effect (less reliable here without direct import)
-        setIsConnected(true); // Optimistic true if mostly testing
+        setIsConnected(false);
       }
     };
 
-    // Simple timeout to simulate connection
-    const timer = setTimeout(() => setIsConnected(true), 1000);
-    return () => clearTimeout(timer);
+    checkConnection();
+
+    const handleStateChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ connected?: boolean }>).detail;
+      setIsConnected(!!detail?.connected);
+    };
+
+    window.addEventListener('trading-ws:state', handleStateChange);
+
+    const interval = setInterval(checkConnection, 5000);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('trading-ws:state', handleStateChange);
+    };
   }, []);
 
   return {

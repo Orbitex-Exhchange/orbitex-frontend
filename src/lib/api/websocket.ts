@@ -1,5 +1,7 @@
 import { env } from '../env';
 
+const normalizeMarketChannel = (market: string) => market.replace(/[-_/]/g, '').toLowerCase();
+
 // WebSocket connection for real-time trading data
 class TradingWebSocket {
   private ws: WebSocket | null = null;
@@ -11,8 +13,20 @@ class TradingWebSocket {
   private isConnected = false;
 
   constructor() {
+    if (typeof window !== 'undefined') {
+      (window as any).tradingWebSocket = this;
+    }
+
     // Enable auto-connect
     this.connect();
+  }
+
+  private emitConnectionState() {
+    if (typeof window === 'undefined') return;
+
+    window.dispatchEvent(new CustomEvent('trading-ws:state', {
+      detail: { connected: this.isConnected }
+    }));
   }
 
   private connect() {
@@ -31,6 +45,7 @@ class TradingWebSocket {
         this.reconnectAttempts = 0;
         this.startHeartbeat();
         this.subscribeToDefaultChannels();
+        this.emitConnectionState();
       };
 
       this.ws.onmessage = (event) => {
@@ -46,14 +61,19 @@ class TradingWebSocket {
         console.log('WebSocket disconnected');
         this.isConnected = false;
         this.stopHeartbeat();
+        this.emitConnectionState();
         this.scheduleReconnect();
       };
 
       this.ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        this.isConnected = false;
+        this.emitConnectionState();
       };
     } catch (error) {
       console.error('Failed to connect WebSocket:', error);
+      this.isConnected = false;
+      this.emitConnectionState();
       this.scheduleReconnect();
     }
   }
@@ -145,10 +165,11 @@ class TradingWebSocket {
   }
 
   public subscribeToMarket(market: string, callback: (data: any) => void) {
+    const normalizedMarket = normalizeMarketChannel(market);
     const channels = [
-      `${market}.ticker`,
-      `${market}.orderbook`,
-      `${market}.trades`
+      `${normalizedMarket}.ticker`,
+      `${normalizedMarket}.orderbook`,
+      `${normalizedMarket}.trades`
     ];
 
     channels.forEach(channel => {
@@ -157,10 +178,11 @@ class TradingWebSocket {
   }
 
   public unsubscribeFromMarket(market: string, callback: (data: any) => void) {
+    const normalizedMarket = normalizeMarketChannel(market);
     const channels = [
-      `${market}.ticker`,
-      `${market}.orderbook`,
-      `${market}.trades`
+      `${normalizedMarket}.ticker`,
+      `${normalizedMarket}.orderbook`,
+      `${normalizedMarket}.trades`
     ];
 
     channels.forEach(channel => {
@@ -188,6 +210,7 @@ class TradingWebSocket {
     }
     this.subscribers.clear();
     this.isConnected = false;
+    this.emitConnectionState();
   }
 
   public getConnectionState(): boolean {
@@ -298,9 +321,9 @@ export const useUserWebSocket = (userId: string) => {
     ws.subscribeToUserBalances(userId, handleUserData);
 
     return () => {
-      ws.unsubscribeFromMarket(`user.${userId}.orders`, handleUserData);
-      ws.unsubscribeFromMarket(`user.${userId}.trades`, handleUserData);
-      ws.unsubscribeFromMarket(`user.${userId}.balances`, handleUserData);
+      ws.unsubscribe(`user.${userId}.orders`, handleUserData);
+      ws.unsubscribe(`user.${userId}.trades`, handleUserData);
+      ws.unsubscribe(`user.${userId}.balances`, handleUserData);
     };
   }, [userId]);
 

@@ -19,26 +19,30 @@ const WALLETS_ENDPOINTS = {
 } as const;
 
 // Real V2 API functions - Standalone (No ObjectWrapper to avoid TDZ)
+const unwrapData = <T>(payload: T | { data?: T }): T =>
+  ((payload as { data?: T })?.data ?? payload) as T;
+
 export const getWallets = async (): Promise<Wallet[]> => {
   const response = await apiClient.get<ApiResponse<V2Account[]>>(WALLETS_ENDPOINTS.list);
-  return response.data.data.map(account => ({
+  const accounts = unwrapData(response.data) || [];
+  return accounts.map(account => ({
     currency: account.currency,
     balance: account.balance,
     locked: account.locked,
-    updated_at: account.updated_at,
+    updated_at: account.updated_at || new Date().toISOString(),
   }));
 };
 
 export const getWallet = async (currency: string): Promise<Wallet | null> => {
   try {
     const url = WALLETS_ENDPOINTS.balance.replace(':currency', currency);
-    const response = await apiClient.get<{ data: V2Account }>(url);
-    const account = response.data.data;
+    const response = await apiClient.get<V2Account | { data: V2Account }>(url);
+    const account = unwrapData(response.data);
     return {
       currency: account.currency,
       balance: account.balance,
       locked: account.locked,
-      updated_at: account.updated_at,
+      updated_at: account.updated_at || new Date().toISOString(),
     };
   } catch (error) {
     return null;
@@ -48,7 +52,7 @@ export const getWallet = async (currency: string): Promise<Wallet | null> => {
 export const getDepositAddress = async (currency: string): Promise<{ currency: string; address: string; state: string }> => {
   const url = WALLETS_ENDPOINTS.depositAddress.replace(':currency', currency);
   const response = await apiClient.post<{ data: { currency: string; address: string; state: string } }>(url);
-  return response.data.data;
+  return unwrapData(response.data);
 };
 
 // React Query hooks
