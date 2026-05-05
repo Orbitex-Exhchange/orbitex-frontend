@@ -6,20 +6,20 @@ import { useMarketWebSocket } from '../websocket';
 // Trading API endpoints
 const TRADING_ENDPOINTS = {
   // Order management
-  orders: '/api/api_v2/market/orders',
-  order: '/api/api_v2/market/orders/:id',
-  cancelOrder: '/api/api_v2/market/orders/:id/cancel',
-  cancelAllOrders: '/api/api_v2/market/orders_cancel',
+  orders: '/api/v2/market/orders',
+  order: '/api/v2/market/orders/:id',
+  cancelOrder: '/api/v2/market/orders/:id/cancel',
+  cancelAllOrders: '/api/v2/market/orders_cancel',
 
   // Trade history
-  trades: '/api/api_v2/market/trades',
-  trade: '/api/api_v2/market/trades/:id',
+  trades: '/api/v2/market/trades',
+  trade: '/api/v2/market/trades/:id',
 
   // Market data (real-time)
-  ticker: '/api/api_v2/public/markets/:market/tickers/',
-  orderbook: '/api/api_v2/public/markets/:market/order-book',
-  marketTrades: '/api/api_v2/public/markets/:market/trades',
-  kline: '/api/api_v2/public/markets/:market/k-line'
+  ticker: '/api/v2/public/markets/:market/tickers/',
+  orderbook: '/api/v2/public/markets/:market/order-book',
+  marketTrades: '/api/v2/public/markets/:market/trades',
+  kline: '/api/v2/public/markets/:market/k-line'
 } as const;
 
 const KLINE_PERIOD_MAP: Record<string, number> = {

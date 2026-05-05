@@ -5,16 +5,16 @@ import { env } from '../../env';
 // Public API endpoints - No authentication required
 const PUBLIC_ENDPOINTS = {
   // Market data
-  markets: '/api/api_v2/public/markets',
-  currencies: '/api/api_v2/public/currencies',
-  tradingFees: '/api/api_v2/public/trading_fees',
-  memberLevels: '/api/api_v2/public/member_levels',
-  withdrawLimits: '/api/api_v2/public/withdraw_limits',
+  markets: '/api/v2/public/markets',
+  currencies: '/api/v2/public/currencies',
+  tradingFees: '/api/v2/public/trading_fees',
+  memberLevels: '/api/v2/public/member_levels',
+  withdrawLimits: '/api/v2/public/withdraw_limits',
 
   // Tools
-  timestamp: '/api/api_v2/public/timestamp',
-  version: '/api/api_v2/public/version',
-  health: '/api/api_v2/public/health',
+  timestamp: '/api/v2/public/timestamp',
+  version: '/api/v2/public/version',
+  health: '/api/v2/public/health',
 } as const;
 
 // Types for public API responses
@@ -139,7 +139,7 @@ export const getHealth = async (): Promise<{ status: string; timestamp: string }
 };
 
 export const getTickers = async (): Promise<any[]> => {
-  const response = await apiClient.get<any>('/api/api_v2/public/markets/tickers');
+  const response = await apiClient.get<any>('/api/v2/public/markets/tickers');
   // The API returns a hash of market_id -> ticker_data, convert to array
   const tickersHash = response.data;
   if (typeof tickersHash === 'object' && tickersHash !== null) {

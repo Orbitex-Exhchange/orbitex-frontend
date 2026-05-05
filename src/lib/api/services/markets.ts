@@ -3,10 +3,10 @@ import { api } from '../../api-client';
 
 // Markets API endpoints - Updated to match our backend
 const MARKETS_ENDPOINTS = {
-  list: '/api/api_v2/markets',
-  ticker: '/api/api_v2/markets/:id/ticker',
-  orderBook: '/api/api_v2/markets/:id/orderbook',
-  trades: '/api/api_v2/markets/:id/trades',
+  list: '/api/v2/public/markets',
+  ticker: '/api/v2/public/markets/:id/tickers',
+  orderBook: '/api/v2/public/markets/:id/order-book',
+  trades: '/api/v2/public/markets/:id/trades',
 } as const;
 
 // Real API functions - Connected to our backend
@@ -23,13 +23,13 @@ export const getMarketTicker = async (marketId: string): Promise<any> => {
 };
 
 export const getOrderBook = async (marketId: string, limit: number = 20) => {
-  const url = MARKETS_ENDPOINTS.orderBook.replace(':id', marketId);
+  const url = `${MARKETS_ENDPOINTS.orderBook.replace(':id', marketId)}?asks_limit=${limit}&bids_limit=${limit}`;
   const response = await api.get(url);
   return response;
 };
 
 export const getTrades = async (marketId: string, limit: number = 50) => {
-  const url = MARKETS_ENDPOINTS.trades.replace(':id', marketId);
+  const url = `${MARKETS_ENDPOINTS.trades.replace(':id', marketId)}?limit=${limit}`;
   const response = await api.get(url);
   return response;
 };

@@ -308,7 +308,7 @@ export const EnhancedOrderBook = React.memo(({
       try {
         const limit = Math.max(orderBookSettings.depth, 20);
         // Use /depth endpoint that returns simple [price, amount] arrays
-        const url = `${apiBase}/api/api_v2/public/markets/${symbol}/depth?limit=${limit}`;
+        const url = `${apiBase}/api/v2/public/markets/${symbol}/depth?limit=${limit}`;
         console.log('Fetching order book from:', url);
 
         const res = await fetch(url);

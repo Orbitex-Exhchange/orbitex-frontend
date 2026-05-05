@@ -13,9 +13,9 @@ export interface Wallet {
 
 // Wallets API endpoints - Updated to match V2 API structure
 const WALLETS_ENDPOINTS = {
-  list: '/api/api_v2/account/balances',
-  balance: '/api/api_v2/account/balances/:currency',
-  depositAddress: '/api/api_v2/account/deposit_address/:currency',
+  list: '/api/v2/account/balances',
+  balance: '/api/v2/account/balances/:currency',
+  depositAddress: '/api/v2/account/deposit_address/:currency',
 } as const;
 
 // Real V2 API functions - Standalone (No ObjectWrapper to avoid TDZ)

@@ -8,12 +8,12 @@ import {
 
 // Market API endpoints - Updated to match V2 API structure
 const MARKET_ENDPOINTS = {
-  orders: '/api/api_v2/market/orders',
-  order: '/api/api_v2/market/orders/:id',
-  cancelOrder: '/api/api_v2/market/orders/:id/cancel',
-  cancelAllOrders: '/api/api_v2/market/orders/cancel',
-  trades: '/api/api_v2/market/trades',
-  trade: '/api/api_v2/market/trades/:id',
+  orders: '/api/v2/market/orders',
+  order: '/api/v2/market/orders/:id',
+  cancelOrder: '/api/v2/market/orders/:id/cancel',
+  cancelAllOrders: '/api/v2/market/orders/cancel',
+  trades: '/api/v2/market/trades',
+  trade: '/api/v2/market/trades/:id',
 } as const;
 
 // Real V2 API functions - Standalone to avoid TDZ

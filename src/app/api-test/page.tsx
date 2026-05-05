@@ -53,7 +53,7 @@ export default function ApiTestPage() {
 
       // Check database health by testing a database-dependent endpoint
       try {
-        const response = await fetch(`${baseUrl}/api/api_v2/public/markets`);
+        const response = await fetch(`${baseUrl}/api/v2/public/markets`);
         if (response.ok) {
           const data = await response.json();
           // If we get a response (even empty array), database connection is working
@@ -95,7 +95,7 @@ export default function ApiTestPage() {
 
       // Load markets data
       try {
-        const response = await fetch(`${baseUrl}/api/api_v2/public/markets`);
+        const response = await fetch(`${baseUrl}/api/v2/public/markets`);
         if (response.ok) {
           const data = await response.json();
           setMarkets(data.markets || []);
@@ -114,7 +114,7 @@ export default function ApiTestPage() {
       const baseUrl = 'http://localhost:3100';
       
       try {
-        const response = await fetch(`${baseUrl}/api/api_v2/public/tickers/${selectedMarket}`);
+        const response = await fetch(`${baseUrl}/api/v2/public/markets/${selectedMarket}/tickers`);
         if (response.ok) {
           const data = await response.json();
           setTicker(data);
@@ -124,7 +124,7 @@ export default function ApiTestPage() {
       }
 
       try {
-        const response = await fetch(`${baseUrl}/api/api_v2/public/order_book/${selectedMarket}`);
+        const response = await fetch(`${baseUrl}/api/v2/public/markets/${selectedMarket}/order-book`);
         if (response.ok) {
           const data = await response.json();
           setOrderBook(data);
@@ -162,7 +162,7 @@ export default function ApiTestPage() {
         name: 'Markets Data Fetch',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/api_v2/public/markets`);
+            const response = await fetch(`${baseUrl}/api/v2/public/markets`);
             const data = await response.json();
             return { success: response.ok, data };
           } catch (error) {
@@ -174,7 +174,7 @@ export default function ApiTestPage() {
         name: 'Market Ticker Data',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/api_v2/public/tickers/${selectedMarket}`);
+            const response = await fetch(`${baseUrl}/api/v2/public/markets/${selectedMarket}/tickers`);
             const data = await response.json();
             return { success: response.ok, data };
           } catch (error) {
@@ -186,7 +186,7 @@ export default function ApiTestPage() {
         name: 'OrderBook Data',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/api_v2/public/order_book/${selectedMarket}`);
+            const response = await fetch(`${baseUrl}/api/v2/public/markets/${selectedMarket}/order-book`);
             const data = await response.json();
             return { success: response.ok, data };
           } catch (error) {
@@ -198,7 +198,7 @@ export default function ApiTestPage() {
         name: 'Currencies Data',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/api_v2/public/currencies`);
+            const response = await fetch(`${baseUrl}/api/v2/public/currencies`);
             const data = await response.json();
             return { success: response.ok, data };
           } catch (error) {
@@ -478,36 +478,36 @@ export default function ApiTestPage() {
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Health Check</h4>
                       <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /health</code>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300 mt-1">GET /api/api_v2/health</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300 mt-1">GET /api/v2/health</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Markets</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/api_v2/public/markets</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Tickers</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/api_v2/public/tickers</code>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300 mt-1">GET /api/api_v2/public/tickers/{'{market}'}</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets/{'{market}'}/tickers</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300 mt-1">GET /api/v2/public/markets/{'{market}'}/tickers</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Order Book</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/api_v2/public/order_book/{'{market}'}</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets/{'{market}'}/order-book</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Market Depth</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/api_v2/public/depth/{'{market}'}</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets/{'{market}'}/depth</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Recent Trades</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/api_v2/public/trades/{'{market}'}</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets/{'{market}'}/trades</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Currencies</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/api_v2/public/currencies</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/currencies</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Trading Fees</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/api_v2/public/trading_fees</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/trading_fees</code>
                     </div>
                   </div>
                 </div>

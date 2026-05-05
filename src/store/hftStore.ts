@@ -108,7 +108,7 @@ export const useHFTStore = create<HFTState & HFTActions>()(
       set({ isLoading: true, error: null });
       try {
         const { apiClient } = await import('@/lib/api/client');
-        const response = await apiClient.get<any>(`/api/api_v2/public/hft/market-depth/${market}?limit=${limit}`);
+        const response = await apiClient.get<any>(`/api/v2/public/hft/market-depth/${market}?limit=${limit}`);
 
         set({
           marketDepth: response.data,
@@ -127,7 +127,7 @@ export const useHFTStore = create<HFTState & HFTActions>()(
       set({ isLoading: true, error: null });
       try {
         const { apiClient } = await import('@/lib/api/client');
-        const response = await apiClient.get<any>(`/api/api_v2/public/hft/trades/${market}?limit=${limit}`);
+        const response = await apiClient.get<any>(`/api/v2/public/hft/trades/${market}?limit=${limit}`);
 
         set({
           realTimeTrades: response.data.trades,
@@ -146,7 +146,7 @@ export const useHFTStore = create<HFTState & HFTActions>()(
       set({ isLoading: true, error: null });
       try {
         const { apiClient } = await import('@/lib/api/client');
-        const response = await apiClient.get<any>(`/api/api_v2/public/hft/volume-profile/${market}?period=${period}`);
+        const response = await apiClient.get<any>(`/api/v2/public/hft/volume-profile/${market}?period=${period}`);
 
         set({
           volumeProfile: response.data,
@@ -165,7 +165,7 @@ export const useHFTStore = create<HFTState & HFTActions>()(
       set({ isLoading: true, error: null });
       try {
         const { apiClient } = await import('@/lib/api/client');
-        const response = await apiClient.get<any>(`/api/api_v2/public/hft/price-velocity/${market}?period=${period}`);
+        const response = await apiClient.get<any>(`/api/v2/public/hft/price-velocity/${market}?period=${period}`);
 
         set({
           priceVelocity: response.data,
@@ -184,7 +184,7 @@ export const useHFTStore = create<HFTState & HFTActions>()(
       set({ isLoading: true, error: null });
       try {
         const { apiClient } = await import('@/lib/api/client');
-        const response = await apiClient.get<any>(`/api/api_v2/public/hft/market-data/${market}?depth_limit=${depthLimit}&trades_limit=${tradesLimit}`);
+        const response = await apiClient.get<any>(`/api/v2/public/hft/market-data/${market}?depth_limit=${depthLimit}&trades_limit=${tradesLimit}`);
 
         set({
           marketData: response.data,
