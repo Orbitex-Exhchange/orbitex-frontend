@@ -229,8 +229,9 @@ function TradingPage() {
     }
 
     const preferredMarket =
-      marketsData.find((market: any) => ['btcusdt', 'btcusd', 'ethusdt'].includes(String(market.id).toLowerCase()))?.id ||
-      marketsData[0]?.id;
+      marketsData.find((market: any) =>
+        ['btcusd', 'ethusd', 'btceur', 'etheur', 'btcusdt', 'ethusdt'].includes(String(market.id).toLowerCase())
+      )?.id || marketsData[0]?.id;
 
     if (preferredMarket) {
       setSelectedMarket(preferredMarket);

@@ -120,8 +120,10 @@ export function OrdersTradesPanel({ market, compact = false }: OrdersTradesPanel
               <label className="text-xs text-[hsl(var(--trading-text-muted))]">Market:</label>
               <select className="h-6 px-2 text-xs bg-[hsl(var(--trading-bg))] border border-[hsl(var(--trading-border))] rounded text-[hsl(var(--trading-text))]">
                 <option value="">All Markets</option>
-                <option value="btcusdt">BTC/USDT</option>
-                <option value="ethusdt">ETH/USDT</option>
+                <option value="btcusd">BTC/USD</option>
+                <option value="ethusd">ETH/USD</option>
+                <option value="btceur">BTC/EUR</option>
+                <option value="etheur">ETH/EUR</option>
               </select>
             </div>
             <div className="flex items-center space-x-2">

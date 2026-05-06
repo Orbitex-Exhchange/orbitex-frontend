@@ -7,16 +7,13 @@ export async function GET(request: Request) {
 
   // Mock symbols data
   const symbols = [
-    { symbol: 'BTCUSDT', full_name: 'Bitcoin/USDT', description: 'Bitcoin', exchange: 'BINANCE', type: 'crypto' },
-    { symbol: 'ETHUSDT', full_name: 'Ethereum/USDT', description: 'Ethereum', exchange: 'BINANCE', type: 'crypto' },
-    { symbol: 'ADAUSDT', full_name: 'Cardano/USDT', description: 'Cardano', exchange: 'BINANCE', type: 'crypto' },
-    { symbol: 'DOTUSDT', full_name: 'Polkadot/USDT', description: 'Polkadot', exchange: 'BINANCE', type: 'crypto' },
-    { symbol: 'LINKUSDT', full_name: 'Chainlink/USDT', description: 'Chainlink', exchange: 'BINANCE', type: 'crypto' },
-    { symbol: 'LTCUSDT', full_name: 'Litecoin/USDT', description: 'Litecoin', exchange: 'BINANCE', type: 'crypto' },
-    { symbol: 'BCHUSDT', full_name: 'Bitcoin Cash/USDT', description: 'Bitcoin Cash', exchange: 'BINANCE', type: 'crypto' },
-    { symbol: 'XRPUSDT', full_name: 'Ripple/USDT', description: 'Ripple', exchange: 'BINANCE', type: 'crypto' },
-    { symbol: 'BNBUSDT', full_name: 'Binance Coin/USDT', description: 'Binance Coin', exchange: 'BINANCE', type: 'crypto' },
-    { symbol: 'EOSUSDT', full_name: 'EOS/USDT', description: 'EOS', exchange: 'BINANCE', type: 'crypto' }
+    { symbol: 'BTCUSD', full_name: 'Bitcoin/USD', description: 'Bitcoin', exchange: 'ORBITEX', type: 'crypto' },
+    { symbol: 'ETHUSD', full_name: 'Ethereum/USD', description: 'Ethereum', exchange: 'ORBITEX', type: 'crypto' },
+    { symbol: 'BTCEUR', full_name: 'Bitcoin/EUR', description: 'Bitcoin', exchange: 'ORBITEX', type: 'crypto' },
+    { symbol: 'ETHEUR', full_name: 'Ethereum/EUR', description: 'Ethereum', exchange: 'ORBITEX', type: 'crypto' },
+    { symbol: 'USDTUSD', full_name: 'Tether/USD', description: 'Tether', exchange: 'ORBITEX', type: 'crypto' },
+    { symbol: 'BTCUSDT', full_name: 'Bitcoin/USDT', description: 'Bitcoin', exchange: 'ORBITEX', type: 'crypto' },
+    { symbol: 'ETHUSDT', full_name: 'Ethereum/USDT', description: 'Ethereum', exchange: 'ORBITEX', type: 'crypto' }
   ];
 
   // Filter symbols based on query

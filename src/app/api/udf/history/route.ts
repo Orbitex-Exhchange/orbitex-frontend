@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const symbol = searchParams.get('symbol') || 'BTCUSDT';
+  const symbol = searchParams.get('symbol') || 'BTCUSD';
   const resolution = searchParams.get('resolution') || '1D';
   const from = parseInt(searchParams.get('from') || '0');
   const to = parseInt(searchParams.get('to') || '0');
