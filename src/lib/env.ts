@@ -28,20 +28,20 @@ export const env = createEnv({
 
   client: {
     // API URLs
-    NEXT_PUBLIC_API_URL: z.string().url().default('https://orbitex-976099405307.us-central1.run.app'),
-    NEXT_PUBLIC_API_FALLBACK_URL: z.string().url().default('https://orbitex-backend-976099405307.us-central1.run.app'),
-    // Point directly to Orbisigner v2 identity base for clean endpoint usage
-    NEXT_PUBLIC_AUTH_SERVICE_URL: z.string().url().default('https://orbisigner-976099405307.us-central1.run.app/api/v2/identity'),
+    NEXT_PUBLIC_API_URL: z.string().url().default('http://localhost:3333'),
+    NEXT_PUBLIC_API_FALLBACK_URL: optionalUrl,
+    // Point directly to the Orbisigner v2 identity base.
+    NEXT_PUBLIC_AUTH_SERVICE_URL: z.string().url().default('https://orbisigner-ih6wdmcn3q-uc.a.run.app/api/v2/identity'),
 
     // Frontend URLs
-    NEXT_PUBLIC_FRONTEND_URL: z.string().url().default('https://orbitex-frontend-976099405307.us-central1.run.app'),
-    NEXT_PUBLIC_ADMIN_DASHBOARD_URL: z.string().url().default('https://orbitex-admin-dashboard.vercel.app'),
+    NEXT_PUBLIC_FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+    NEXT_PUBLIC_ADMIN_DASHBOARD_URL: z.string().url().default('http://localhost:3001'),
 
     // WebSocket URLs
-    NEXT_PUBLIC_WS_URL: z.string().default('wss://socketeer-976099405307.us-central1.run.app/public'),
+    NEXT_PUBLIC_WS_URL: optionalUrl,
 
     // Feature flags - parse from strings
-    NEXT_PUBLIC_ENABLE_2FA: booleanFromString.default(true),
+    NEXT_PUBLIC_ENABLE_2FA: booleanFromString.default(false),
     NEXT_PUBLIC_ENABLE_KYC: booleanFromString.default(true),
     NEXT_PUBLIC_ENABLE_WEBAUTHN: booleanFromString.default(false),
 

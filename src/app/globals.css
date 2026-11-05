@@ -1,44 +1,43 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
 
 @layer base {
   :root {
-    /* Trading Theme Colors - Light Mode */
-    --trading-bg: 0 0% 100%;
-    --trading-bg-secondary: 0 0% 97%;
-    --trading-bg-tertiary: 0 0% 94%;
-    --trading-text: 0 0% 8%;
-    --trading-text-secondary: 0 0% 25%;
-    --trading-text-muted: 0 0% 45%;
-    --trading-accent: 142 76% 36%;
-    --trading-accent-secondary: 142 76% 46%;
-    --trading-border: 0 0% 88%;
+    /* Trading Theme Colors - Orbitex defaults to a dark exchange surface. */
+    --trading-bg: 222 47% 5%;
+    --trading-bg-secondary: 222 40% 8%;
+    --trading-bg-tertiary: 222 32% 12%;
+    --trading-text: 210 40% 98%;
+    --trading-text-secondary: 214 20% 82%;
+    --trading-text-muted: 215 16% 62%;
+    --trading-accent: 142 72% 45%;
+    --trading-accent-secondary: 156 74% 52%;
+    --trading-border: 217 32% 18%;
     --trading-success: 142 76% 36%;
     --trading-error: 0 84% 60%;
     --trading-warning: 38 92% 50%;
     --trading-info: 217 91% 60%;
     
-    /* Shadcn/ui Colors - Light Mode */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
+    /* Shadcn/ui Colors */
+    --background: 222 47% 5%;
+    --foreground: 210 40% 98%;
+    --card: 222 40% 8%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 40% 8%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 142 72% 45%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
+    --secondary: 217 32% 18%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 32% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 32% 18%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 217 32% 18%;
+    --input: 217 32% 18%;
+    --ring: 142 72% 45%;
     --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -49,15 +48,15 @@
 
   .dark {
     /* Trading Theme Colors - Dark Mode */
-    --trading-bg: 0 0% 4%;
-    --trading-bg-secondary: 0 0% 7%;
-    --trading-bg-tertiary: 0 0% 10%;
-    --trading-text: 0 0% 98%;
-    --trading-text-secondary: 0 0% 85%;
-    --trading-text-muted: 0 0% 65%;
+    --trading-bg: 222 47% 5%;
+    --trading-bg-secondary: 222 40% 8%;
+    --trading-bg-tertiary: 222 32% 12%;
+    --trading-text: 210 40% 98%;
+    --trading-text-secondary: 214 20% 82%;
+    --trading-text-muted: 215 16% 62%;
     --trading-accent: 142 76% 36%;
     --trading-accent-secondary: 142 76% 46%;
-    --trading-border: 0 0% 18%;
+    --trading-border: 217 32% 18%;
     --trading-success: 142 76% 36%;
     --trading-error: 0 84% 60%;
     --trading-warning: 38 92% 50%;
@@ -96,13 +95,18 @@
 
   body {
     @apply bg-background text-foreground;
+    background:
+      radial-gradient(circle at 12% 0%, hsl(var(--trading-accent) / 0.14), transparent 30rem),
+      radial-gradient(circle at 86% 12%, hsl(var(--trading-info) / 0.10), transparent 34rem),
+      hsl(var(--trading-bg));
+    color: hsl(var(--trading-text));
     font-feature-settings: "rlig" 1, "calt" 1;
     font-family: var(--font-inter), system-ui, sans-serif;
   }
 
-  /* Performance optimizations */
-  * {
-    contain: layout style paint;
+  html,
+  body {
+    min-height: 100%;
   }
 
   /* Smooth scrolling */
@@ -134,15 +138,15 @@
   }
 
   .glass {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: hsl(var(--trading-bg-secondary) / 0.82);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--trading-border) / 0.85);
   }
 
   .dark .glass {
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: hsl(var(--trading-bg-secondary) / 0.82);
+    border: 1px solid hsl(var(--trading-border) / 0.85);
   }
 
   /* Gradient text */
@@ -159,17 +163,18 @@
   }
 
   .card-gradient-primary {
-    background: linear-gradient(135deg, 
-      rgba(16, 185, 129, 0.1) 0%, 
-      rgba(16, 185, 129, 0.05) 100%);
-    border: 1px solid rgba(16, 185, 129, 0.2);
+    background:
+      radial-gradient(circle at top left, hsl(var(--trading-accent) / 0.18), transparent 18rem),
+      linear-gradient(135deg, hsl(var(--trading-bg-secondary)) 0%, hsl(var(--trading-bg-tertiary)) 100%);
+    border: 1px solid hsl(var(--trading-accent) / 0.24);
+    color: hsl(var(--trading-text));
   }
 
   .dark .card-gradient-primary {
-    background: linear-gradient(135deg, 
-      rgba(16, 185, 129, 0.1) 0%, 
-      rgba(16, 185, 129, 0.05) 100%);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    background:
+      radial-gradient(circle at top left, hsl(var(--trading-accent) / 0.18), transparent 18rem),
+      linear-gradient(135deg, hsl(var(--trading-bg-secondary)) 0%, hsl(var(--trading-bg-tertiary)) 100%);
+    border: 1px solid hsl(var(--trading-accent) / 0.28);
   }
 
   /* Button gradients */
@@ -461,5 +466,48 @@
     background: linear-gradient(to right, 
       rgba(16, 185, 129, 0.1) 0%, 
       transparent 100%);
+  }
+}
+
+@layer components {
+  .ambient-card {
+    background:
+      radial-gradient(circle at top left, hsl(var(--trading-accent) / 0.12), transparent 22rem),
+      linear-gradient(135deg, hsl(222 40% 8% / 0.92), hsl(222 32% 12% / 0.78));
+    border: 1px solid hsl(var(--trading-border) / 0.86);
+    border-radius: 0.5rem;
+    box-shadow: 0 14px 36px rgb(0 0 0 / 0.24), inset 0 1px 0 rgb(255 255 255 / 0.04);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .ambient-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .ambient-table th {
+    color: hsl(var(--trading-text-muted));
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.65rem 0.85rem;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .ambient-table td {
+    border-top: 1px solid hsl(var(--trading-border) / 0.62);
+    color: hsl(var(--trading-text-secondary));
+    padding: 0.7rem 0.85rem;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  .ambient-table tbody tr:hover td {
+    background: hsl(var(--trading-bg-tertiary) / 0.48);
+    color: hsl(var(--trading-text));
   }
 }

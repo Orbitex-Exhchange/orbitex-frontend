@@ -1,694 +1,577 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Navigation } from '@/components/layout/Navigation';
-import { 
-  ArrowRight, 
-  Star,
-  Shield,
-  Zap,
-  TrendingUp,
-  Users,
+import { startTransition, useDeferredValue, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
   Activity,
-  Cpu,
-  Search,
-  Bell,
-  Settings,
-  Menu,
-  Sparkles,
-  Coins,
-  Percent,
+  ArrowRight,
   BarChart3,
-  Play,
-  CheckCircle,
-  Globe,
-  Wallet,
-  Lock,
-  Rocket,
-  Target,
-  Award,
-  Eye,
-  EyeOff,
-  ChevronDown,
-  User,
-  Bitcoin,
-  DollarSign,
-  Clock,
-  ArrowUp,
-  ArrowDown,
-  Layers,
-  Database,
-  Network,
-  Code,
-  Terminal,
-  Smartphone,
-  Monitor,
-  Server,
-  Cloud,
+  CheckCircle2,
+  Clock3,
+  Globe2,
+  LineChart,
+  LockKeyhole,
+  RefreshCw,
   ShieldCheck,
-  Gauge,
-  Timer,
-  Heart,
-  MessageCircle,
-  Share2,
-  Download,
-  Upload,
-  ExternalLink,
-  X,
-  ChevronRight,
-  ChevronLeft,
-  Maximize2,
-  Minimize2,
-  RotateCcw,
-  PlayCircle,
-  PauseCircle,
-  SkipForward,
-  SkipBack,
-  Volume2,
-  VolumeX,
-  Settings2,
-  HelpCircle,
-  Info,
-  AlertCircle,
-  Check,
-  XCircle,
-  AlertTriangle,
-  Lightbulb,
-  Sun,
-  Moon,
-  CloudRain,
-  CloudLightning,
-  CloudSnow,
-  CloudFog,
-  CloudSun,
-  CloudMoon,
-  Droplets,
-  Thermometer,
-  Calendar,
-  Watch,
-  Hourglass,
-  CalendarDays,
-  CalendarCheck,
-  CalendarX,
-  CalendarPlus,
-  CalendarMinus,
-  CalendarRange,
-  CalendarSearch,
-  CalendarHeart,
-  CalendarClock,
-  CalendarOff
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+  Zap,
+  type LucideIcon,
 } from 'lucide-react';
+import { Navigation } from '@/components/layout/Navigation';
+import { env } from '@/lib/env';
+import { cn, formatCurrency, formatNumber, formatPercentage, toFiniteNumber } from '@/lib/utils';
+
+type Market = {
+  id: string;
+  symbol: string;
+  name: string;
+  status: string;
+  base_unit?: string;
+  quote_unit?: string;
+};
+
+type Ticker = {
+  market: string;
+  last: number;
+  high: number;
+  low: number;
+  volume: number;
+  amount: number;
+  change: number;
+};
+
+type OrderRow = {
+  price: number;
+  amount: number;
+  total: number;
+};
+
+type TradeRow = {
+  id: string;
+  price: number;
+  amount: number;
+  total: number;
+  side: string;
+  createdAt: string;
+};
+
+type TerminalData = {
+  markets: Market[];
+  tickers: Ticker[];
+  asks: OrderRow[];
+  bids: OrderRow[];
+  trades: TradeRow[];
+  lastUpdated: Date | null;
+};
+
+const API_BASE = env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
+const DEFAULT_MARKET = 'btcusd';
+
+const emptyTerminalData: TerminalData = {
+  markets: [],
+  tickers: [],
+  asks: [],
+  bids: [],
+  trades: [],
+  lastUpdated: null,
+};
+
+function normalizeMarketId(value: unknown): string {
+  return String(value || '').replace(/[-_/]/g, '').toLowerCase();
+}
+
+function displayMarket(market: Market | string | undefined): string {
+  if (!market) return 'BTC/USD';
+  if (typeof market === 'string') {
+    return splitMarketLabel(market);
+  }
+  return market.name || `${String(market.base_unit || '').toUpperCase()}/${String(market.quote_unit || '').toUpperCase()}`;
+}
+
+function splitMarketLabel(marketId: string): string {
+  const id = normalizeMarketId(marketId);
+  const knownQuotes = ['usdt', 'usdc', 'usd', 'eur', 'zar', 'btc', 'eth'];
+  const quote = knownQuotes.find((candidate) => id.endsWith(candidate) && id.length > candidate.length);
+  if (!quote) return id.toUpperCase();
+  return `${id.slice(0, -quote.length).toUpperCase()}/${quote.toUpperCase()}`;
+}
+
+function normalizeTickers(raw: unknown): Ticker[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+
+  return Object.entries(raw).map(([market, value]) => {
+    const wrapper = value as { ticker?: Record<string, unknown> };
+    const ticker = wrapper.ticker || (value as Record<string, unknown>) || {};
+    return {
+      market: normalizeMarketId(ticker.market ?? market),
+      last: toFiniteNumber(ticker.last ?? ticker.lastPrice ?? ticker.last_price ?? ticker.close ?? ticker.price),
+      high: toFiniteNumber(ticker.high),
+      low: toFiniteNumber(ticker.low),
+      volume: toFiniteNumber(ticker.volume ?? ticker.vol),
+      amount: toFiniteNumber(ticker.amount),
+      change: toFiniteNumber(ticker.price_change_percent ?? ticker.change ?? ticker.change_percent),
+    };
+  }).filter((ticker) => ticker.market && Number.isFinite(ticker.last));
+}
+
+function normalizeOrderRows(raw: unknown): OrderRow[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((entry) => {
+    const row = entry as Record<string, unknown>;
+    const price = toFiniteNumber(row.price);
+    const amount = toFiniteNumber(row.remaining_volume ?? row.origin_volume ?? row.volume ?? row.amount ?? row.size);
+    return {
+      price,
+      amount,
+      total: price * amount,
+    };
+  }).filter((row) => row.price > 0 && row.amount >= 0);
+}
+
+function normalizeTrades(raw: unknown): TradeRow[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((entry, index) => {
+    const trade = entry as Record<string, unknown>;
+    const price = toFiniteNumber(trade.price);
+    const amount = toFiniteNumber(trade.amount ?? trade.volume);
+    const createdAt = trade.created_at;
+    return {
+      id: String(trade.id ?? `${price}-${amount}-${index}`),
+      price,
+      amount,
+      total: toFiniteNumber(trade.total, price * amount),
+      side: String(trade.taker_type ?? trade.side ?? 'trade'),
+      createdAt: formatTradeTime(createdAt),
+    };
+  }).filter((trade) => trade.price > 0 && trade.amount >= 0);
+}
+
+function formatTradeTime(value: unknown): string {
+  const numeric = toFiniteNumber(value, Number.NaN);
+  const raw = Number.isFinite(numeric) ? (numeric < 10_000_000_000 ? numeric * 1000 : numeric) : value;
+  const date = new Date(raw as string | number | Date);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '--';
+}
+
+function formatPrice(value: unknown): string {
+  const amount = toFiniteNumber(value);
+  return amount > 0 ? formatCurrency(amount) : '--';
+}
+
+function formatCompactNumber(value: unknown, decimals = 4): string {
+  const amount = toFiniteNumber(value);
+  return amount > 0 ? formatNumber(amount, decimals) : '--';
+}
+
+import { publicApiService } from '@/services/publicService';
+
+async function loadTerminalData(marketId: string): Promise<TerminalData> {
+  try {
+    const [markets, tickersRaw, orderBook, trades] = await Promise.all([
+      publicApiService.getMarkets(),
+      publicApiService.getTickers(),
+      publicApiService.getOrderBook(marketId),
+      publicApiService.getTrades(marketId),
+    ]);
+
+    return {
+      markets: markets.filter((market) => market.status !== 'disabled'),
+      tickers: normalizeTickers(tickersRaw),
+      asks: normalizeOrderRows(orderBook?.asks).slice(0, 8),
+      bids: normalizeOrderRows(orderBook?.bids).slice(0, 8),
+      trades: normalizeTrades(trades).slice(0, 8),
+      lastUpdated: new Date(),
+    };
+  } catch (error) {
+    console.error('Failed to load terminal data:', error);
+    throw error;
+  }
+}
+
+function metricTone(value: number): string {
+  return value >= 0 ? 'text-emerald-300' : 'text-red-300';
+}
 
 export default function HomePage() {
-  const router = useRouter();
-  const { scrollY } = useScroll();
+  const [selectedMarket, setSelectedMarket] = useState(DEFAULT_MARKET);
+  const deferredMarket = useDeferredValue(selectedMarket);
+  const [data, setData] = useState<TerminalData>(emptyTerminalData);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Parallax effects
-  const heroY = useTransform(scrollY, [0, 500], [0, -100]);
-  const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
+  useEffect(() => {
+    let active = true;
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.2
+    const load = async (quiet = false) => {
+      if (!quiet) setIsLoading(true);
+      setIsRefreshing(quiet);
+
+      try {
+        const nextData = await loadTerminalData(deferredMarket);
+        if (!active) return;
+        startTransition(() => {
+          setData(nextData);
+          setError(null);
+        });
+      } catch (loadError) {
+        if (!active) return;
+        const message = loadError instanceof Error ? loadError.message : 'Market data unavailable';
+        startTransition(() => setError(message));
+      } finally {
+        if (active) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
       }
-    }
-  };
+    };
 
-  const itemVariants = {
-    hidden: { y: 30, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.6,
-        ease: "easeOut"
-      }
-    }
-  };
+    load();
+    const interval = window.setInterval(() => load(true), 15000);
 
-  const floatingVariants = {
-    animate: {
-      y: [-10, 10, -10],
-      transition: {
-        duration: 3,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }
-    }
-  };
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [deferredMarket]);
 
-  // Mock data
-  const stats = [
-    { label: 'Trading Volume', value: '$2.5B+', icon: TrendingUp, color: 'text-gradient-primary' },
-    { label: 'Active Users', value: '500K+', icon: Users, color: 'text-gradient-primary' },
-    { label: 'Trading Pairs', value: '150+', icon: BarChart3, color: 'text-gradient-primary' },
-    { label: 'Uptime', value: '99.99%', icon: Activity, color: 'text-gradient-primary' }
-  ];
-
-  const features = [
-    {
-      icon: Zap,
-      title: 'Lightning Fast',
-      description: 'Sub-millisecond order execution with 99.99% uptime guarantee',
-      gradient: 'from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))]',
-      color: 'text-[hsl(var(--trading-accent))]'
-    },
-    {
-      icon: Shield,
-      title: 'Bank-Grade Security',
-      description: 'Multi-layer security with cold storage and insurance protection',
-      gradient: 'from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))]',
-      color: 'text-[hsl(var(--trading-accent))]'
-    },
-    {
-      icon: Cpu,
-      title: 'Advanced Trading',
-      description: 'Professional tools with 100+ technical indicators and AI insights',
-      gradient: 'from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))]',
-      color: 'text-[hsl(var(--trading-accent))]'
-    }
-  ];
-
-  const tradingFeatures = [
-    {
-      title: 'Spot Trading',
-      description: 'Trade 150+ cryptocurrencies with zero fees',
-      icon: Coins,
-      color: 'text-[hsl(var(--trading-accent))]'
-    },
-    {
-      title: 'Futures & Options',
-      description: 'Advanced derivatives with up to 125x leverage',
-      icon: TrendingUp,
-      color: 'text-[hsl(var(--trading-accent))]'
-    },
-    {
-      title: 'Staking & Yield',
-      description: 'Earn up to 15% APY on your crypto holdings',
-      icon: Percent,
-      color: 'text-[hsl(var(--trading-accent))]'
-    },
-    {
-      title: 'NFT Marketplace',
-      description: 'Trade, mint, and collect unique digital assets',
-      icon: Star,
-      color: 'text-[hsl(var(--trading-accent))]'
-    }
-  ];
+  const selectedMarketMeta = data.markets.find((market) => normalizeMarketId(market.symbol) === normalizeMarketId(deferredMarket));
+  const selectedTicker = data.tickers.find((ticker) => normalizeMarketId(ticker.market) === normalizeMarketId(deferredMarket));
+  const marketLeaders = data.tickers.slice(0, 6);
+  const bestAsk = data.asks[0];
+  const bestBid = data.bids[0];
+  const spread = bestAsk && bestBid ? bestAsk.price - bestBid.price : 0;
+  const spreadBps = bestAsk && bestBid && bestAsk.price > 0 ? (spread / bestAsk.price) * 10000 : 0;
+  const quoteVolume = selectedTicker ? selectedTicker.amount || selectedTicker.volume * selectedTicker.last : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] trading-font overflow-hidden">
-      {/* Navigation */}
+    <div className="min-h-screen overflow-hidden bg-[hsl(var(--trading-bg))] text-[hsl(var(--trading-text))]">
       <Navigation />
 
-      {/* Enhanced Hero Section */}
-      <motion.section 
-        className="relative min-h-screen flex items-center justify-center pt-16"
-        style={{ y: heroY, opacity: heroOpacity }}
-      >
-        {/* Enhanced Background Effects */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-[hsl(var(--trading-accent))]/10 to-[hsl(var(--trading-accent-secondary))]/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-[hsl(var(--trading-accent))]/10 to-[hsl(var(--trading-accent-secondary))]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-[hsl(var(--trading-accent))]/5 to-[hsl(var(--trading-accent-secondary))]/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            {/* Enhanced Badge */}
-            <motion.div variants={itemVariants} className="mb-8">
-              <Badge className="badge-gradient-primary px-4 py-2 text-sm border-0 shadow-lg">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Next Generation Trading Platform
-              </Badge>
-            </motion.div>
-
-            {/* Enhanced Main Heading */}
-            <motion.h1 
-              variants={itemVariants}
-              className="text-5xl md:text-7xl lg:text-8xl font-bold text-[hsl(var(--trading-text))] mb-6 leading-tight"
-            >
-              The Future of
-              <span className="block text-gradient-primary">
-                Crypto Trading
-              </span>
-            </motion.h1>
-
-            {/* Enhanced Subtitle */}
-            <motion.p 
-              variants={itemVariants}
-              className="text-xl md:text-2xl text-[hsl(var(--trading-text-secondary))] mb-12 max-w-4xl mx-auto leading-relaxed"
-            >
-              Experience institutional-grade trading with lightning-fast execution, 
-              advanced security, and professional tools designed for serious traders.
-            </motion.p>
-
-            {/* Enhanced CTA Buttons */}
-            <motion.div 
-              variants={itemVariants}
-              className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
-            >
-              <Link href="/trade">
-                <Button size="lg" className="text-lg px-8 py-6 btn-gradient-primary shadow-2xl">
-                  Start Trading
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-              <Link href="/demo">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-[hsl(var(--trading-border))] text-[hsl(var(--trading-text))] hover:bg-[hsl(var(--trading-bg-tertiary))] hover:border-[hsl(var(--trading-accent))] transition-all duration-300">
-                  <Play className="mr-2 h-5 w-5" />
-                  Watch Demo
-                </Button>
-              </Link>
-            </motion.div>
-
-            {/* Enhanced Stats */}
-            <motion.div 
-              variants={itemVariants}
-              className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto"
-            >
-              {stats.map((stat, index) => (
-                <motion.div
-                  key={index}
-                  className="text-center group"
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  <div className={`${stat.color} text-3xl font-bold mb-2 group-hover:scale-110 transition-transform duration-300`}>
-                    {stat.value}
-                  </div>
-                  <div className="text-[hsl(var(--trading-text-muted))] text-sm group-hover:text-[hsl(var(--trading-text-secondary))] transition-colors duration-300">{stat.label}</div>
-                </motion.div>
-              ))}
-            </motion.div>
-          </motion.div>
-        </div>
-
-        {/* Enhanced Floating Elements */}
-        <motion.div
-          className="absolute top-1/4 right-1/4"
-          variants={floatingVariants}
-          animate="animate"
-        >
-          <div className="w-4 h-4 bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] rounded-full shadow-lg"></div>
-        </motion.div>
-        <motion.div
-          className="absolute bottom-1/4 left-1/4"
-          variants={floatingVariants}
-          animate="animate"
-          style={{ animationDelay: '1s' }}
-        >
-          <div className="w-6 h-6 bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] rounded-full shadow-lg"></div>
-        </motion.div>
-      </motion.section>
-
-      {/* Enhanced Features Section */}
-      <motion.section 
-        className="py-24 relative"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.8 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-[hsl(var(--trading-text))] mb-6">
-              Why Choose <span className="text-gradient-primary">Orbitex</span>?
-            </h2>
-            <p className="text-xl text-[hsl(var(--trading-text-secondary))] max-w-3xl mx-auto">
-              Built for traders who demand the best. Experience the difference with our 
-              cutting-edge technology and unwavering commitment to excellence.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: index * 0.2 }}
-                whileHover={{ y: -10 }}
-                className="group"
-              >
-                <Card className="card-gradient-primary hover:border-[hsl(var(--trading-accent))]/30 transition-all duration-300 shadow-xl">
-                  <CardHeader className="text-center">
-                    <motion.div
-                      className={`w-16 h-16 bg-gradient-to-r ${feature.gradient} rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg`}
-                      whileHover={{ rotate: 5 }}
-                    >
-                      <feature.icon className="h-8 w-8 text-white" />
-                    </motion.div>
-                    <CardTitle className="text-[hsl(var(--trading-text))] text-2xl group-hover:text-gradient-primary transition-all duration-300">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-[hsl(var(--trading-text-secondary))] text-lg leading-relaxed group-hover:text-[hsl(var(--trading-text))] transition-colors duration-300">
-                      {feature.description}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Enhanced Trading Platform Preview with Laptop Design */}
-      <motion.section 
-        className="py-24 bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] relative overflow-hidden"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.8 }}
-      >
-        {/* Enhanced Background Effects */}
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-[hsl(var(--trading-accent))]/5 to-[hsl(var(--trading-accent-secondary))]/5 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-[hsl(var(--trading-accent))]/5 to-[hsl(var(--trading-accent-secondary))]/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-[hsl(var(--trading-accent))]/3 to-[hsl(var(--trading-accent-secondary))]/3 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-[hsl(var(--trading-text))] mb-6">
-              Professional <span className="text-gradient-primary">Trading Platform</span>
-            </h2>
-            <p className="text-xl text-[hsl(var(--trading-text-secondary))] max-w-3xl mx-auto">
-              Experience the power of institutional-grade trading tools with our 
-              advanced platform designed for serious traders.
-            </p>
-          </motion.div>
-
-          {/* Enhanced Professional Trading Platform Display - OKX Style */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="relative max-w-7xl mx-auto"
-          >
-            {/* Enhanced Main Container */}
-            <div className="relative">
-              {/* Enhanced Laptop Frame - Cleaner Design */}
-              <div className="relative bg-gradient-to-b from-[hsl(var(--trading-bg-tertiary))] to-[hsl(var(--trading-bg))] rounded-t-2xl border-4 border-[hsl(var(--trading-border))] shadow-2xl overflow-hidden">
-                {/* Enhanced Screen Bezel - Thinner */}
-                <div className="bg-[hsl(var(--trading-bg))] p-1">
-                  {/* Enhanced Camera - Smaller */}
-                  <div className="w-2 h-2 bg-gradient-to-r from-[hsl(var(--trading-border))] to-[hsl(var(--trading-bg-tertiary))] rounded-full mx-auto mb-1"></div>
-                  
-                  {/* Enhanced Screen Content - Trade.png Image with Better Proportions */}
-                  <div className="bg-[hsl(var(--trading-bg))] rounded-lg overflow-hidden relative">
-                    <img 
-                      src="/trade.png" 
-                      alt="Orbitex Trading Platform" 
-                      className="w-full h-auto object-cover"
-                      style={{ 
-                        maxHeight: '500px',
-                        minHeight: '400px',
-                        objectPosition: 'center top'
-                      }}
-                    />
-                    
-                    {/* Enhanced Overlay for Professional Look */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--trading-bg))]/20 to-transparent pointer-events-none"></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Enhanced Laptop Base - Thinner */}
-              <div className="bg-gradient-to-b from-[hsl(var(--trading-border))] to-[hsl(var(--trading-bg-secondary))] h-6 rounded-b-2xl border-4 border-[hsl(var(--trading-border))] border-t-0 shadow-2xl">
-                <div className="flex items-center justify-center h-full">
-                  <div className="w-24 h-0.5 bg-gradient-to-r from-[hsl(var(--trading-bg-tertiary))] to-[hsl(var(--trading-border))] rounded-full"></div>
-                </div>
-              </div>
-
-              {/* Enhanced Laptop Stand - More Subtle */}
-              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-                <div className="w-16 h-2 bg-gradient-to-r from-[hsl(var(--trading-border))] to-[hsl(var(--trading-bg-tertiary))] rounded-full"></div>
-              </div>
-            </div>
-
-            {/* Enhanced Floating Elements for Professional Touch */}
-            <motion.div
-              className="absolute -top-4 -right-4 w-8 h-8 bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] rounded-full opacity-20"
-              animate={{ 
-                scale: [1, 1.2, 1],
-                opacity: [0.2, 0.4, 0.2]
-              }}
-              transition={{ 
-                duration: 3,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
+      <main className="relative">
+        <section className="relative min-h-[calc(100vh-4rem)] overflow-hidden border-b border-slate-800/80">
+          <div className="absolute inset-0">
+            <img
+              src="/trade.png"
+              alt=""
+              aria-hidden="true"
+              className="h-full w-full object-cover opacity-18"
             />
-            <motion.div
-              className="absolute -bottom-4 -left-4 w-6 h-6 bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] rounded-full opacity-15"
-              animate={{ 
-                scale: [1, 1.3, 1],
-                opacity: [0.15, 0.3, 0.15]
-              }}
-              transition={{ 
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 1
-              }}
-            />
-          </motion.div>
-
-          {/* Enhanced Advanced Trading Features Surrounding the Laptop */}
-          <div className="mt-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {tradingFeatures.map((feature, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                whileHover={{ y: -10, scale: 1.05 }}
-                className="group"
-              >
-                <Card className="card-gradient-primary hover:border-[hsl(var(--trading-accent))]/30 transition-all duration-300 relative overflow-hidden shadow-xl">
-                  {/* Enhanced Hover Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[hsl(var(--trading-accent))]/5 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-                  
-                  <CardHeader className="pb-3 relative z-10">
-                    <motion.div 
-                      className={`${feature.color} w-12 h-12 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300 bg-gradient-to-r from-[hsl(var(--trading-accent))]/10 to-[hsl(var(--trading-accent-secondary))]/10`}
-                      whileHover={{ rotate: 5 }}
-                    >
-                      <feature.icon className="h-6 w-6" />
-                    </motion.div>
-                    <CardTitle className="text-[hsl(var(--trading-text))] group-hover:text-gradient-primary transition-colors duration-300">
-                      {feature.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="relative z-10">
-                    <CardDescription className="text-[hsl(var(--trading-text-secondary))] group-hover:text-[hsl(var(--trading-text))] transition-colors duration-300">
-                      {feature.description}
-                    </CardDescription>
-                    <motion.div
-                      className="mt-3 flex items-center text-gradient-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                      initial={{ x: -10 }}
-                      whileHover={{ x: 0 }}
-                    >
-                      Learn More
-                      <ArrowRight className="ml-1 h-3 w-3" />
-                    </motion.div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,hsl(var(--trading-bg))_0%,hsl(var(--trading-bg)/0.94)_38%,hsl(var(--trading-bg)/0.76)_100%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.045)_1px,transparent_1px)] bg-[size:44px_44px]" />
           </div>
 
-          {/* Enhanced Interactive Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8"
-          >
-            {[
-              { label: 'Order Execution', value: '<1ms', icon: Zap, color: 'text-gradient-primary' },
-              { label: 'Uptime', value: '99.99%', icon: Activity, color: 'text-gradient-primary' },
-              { label: 'Security', value: 'Bank-Grade', icon: Shield, color: 'text-gradient-primary' },
-              { label: 'Support', value: '24/7', icon: Users, color: 'text-gradient-primary' }
-            ].map((stat, index) => (
-              <motion.div
-                key={index}
-                className="text-center group cursor-pointer"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 300 }}
-              >
-                <motion.div
-                  className={`${stat.color} text-3xl font-bold mb-2 group-hover:scale-110 transition-transform duration-300`}
-                  whileHover={{ rotate: 5 }}
-                >
-                  <stat.icon className="h-8 w-8 mx-auto mb-2" />
-                  {stat.value}
-                </motion.div>
-                <div className="text-[hsl(var(--trading-text-muted))] text-sm group-hover:text-[hsl(var(--trading-text-secondary))] transition-colors duration-300">
-                  {stat.label}
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </motion.section>
-
-      {/* Enhanced CTA Section */}
-      <motion.section 
-        className="py-24 bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))]"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.8 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Ready to Start Trading?
-            </h2>
-            <p className="text-xl text-white/80 mb-8 max-w-3xl mx-auto">
-              Join thousands of traders who trust Orbitex for their cryptocurrency trading needs.
-              Start your journey today with our professional-grade platform.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/signup">
-                <Button size="lg" className="text-lg px-8 py-6 bg-white text-[hsl(var(--trading-accent))] hover:bg-gray-100 shadow-2xl transition-all duration-300">
-                  Get Started Free
-                </Button>
-              </Link>
-              <Link href="/trade">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-white text-white hover:bg-white hover:text-[hsl(var(--trading-accent))] transition-all duration-300">
-                  View Demo
-                </Button>
-              </Link>
-            </div>
-          </motion.div>
-        </div>
-      </motion.section>
-
-      {/* Enhanced Footer */}
-      <motion.footer 
-        className="bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] text-[hsl(var(--trading-text))] py-12 border-t border-[hsl(var(--trading-border))]"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.8 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="relative mx-auto grid w-full max-w-[1800px] grid-cols-1 gap-5 px-4 py-6 sm:px-5 lg:grid-cols-[0.88fr_1.12fr] lg:px-6 xl:py-8">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="flex min-h-[34rem] flex-col justify-between gap-6 py-2"
             >
-              <div className="flex items-center mb-4">
-                <div className="h-8 w-8 bg-gradient-to-r from-[hsl(var(--trading-accent))] to-[hsl(var(--trading-accent-secondary))] rounded-lg flex items-center justify-center mr-2 shadow-lg">
-                  <span className="text-white font-bold">O</span>
+              <div>
+                <div className="mb-4 inline-flex items-center gap-2 border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-[11px] font-semibold uppercase text-emerald-200">
+                  <Activity className="h-3.5 w-3.5" />
+                  Global digital asset exchange
                 </div>
-                <span className="text-xl font-bold text-gradient-primary">Orbitex</span>
+                <h1 className="max-w-3xl text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl">
+                  Orbitex
+                </h1>
+                <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
+                  Institutional crypto market access with live execution surfaces, guarded account operations, and dense trading intelligence built for professional desks.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <Link
+                    href="/auth/signin"
+                    className="inline-flex h-10 items-center justify-center rounded-md bg-emerald-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+                  >
+                    Sign In
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/trade"
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-slate-700 bg-slate-950/70 px-4 text-sm font-semibold text-slate-100 transition hover:border-emerald-300/60 hover:bg-slate-900"
+                  >
+                    Open Trade Desk
+                  </Link>
+                  <Link
+                    href="/dashboard"
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-slate-800 bg-slate-950/40 px-4 text-sm font-semibold text-slate-300 transition hover:text-white"
+                  >
+                    Dashboard
+                  </Link>
+                </div>
               </div>
-              <p className="text-[hsl(var(--trading-text-muted))]">
-                Advanced cryptocurrency trading platform for professional traders.
-              </p>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <TrustMetric icon={ShieldCheck} label="Custody Controls" value="Layered" />
+                <TrustMetric icon={Zap} label="Execution Path" value="<1s" />
+                <TrustMetric icon={Globe2} label="Markets" value={`${data.markets.length || '--'}`} />
+                <TrustMetric icon={Clock3} label="Uptime Target" value="99.99%" />
+              </div>
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.08 }}
+              className="min-w-0"
             >
-              <h3 className="font-semibold mb-4 text-gradient-primary">Product</h3>
-              <ul className="space-y-2 text-[hsl(var(--trading-text-muted))]">
-                <li><Link href="/trade" className="hover:text-gradient-primary transition-colors duration-300">Trading</Link></li>
-                <li><Link href="/wallets" className="hover:text-gradient-primary transition-colors duration-300">Wallets</Link></li>
-                <li><Link href="/earn" className="hover:text-gradient-primary transition-colors duration-300">Earn</Link></li>
-                <li><Link href="/api" className="hover:text-gradient-primary transition-colors duration-300">API</Link></li>
-              </ul>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              <h3 className="font-semibold mb-4 text-gradient-primary">Support</h3>
-              <ul className="space-y-2 text-[hsl(var(--trading-text-muted))]">
-                <li><Link href="/help" className="hover:text-gradient-primary transition-colors duration-300">Help Center</Link></li>
-                <li><Link href="/contact" className="hover:text-gradient-primary transition-colors duration-300">Contact Us</Link></li>
-                <li><Link href="/status" className="hover:text-gradient-primary transition-colors duration-300">System Status</Link></li>
-                <li><Link href="/security" className="hover:text-gradient-primary transition-colors duration-300">Security</Link></li>
-              </ul>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              <h3 className="font-semibold mb-4 text-gradient-primary">Company</h3>
-              <ul className="space-y-2 text-[hsl(var(--trading-text-muted))]">
-                <li><Link href="/about" className="hover:text-gradient-primary transition-colors duration-300">About</Link></li>
-                <li><Link href="/careers" className="hover:text-gradient-primary transition-colors duration-300">Careers</Link></li>
-                <li><Link href="/press" className="hover:text-gradient-primary transition-colors duration-300">Press</Link></li>
-                <li><Link href="/legal" className="hover:text-gradient-primary transition-colors duration-300">Legal</Link></li>
-              </ul>
+              <LiveTerminal
+                data={data}
+                error={error}
+                isLoading={isLoading}
+                isRefreshing={isRefreshing}
+                marketLeaders={marketLeaders}
+                quoteVolume={quoteVolume}
+                selectedMarket={selectedMarket}
+                selectedMarketMeta={selectedMarketMeta}
+                selectedTicker={selectedTicker}
+                spread={spread}
+                spreadBps={spreadBps}
+                onMarketChange={setSelectedMarket}
+              />
             </motion.div>
           </div>
+        </section>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="border-t border-[hsl(var(--trading-border))] mt-8 pt-8 text-center text-[hsl(var(--trading-text-muted))]"
-          >
-            <p>&copy; 2025 Orbitex. All rights reserved.</p>
-          </motion.div>
+        <section className="border-b border-slate-800/80 bg-slate-950/60">
+          <div className="mx-auto grid max-w-[1800px] grid-cols-1 gap-4 px-4 py-5 sm:px-5 md:grid-cols-3 lg:px-6">
+            <CapabilityCard icon={LockKeyhole} title="Account Security" text="Bearer-token protected account routes, guarded role access, and hardened operational controls." />
+            <CapabilityCard icon={LineChart} title="Market Intelligence" text="Live ticker, order-book, and recent trade feeds normalized for dense professional workflows." />
+            <CapabilityCard icon={Sparkles} title="Local Agents" text="Deterministic in-browser agents summarize liquidity, activity, and execution posture without new secrets." />
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function TrustMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+  return (
+    <div className="border border-slate-800 bg-slate-950/70 p-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <Icon className="h-4 w-4 text-emerald-300" />
+        <CheckCircle2 className="h-3.5 w-3.5 text-slate-500" />
+      </div>
+      <div className="text-lg font-semibold text-white">{value}</div>
+      <div className="mt-1 text-[11px] uppercase text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+function LiveTerminal({
+  data,
+  error,
+  isLoading,
+  isRefreshing,
+  marketLeaders,
+  onMarketChange,
+  quoteVolume,
+  selectedMarket,
+  selectedMarketMeta,
+  selectedTicker,
+  spread,
+  spreadBps,
+}: {
+  data: TerminalData;
+  error: string | null;
+  isLoading: boolean;
+  isRefreshing: boolean;
+  marketLeaders: Ticker[];
+  onMarketChange: (market: string) => void;
+  quoteVolume: number;
+  selectedMarket: string;
+  selectedMarketMeta: Market | undefined;
+  selectedTicker: Ticker | undefined;
+  spread: number;
+  spreadBps: number;
+}) {
+  return (
+    <div className="border border-slate-800 bg-slate-950/88 shadow-2xl shadow-black/30 backdrop-blur">
+      <div className="flex flex-col gap-3 border-b border-slate-800 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] uppercase text-slate-500">
+            <span className="h-2 w-2 rounded-full bg-emerald-300" />
+            HTTP live terminal
+            {isRefreshing && <RefreshCw className="h-3 w-3 animate-spin text-emerald-300" />}
+          </div>
+          <div className="mt-1 flex items-baseline gap-3">
+            <h2 className="text-xl font-semibold text-white">{displayMarket(selectedMarketMeta || selectedMarket)}</h2>
+            <span className={cn('font-mono text-sm', metricTone(selectedTicker?.change || 0))}>
+              {selectedTicker ? formatPercentage(selectedTicker.change) : '--'}
+            </span>
+          </div>
         </div>
-      </motion.footer>
+        <select
+          value={selectedMarket}
+          onChange={(event) => onMarketChange(normalizeMarketId(event.target.value))}
+          className="h-9 rounded-md border border-slate-700 bg-[hsl(222_40%_8%_/_1)] px-3 text-sm text-slate-100 outline-none transition focus:border-emerald-300"
+        >
+          {(data.markets.length ? data.markets : [{ symbol: DEFAULT_MARKET, name: 'BTC/USD' }]).map((market: any) => (
+            <option key={market.symbol} value={normalizeMarketId(market.symbol)}>
+              {displayMarket(market)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {error && (
+        <div className="border-b border-amber-300/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+          Market data delayed: {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 border-b border-slate-800 sm:grid-cols-4">
+        <TerminalMetric label="Last Price" value={formatPrice(selectedTicker?.last)} />
+        <TerminalMetric label="24h High" value={formatPrice(selectedTicker?.high)} />
+        <TerminalMetric label="24h Low" value={formatPrice(selectedTicker?.low)} />
+        <TerminalMetric label="Quote Volume" value={formatPrice(quoteVolume)} />
+      </div>
+
+      <div className="border-b border-slate-800 p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <span className="text-xs font-semibold uppercase text-slate-400">Market Pulse</span>
+          <span className="text-[11px] text-slate-500">
+            {data.lastUpdated ? data.lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--'}
+          </span>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {marketLeaders.length ? marketLeaders.map((ticker) => (
+            <button
+              key={ticker.market}
+              type="button"
+              onClick={() => onMarketChange(ticker.market)}
+              className={cn(
+                'min-w-[9.5rem] border px-3 py-2 text-left transition',
+                normalizeMarketId(selectedMarket) === normalizeMarketId(ticker.market)
+                  ? 'border-emerald-300/60 bg-emerald-300/10'
+                  : 'border-slate-800 bg-slate-900/60 hover:border-slate-600'
+              )}
+            >
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-white">{splitMarketLabel(ticker.market)}</span>
+                {ticker.change >= 0 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-300" /> : <TrendingDown className="h-3.5 w-3.5 text-red-300" />}
+              </div>
+              <div className="mt-1 font-mono text-xs text-slate-300">{formatPrice(ticker.last)}</div>
+            </button>
+          )) : (
+            <div className="w-full border border-dashed border-slate-800 px-3 py-4 text-center text-xs text-slate-500">
+              {isLoading ? 'Loading markets...' : 'No ticker rows returned.'}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid min-h-[24rem] grid-cols-1 lg:grid-cols-[1fr_0.9fr]">
+        <div className="border-b border-slate-800 lg:border-b-0 lg:border-r">
+          <div className="grid grid-cols-2 border-b border-slate-800">
+            <AgentTile label="Spread" value={spread > 0 ? `${formatCurrency(spread)} / ${formatNumber(spreadBps, 1)} bps` : '--'} tone="emerald" />
+            <AgentTile label="Liquidity Agent" value={data.asks.length + data.bids.length > 8 ? 'Depth normal' : 'Thin book'} tone={data.asks.length + data.bids.length > 8 ? 'emerald' : 'amber'} />
+          </div>
+          <OrderBookTable asks={data.asks} bids={data.bids} loading={isLoading} />
+        </div>
+        <div>
+          <div className="border-b border-slate-800 px-3 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase text-slate-400">Recent Trades</span>
+              <BarChart3 className="h-4 w-4 text-slate-500" />
+            </div>
+          </div>
+          <RecentTrades trades={data.trades} loading={isLoading} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TerminalMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-r border-slate-800 p-3 last:border-r-0">
+      <div className="text-[11px] uppercase text-slate-500">{label}</div>
+      <div className="mt-1 font-mono text-sm font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
+function AgentTile({ label, value, tone }: { label: string; value: string; tone: 'emerald' | 'amber' }) {
+  return (
+    <div className="p-3">
+      <div className="text-[11px] uppercase text-slate-500">{label}</div>
+      <div className={cn('mt-1 text-sm font-semibold', tone === 'emerald' ? 'text-emerald-200' : 'text-amber-200')}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function OrderBookTable({ asks, bids, loading }: { asks: OrderRow[]; bids: OrderRow[]; loading: boolean }) {
+  const rows = [...asks.map((row) => ({ ...row, side: 'ask' })), ...bids.map((row) => ({ ...row, side: 'bid' }))];
+
+  return (
+    <div className="p-3">
+      <div className="mb-2 grid grid-cols-3 text-[11px] uppercase text-slate-500">
+        <span>Price</span>
+        <span className="text-right">Size</span>
+        <span className="text-right">Total</span>
+      </div>
+      <div className="space-y-1">
+        {rows.length ? rows.map((row, index) => (
+          <div key={`${row.side}-${row.price}-${index}`} className="grid grid-cols-3 rounded-sm bg-slate-900/45 px-2 py-1.5 font-mono text-xs">
+            <span className={row.side === 'ask' ? 'text-red-300' : 'text-emerald-300'}>{formatPrice(row.price)}</span>
+            <span className="text-right text-slate-300">{formatCompactNumber(row.amount, 5)}</span>
+            <span className="text-right text-slate-500">{formatPrice(row.total)}</span>
+          </div>
+        )) : (
+          <div className="border border-dashed border-slate-800 py-12 text-center text-xs text-slate-500">
+            {loading ? 'Loading order book...' : 'Order book is empty.'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RecentTrades({ trades, loading }: { trades: TradeRow[]; loading: boolean }) {
+  return (
+    <div className="p-3">
+      <div className="mb-2 grid grid-cols-[0.7fr_1fr_1fr] text-[11px] uppercase text-slate-500">
+        <span>Time</span>
+        <span className="text-right">Price</span>
+        <span className="text-right">Amount</span>
+      </div>
+      <div className="space-y-1">
+        {trades.length ? trades.map((trade) => (
+          <div key={trade.id} className="grid grid-cols-[0.7fr_1fr_1fr] rounded-sm bg-slate-900/45 px-2 py-1.5 font-mono text-xs">
+            <span className="text-slate-500">{trade.createdAt}</span>
+            <span className={cn('text-right', trade.side === 'sell' ? 'text-red-300' : 'text-emerald-300')}>{formatPrice(trade.price)}</span>
+            <span className="text-right text-slate-300">{formatCompactNumber(trade.amount, 5)}</span>
+          </div>
+        )) : (
+          <div className="border border-dashed border-slate-800 py-12 text-center text-xs text-slate-500">
+            {loading ? 'Loading trades...' : 'No recent trades returned.'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CapabilityCard({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
+  return (
+    <div className="border border-slate-800 bg-slate-950/70 p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <Icon className="h-5 w-5 text-emerald-300" />
+        <span className="h-px w-14 bg-gradient-to-r from-emerald-300/80 to-transparent" />
+      </div>
+      <h3 className="text-base font-semibold text-white">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-400">{text}</p>
     </div>
   );
 }

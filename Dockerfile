@@ -1,5 +1,5 @@
 # Multi-stage build for Next.js frontend
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -23,10 +23,10 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
 
 # Build-time environment variables for Next.js (NEXT_PUBLIC_* must be set at build time)
-ARG NEXT_PUBLIC_API_URL=https://orbitex-976099405307.us-central1.run.app
-ARG NEXT_PUBLIC_AUTH_SERVICE_URL=https://orbisigner-976099405307.us-central1.run.app/api/v2/identity
-ARG NEXT_PUBLIC_FRONTEND_URL=https://orbitex-frontend-976099405307.us-central1.run.app
-ARG NEXT_PUBLIC_WS_URL=wss://socketeer-976099405307.us-central1.run.app/public
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_AUTH_SERVICE_URL
+ARG NEXT_PUBLIC_FRONTEND_URL
+ARG NEXT_PUBLIC_WS_URL
 ARG NEXT_PUBLIC_ENABLE_2FA=false
 ARG NEXT_PUBLIC_ENABLE_KYC=false
 ARG NEXT_PUBLIC_ENABLE_WEBAUTHN=false

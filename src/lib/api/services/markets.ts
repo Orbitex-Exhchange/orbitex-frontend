@@ -1,9 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api-client';
+import {
+  BACKEND_RUST_ENDPOINTS,
+  normalizeBackendMarkets,
+  normalizeBackendOrderBook,
+  normalizeBackendTicker,
+  normalizeBackendTrades,
+} from '../backend-rust';
 
 // Markets API endpoints - Updated to match our backend
 const MARKETS_ENDPOINTS = {
-  list: '/api/v2/public/markets',
+  list: BACKEND_RUST_ENDPOINTS.public.markets,
   ticker: '/api/v2/public/markets/:id/tickers',
   orderBook: '/api/v2/public/markets/:id/order-book',
   trades: '/api/v2/public/markets/:id/trades',
@@ -13,25 +20,25 @@ const MARKETS_ENDPOINTS = {
 // Real API functions - Connected to our backend (Standalone to avoid TDZ)
 export const getMarkets = async (): Promise<any> => {
   const response = await api.get(MARKETS_ENDPOINTS.list);
-  return response;
+  return normalizeBackendMarkets(response);
 };
 
 export const getMarketTicker = async (marketId: string): Promise<any> => {
   const url = MARKETS_ENDPOINTS.ticker.replace(':id', marketId);
   const response = await api.get(url);
-  return response;
+  return normalizeBackendTicker(response, marketId);
 };
 
 export const getOrderBook = async (marketId: string, limit: number = 20) => {
   const url = `${MARKETS_ENDPOINTS.orderBook.replace(':id', marketId)}?asks_limit=${limit}&bids_limit=${limit}`;
   const response = await api.get(url);
-  return response;
+  return normalizeBackendOrderBook(response, marketId);
 };
 
 export const getTrades = async (marketId: string, limit: number = 50) => {
   const url = `${MARKETS_ENDPOINTS.trades.replace(':id', marketId)}?limit=${limit}`;
   const response = await api.get(url);
-  return response;
+  return normalizeBackendTrades(response, marketId);
 };
 
 // React Query hooks - Connected to real backend

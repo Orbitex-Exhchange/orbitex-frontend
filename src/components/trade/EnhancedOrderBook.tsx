@@ -22,7 +22,7 @@ import {
   Clock,
   BookOpen
 } from 'lucide-react';
-import { cn, formatNumber } from '../../lib/utils';
+import { cn, formatNumber, toFiniteNumber } from '../../lib/utils';
 import { env } from '@/lib/env';
 
 interface OrderBookProps {
@@ -65,6 +65,80 @@ const priceGroupings = [
   { value: 100, label: '100' }
 ];
 
+const normalizeOrderEntry = (entry: any, runningTotal: number): OrderBookEntry | null => {
+  let priceValue;
+  let sizeValue;
+
+  if (Array.isArray(entry)) {
+    [priceValue, sizeValue] = entry;
+  } else {
+    priceValue = entry?.price;
+    sizeValue = entry?.remaining_volume ??
+      entry?.origin_volume ??
+      entry?.amount ??
+      entry?.volume ??
+      entry?.size;
+  }
+
+  const price = toFiniteNumber(priceValue, NaN);
+  const size = Math.max(toFiniteNumber(sizeValue), 0);
+
+  if (!Number.isFinite(price) || price <= 0) {
+    return null;
+  }
+
+  return {
+    price,
+    size,
+    total: runningTotal + size,
+    percentage: 0
+  };
+};
+
+const normalizeProcessedEntry = (entry: any): OrderBookEntry | null => {
+  const price = toFiniteNumber(entry?.price, NaN);
+  const size = Math.max(toFiniteNumber(
+    entry?.size ??
+    entry?.quantity ??
+    entry?.remaining_volume ??
+    entry?.origin_volume ??
+    entry?.amount ??
+    entry?.volume
+  ), 0);
+  const total = Math.max(toFiniteNumber(entry?.total, size), 0);
+  const percentage = Math.max(toFiniteNumber(entry?.percentage), 0);
+
+  if (!Number.isFinite(price) || price <= 0) {
+    return null;
+  }
+
+  return { price, size, total, percentage };
+};
+
+const validOrderEntry = (entry: OrderBookEntry | null): entry is OrderBookEntry => Boolean(entry);
+
+const normalizeTradeTimestamp = (value: unknown): number => {
+  const numeric = toFiniteNumber(value, NaN);
+  if (Number.isFinite(numeric)) {
+    return numeric > 10_000_000_000 ? numeric : numeric * 1000;
+  }
+
+  const parsed = new Date(String(value)).getTime();
+  return Number.isFinite(parsed) ? parsed : Date.now();
+};
+
+const splitMarketSymbol = (market: string): [string, string] => {
+  if (market.includes('-')) {
+    const [base = '', quote = ''] = market.split('-');
+    return [base.toUpperCase(), quote.toUpperCase()];
+  }
+
+  const normalized = market.replace(/[-_/]/g, '').toUpperCase();
+  const quote = ['USDT', 'USDC', 'USD', 'EUR', 'ZAR'].find((candidate) => normalized.endsWith(candidate)) || '';
+  const base = quote ? normalized.slice(0, -quote.length) : normalized.slice(0, 3);
+  return [base, quote || normalized.slice(base.length)];
+};
+
 export const EnhancedOrderBook = React.memo(({
   market = 'BTC-USDT',
   onPriceClick,
@@ -73,6 +147,7 @@ export const EnhancedOrderBook = React.memo(({
   marketTradesData: propMarketTradesData
 }: OrderBookProps) => {
   const { theme } = useTheme();
+  const [baseAsset, quoteAsset] = splitMarketSymbol(market);
 
   // Zustand store hooks
   const orderBookData = useOrderBookData();
@@ -119,53 +194,27 @@ export const EnhancedOrderBook = React.memo(({
 
       if (realOrderBookData.bids && Array.isArray(realOrderBookData.bids)) {
         if (isProcessed(realOrderBookData.bids)) {
-          processedBids = [...realOrderBookData.bids];
+          processedBids = realOrderBookData.bids.map(normalizeProcessedEntry).filter(validOrderEntry);
         } else {
           let runningBids = 0;
           processedBids = realOrderBookData.bids.map((entry: any) => {
-            let priceStr, amountStr;
-            if (Array.isArray(entry)) {
-              [priceStr, amountStr] = entry;
-            } else {
-              priceStr = entry.price;
-              amountStr = entry.amount || entry.size;
-            }
-            const priceNum = parseFloat(priceStr);
-            const amountNum = parseFloat(amountStr);
-            runningBids += amountNum;
-            return {
-              price: priceNum,
-              size: amountNum,
-              total: runningBids,
-              percentage: 0
-            };
-          });
+            const normalized = normalizeOrderEntry(entry, runningBids);
+            if (normalized) runningBids = normalized.total;
+            return normalized;
+          }).filter(validOrderEntry);
         }
       }
 
       if (realOrderBookData.asks && Array.isArray(realOrderBookData.asks)) {
         if (isProcessed(realOrderBookData.asks)) {
-          processedAsks = [...realOrderBookData.asks];
+          processedAsks = realOrderBookData.asks.map(normalizeProcessedEntry).filter(validOrderEntry);
         } else {
           let runningAsks = 0;
           processedAsks = realOrderBookData.asks.map((entry: any) => {
-            let priceStr, amountStr;
-            if (Array.isArray(entry)) {
-              [priceStr, amountStr] = entry;
-            } else {
-              priceStr = entry.price;
-              amountStr = entry.amount || entry.size;
-            }
-            const priceNum = parseFloat(priceStr);
-            const amountNum = parseFloat(amountStr);
-            runningAsks += amountNum;
-            return {
-              price: priceNum,
-              size: amountNum,
-              total: runningAsks,
-              percentage: 0
-            };
-          });
+            const normalized = normalizeOrderEntry(entry, runningAsks);
+            if (normalized) runningAsks = normalized.total;
+            return normalized;
+          }).filter(validOrderEntry);
         }
       }
 
@@ -179,8 +228,8 @@ export const EnhancedOrderBook = React.memo(({
         processedBids[processedBids.length - 1]?.total || 0,
         1
       );
-      processedAsks.forEach(ask => ask.percentage = (ask.total / maxTotal) * 100);
-      processedBids.forEach(bid => bid.percentage = (bid.total / maxTotal) * 100);
+      processedAsks.forEach(ask => ask.percentage = Math.min(100, (ask.total / maxTotal) * 100));
+      processedBids.forEach(bid => bid.percentage = Math.min(100, (bid.total / maxTotal) * 100));
 
       // Calculate spread
       const bestBid = processedBids[0]?.price || 0;
@@ -216,21 +265,21 @@ export const EnhancedOrderBook = React.memo(({
       if (propMarketTradesData) {
         return propMarketTradesData.map((trade: any) => ({
           id: trade.id.toString(),
-          price: parseFloat(trade.price),
-          size: parseFloat(trade.volume),
-          side: trade.side as 'buy' | 'sell',
-          timestamp: new Date(trade.created_at).getTime()
-        }));
+          price: toFiniteNumber(trade.price),
+          size: toFiniteNumber(trade.volume ?? trade.amount ?? trade.size),
+          side: (trade.side ?? trade.taker_type ?? 'buy') as 'buy' | 'sell',
+          timestamp: normalizeTradeTimestamp(trade.created_at)
+        })).filter((trade) => trade.price > 0);
       }
       // Handle store data format
       if (recentTrades && Array.isArray(recentTrades)) {
         return recentTrades.map((trade: any) => ({
           id: trade.id?.toString() || `trade-${Date.now()}-${Math.random()}`,
-          price: parseFloat(trade.price || trade.price),
-          size: parseFloat(trade.volume || trade.size),
-          side: trade.side as 'buy' | 'sell',
-          timestamp: new Date(trade.created_at || trade.timestamp).getTime()
-        }));
+          price: toFiniteNumber(trade.price),
+          size: toFiniteNumber(trade.volume ?? trade.amount ?? trade.size),
+          side: (trade.side ?? trade.taker_type ?? 'buy') as 'buy' | 'sell',
+          timestamp: normalizeTradeTimestamp(trade.created_at ?? trade.timestamp)
+        })).filter((trade) => trade.price > 0);
       }
       return realTradesData;
     }
@@ -307,8 +356,7 @@ export const EnhancedOrderBook = React.memo(({
     const fetchOrderBook = async () => {
       try {
         const limit = Math.max(orderBookSettings.depth, 20);
-        // Use /depth endpoint that returns simple [price, amount] arrays
-        const url = `${apiBase}/api/v2/public/markets/${symbol}/depth?limit=${limit}`;
+        const url = `${apiBase}/api/v2/public/markets/${symbol}/order-book?limit=${limit}`;
         console.log('Fetching order book from:', url);
 
         const res = await fetch(url);
@@ -325,8 +373,8 @@ export const EnhancedOrderBook = React.memo(({
         const rawBids = data.bids || [];
 
         // If bids are higher than asks, they might be swapped
-        const firstBidPrice = rawBids[0] ? parseFloat(rawBids[0][0]) : 0;
-        const firstAskPrice = rawAsks[0] ? parseFloat(rawAsks[0][0]) : 0;
+        const firstBidPrice = rawBids[0] ? toFiniteNumber(Array.isArray(rawBids[0]) ? rawBids[0][0] : rawBids[0]?.price) : 0;
+        const firstAskPrice = rawAsks[0] ? toFiniteNumber(Array.isArray(rawAsks[0]) ? rawAsks[0][0] : rawAsks[0]?.price) : 0;
 
         let asksRaw: [string, string][];
         let bidsRaw: [string, string][];
@@ -343,31 +391,15 @@ export const EnhancedOrderBook = React.memo(({
         let runningAsks = 0;
         let runningBids = 0;
         let asks = asksRaw.map((entry: any) => {
-          let priceStr, sizeStr;
-          if (Array.isArray(entry)) {
-            [priceStr, sizeStr] = entry;
-          } else {
-            priceStr = entry.price;
-            sizeStr = entry.amount || entry.volume || entry.size || '0';
-          }
-          const price = parseFloat(priceStr);
-          const size = parseFloat(sizeStr);
-          runningAsks += size;
-          return { price, size, total: runningAsks, percentage: 0 } as OrderBookEntry;
-        });
+          const normalized = normalizeOrderEntry(entry, runningAsks);
+          if (normalized) runningAsks = normalized.total;
+          return normalized;
+        }).filter(validOrderEntry);
         let bids = bidsRaw.map((entry: any) => {
-          let priceStr, sizeStr;
-          if (Array.isArray(entry)) {
-            [priceStr, sizeStr] = entry;
-          } else {
-            priceStr = entry.price;
-            sizeStr = entry.amount || entry.volume || entry.size || '0';
-          }
-          const price = parseFloat(priceStr);
-          const size = parseFloat(sizeStr);
-          runningBids += size;
-          return { price, size, total: runningBids, percentage: 0 } as OrderBookEntry;
-        });
+          const normalized = normalizeOrderEntry(entry, runningBids);
+          if (normalized) runningBids = normalized.total;
+          return normalized;
+        }).filter(validOrderEntry);
 
         // Sort: bids descending by price (highest first); asks ascending by price (lowest first)
         bids = bids.sort((a, b) => b.price - a.price);
@@ -377,15 +409,15 @@ export const EnhancedOrderBook = React.memo(({
         console.log('Sorted asks (lowest first):', asks.slice(0, 3));
 
         const maxTotal = Math.max(runningAsks, runningBids, 1);
-        asks.forEach(x => (x.percentage = (x.total / maxTotal) * 100));
-        bids.forEach(x => (x.percentage = (x.total / maxTotal) * 100));
+        asks.forEach(x => (x.percentage = Math.min(100, (x.total / maxTotal) * 100)));
+        bids.forEach(x => (x.percentage = Math.min(100, (x.total / maxTotal) * 100)));
 
         const bestBid = bids[0]?.price || 0;
         const bestAsk = asks[0]?.price || 0;
         const spread = bestAsk && bestBid ? Math.max(0, bestAsk - bestBid) : 0;
         const mid = bestAsk && bestBid ? (bestAsk + bestBid) / 2 : (bids[0]?.price || asks[0]?.price || lastPrice);
         const spreadPercentage = mid ? (spread / mid) * 100 : 0;
-        setLastPrice(mid || lastPrice);
+        setLastPrice(Number.isFinite(mid) && mid > 0 ? mid : lastPrice);
 
         const orderBookData = {
           // For top list we want bids (buy orders)
@@ -415,13 +447,23 @@ export const EnhancedOrderBook = React.memo(({
       const bestBid = processedOrderBookData.bids[0]?.price || 0;
       const bestAsk = processedOrderBookData.asks[0]?.price || 0;
       const mid = bestAsk && bestBid ? (bestAsk + bestBid) / 2 : (bestBid || bestAsk || lastPrice);
-      setLastPrice(mid);
+      if (Number.isFinite(mid) && mid > 0) {
+        setLastPrice(mid);
+      }
     }
   }, [processedOrderBookData, lastPrice]);
 
   const handlePriceClick = useCallback((price: number) => {
-    onPriceClick?.(price);
+    if (Number.isFinite(price) && price > 0) {
+      onPriceClick?.(price);
+    }
   }, [onPriceClick]);
+
+  const sizePercentDenominator = useMemo(() => Math.max(
+    processedOrderBookData.asks[processedOrderBookData.asks.length - 1]?.total || 0,
+    processedOrderBookData.bids[processedOrderBookData.bids.length - 1]?.total || 0,
+    1
+  ), [processedOrderBookData]);
 
   // Memoized order row component
   const OrderRow = React.memo(({
@@ -468,7 +510,7 @@ export const EnhancedOrderBook = React.memo(({
           </div>
           <div className="text-[hsl(var(--trading-text))] text-right font-mono font-medium">
             {showSizePercent
-              ? `${((entry.size / (processedOrderBookData.asks[0]?.total || 1)) * 100).toFixed(1)}%`
+              ? `${formatNumber((entry.size / sizePercentDenominator) * 100, 1)}%`
               : formatNumber(entry.size, 4)
             }
           </div>
@@ -637,8 +679,8 @@ export const EnhancedOrderBook = React.memo(({
 
           {/* Column Headers */}
           <div className="grid grid-cols-3 gap-2 px-3 py-2 text-xs font-medium text-[hsl(var(--trading-text-secondary))] bg-[hsl(var(--trading-bg-secondary))] border-b border-[hsl(var(--trading-border))]">
-            <div>Price ({market?.split('-')?.[1] || 'USDT'})</div>
-            <div className="text-right">Size ({market?.split('-')?.[0] || 'BTC'})</div>
+            <div>Price ({quoteAsset})</div>
+            <div className="text-right">Size ({baseAsset})</div>
             <div className="text-right">Total</div>
           </div>
 
@@ -692,10 +734,10 @@ export const EnhancedOrderBook = React.memo(({
                     className="font-mono font-bold text-[hsl(var(--trading-accent))] transition-colors duration-1000"
                     style={{ fontSize: '14px' }}
                   >
-                    ${(processedOrderBookData.spread || 0).toFixed(2)}
+                    ${formatNumber(processedOrderBookData.spread, 2)}
                   </span>
                   <span className="text-xs text-[hsl(var(--trading-text-muted))]">
-                    ({(processedOrderBookData.spreadPercentage || 0).toFixed(3)}%)
+                    ({formatNumber(processedOrderBookData.spreadPercentage, 3)}%)
                   </span>
                 </div>
 
@@ -790,8 +832,8 @@ export const EnhancedOrderBook = React.memo(({
         <>
           {/* Recent Trades Column Headers */}
           <div className="grid grid-cols-3 gap-2 px-3 py-2 text-xs font-medium text-[hsl(var(--trading-text-secondary))] bg-[hsl(var(--trading-bg-secondary))] border-b border-[hsl(var(--trading-border))]">
-            <div>Price ({market.split('-')[1] || 'USDT'})</div>
-            <div className="text-right">Size ({market.split('-')[0] || 'BTC'})</div>
+            <div>Price ({quoteAsset})</div>
+            <div className="text-right">Size ({baseAsset})</div>
             <div className="text-right">Time</div>
           </div>
 
@@ -852,7 +894,7 @@ export const EnhancedOrderBook = React.memo(({
               <div className="flex items-center gap-1">
                 <span className="text-[hsl(var(--trading-text-secondary))] font-medium">Last Price:</span>
                 <span className="text-[hsl(var(--trading-accent))] font-semibold">
-                  ${lastPrice.toFixed(2)}
+                  ${formatNumber(lastPrice, 2)}
                 </span>
               </div>
             </div>

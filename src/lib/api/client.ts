@@ -5,6 +5,7 @@ import axios, {
   AxiosError
 } from 'axios';
 import { env } from '../env';
+import { normalizeBackendRustEndpoint } from './backend-rust';
 
 // ===== API CLIENT CONFIGURATION =====
 
@@ -222,42 +223,49 @@ export class ApiClient {
   private getCandidateBaseURLs(): string[] {
     const primary = this.config.baseURL.replace(/\/$/, '');
     const fallback = env?.NEXT_PUBLIC_API_FALLBACK_URL?.replace(/\/$/, '');
-    const derivedBackend = primary.includes('orbitex-') && !primary.includes('orbitex-backend-')
-      ? primary.replace('://orbitex-', '://orbitex-backend-')
-      : undefined;
+    const safeFallback = fallback && fallback !== primary ? fallback : undefined;
 
-    return Array.from(new Set([primary, fallback, derivedBackend].filter(Boolean) as string[]));
+    return Array.from(new Set([primary, safeFallback].filter(Boolean) as string[]));
   }
 
   private getCandidateUrls(url?: string): string[] {
     if (!url) return [''];
 
-    const normalized = url.endsWith('/') ? url.slice(0, -1) : url;
+    const normalized = normalizeBackendRustEndpoint(url.endsWith('/') && url !== '/' ? url.slice(0, -1) : url);
     const candidates = new Set<string>([normalized]);
 
-    if (normalized.includes('/api/api_v2/')) {
-      candidates.add(normalized.replace('/api/api_v2/', '/api/v2/'));
+    // Split path from query/hash so dialect rewrites only touch the path.
+    const suffixIndex = normalized.search(/[?#]/);
+    const path = suffixIndex >= 0 ? normalized.slice(0, suffixIndex) : normalized;
+    const suffix = suffixIndex >= 0 ? normalized.slice(suffixIndex) : '';
+    const add = (p: string) => candidates.add(`${p}${suffix}`);
+
+    // The UI speaks the Rust backend's path dialect. When pointed at the
+    // Ruby/Peatio backend, add the Peatio-dialect equivalents as fallback
+    // candidates so the same build works against either backend.
+    if (path === '/api/v2/public/tickers') {
+      add('/api/v2/public/markets/tickers');
+    }
+    if (path.endsWith('/trading-fees')) {
+      add(path.replace(/\/trading-fees$/, '/trading_fees'));
+    }
+    if (path.endsWith('/withdraw-limits')) {
+      add(path.replace(/\/withdraw-limits$/, '/withdraw_limits'));
+    }
+    if (path.endsWith('/member-levels')) {
+      add(path.replace(/\/member-levels$/, '/member_levels'));
+    }
+    if (path.includes('/internal-transfers')) {
+      add(path.replace('/internal-transfers', '/internal_transfers'));
     }
 
-    if (normalized.includes('/api/v2/')) {
-      candidates.add(normalized.replace('/api/v2/', '/api/api_v2/'));
+    if (path.endsWith('/ticker')) {
+      add(path.replace(/\/ticker$/, '/tickers'));
+      add(path.replace(/\/ticker$/, '/tickers/'));
     }
 
-    if (normalized.includes('/api/api_v2/public/')) {
-      candidates.add(normalized.replace('/api/api_v2/public/', '/api/v2/public/'));
-    }
-
-    if (normalized.includes('/api/v2/public/')) {
-      candidates.add(normalized.replace('/api/v2/public/', '/api/api_v2/public/'));
-    }
-
-    if (normalized.endsWith('/ticker')) {
-      candidates.add(normalized.replace(/\/ticker$/, '/tickers'));
-      candidates.add(normalized.replace(/\/ticker$/, '/tickers/'));
-    }
-
-    if (normalized.endsWith('/tickers')) {
-      candidates.add(`${normalized}/`);
+    if (path.endsWith('/tickers')) {
+      add(`${path}/`);
     }
 
     return Array.from(candidates);

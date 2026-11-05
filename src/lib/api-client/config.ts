@@ -12,11 +12,11 @@ const getBaseUrl = () => {
 
   // Default to local development
   if (isDevelopment) {
-    return 'http://localhost:3330';
+    return 'http://localhost:3333';
   }
   
   // Production URL
-  return 'http://0.0.0.0:3002';
+  return 'https://orbitex-backend-976099405307.us-central1.run.app';
 };
 
 const baseUrl = getBaseUrl();

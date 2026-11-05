@@ -20,7 +20,7 @@ import {
   Zap,
   Globe
 } from 'lucide-react';
-import { cn, formatNumber, formatPercentage } from '../../lib/utils';
+import { cn, formatNumber, normalizeMarketId, toFiniteNumber } from '../../lib/utils';
 
 interface TickerSearchPanelProps {
   onMarketSelect: (market: string) => void;
@@ -54,7 +54,7 @@ export default function TickerSearchPanel({
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('volume');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(['BTCUSDT', 'ETHUSDT', 'BTC-PERP']));
+  const [favorites, setFavorites] = useState<Set<string>>(new Set(['btcusd', 'ethusd']));
   const [showFilters, setShowFilters] = useState(false);
 
   // Get real data from V2 API
@@ -65,11 +65,12 @@ export default function TickerSearchPanel({
     if (!marketsData || !tickersData) return [];
 
     return marketsData.map(market => {
-      const ticker = tickersData.find(t => t.market === market.id);
+      const marketId = normalizeMarketId(market.id);
+      const ticker = tickersData.find(t => normalizeMarketId(t.market) === marketId);
 
       if (!ticker) {
         return {
-          symbol: market.id,
+          symbol: marketId,
           baseAsset: market.base_unit,
           quoteAsset: market.quote_unit,
           lastPrice: 0,
@@ -79,24 +80,24 @@ export default function TickerSearchPanel({
           quoteVolume24h: 0,
           high24h: 0,
           low24h: 0,
-          isFavorite: favorites.has(market.id),
+          isFavorite: favorites.has(marketId),
           category: 'spot',
           tags: []
         };
       }
 
       return {
-        symbol: market.id,
+        symbol: marketId,
         baseAsset: market.base_unit,
         quoteAsset: market.quote_unit,
-        lastPrice: parseFloat(ticker.ticker.last),
-        priceChange24h: parseFloat(ticker.ticker.last) - parseFloat(ticker.ticker.open),
-        priceChangePercent24h: parseFloat(ticker.ticker.price_change_percent),
-        volume24h: parseFloat(ticker.ticker.volume),
-        quoteVolume24h: parseFloat(ticker.ticker.amount),
-        high24h: parseFloat(ticker.ticker.high),
-        low24h: parseFloat(ticker.ticker.low),
-        isFavorite: favorites.has(market.id),
+        lastPrice: toFiniteNumber(ticker.ticker.last),
+        priceChange24h: toFiniteNumber(ticker.ticker.last) - toFiniteNumber(ticker.ticker.open),
+        priceChangePercent24h: toFiniteNumber(ticker.ticker.price_change_percent),
+        volume24h: toFiniteNumber(ticker.ticker.volume ?? ticker.ticker.vol),
+        quoteVolume24h: toFiniteNumber(ticker.ticker.amount),
+        high24h: toFiniteNumber(ticker.ticker.high),
+        low24h: toFiniteNumber(ticker.ticker.low),
+        isFavorite: favorites.has(marketId),
         category: 'spot',
         tags: []
       };
@@ -178,7 +179,7 @@ export default function TickerSearchPanel({
 
   if (compact) {
     return (
-      <div className="bg-[hsl(var(--trading-background))] border border-[hsl(var(--trading-border))] rounded-lg">
+      <div className="bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg">
         <div className="p-3 border-b border-[hsl(var(--trading-border))]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[hsl(var(--trading-text-muted))]" />
@@ -207,9 +208,9 @@ export default function TickerSearchPanel({
                   onClick={() => handleMarketClick(market)}
                   className={cn(
                     "flex items-center justify-between p-2 rounded cursor-pointer transition-colors",
-                    selectedMarket === market.symbol
-                      ? "bg-[hsl(var(--trading-accent))] text-[hsl(var(--trading-accent-foreground))]"
-                      : "hover:bg-[hsl(var(--trading-muted))]"
+                    normalizeMarketId(selectedMarket) === market.symbol
+                      ? "bg-[hsl(var(--trading-accent))] text-white"
+                      : "hover:bg-[hsl(var(--trading-bg-tertiary))]"
                   )}
                 >
                   <div className="flex items-center space-x-2">
@@ -218,7 +219,7 @@ export default function TickerSearchPanel({
                         e.stopPropagation();
                         toggleFavorite(market.symbol);
                       }}
-                      className="p-1 hover:bg-[hsl(var(--trading-muted))] rounded"
+                      className="p-1 hover:bg-[hsl(var(--trading-bg-tertiary))] rounded"
                     >
                       <Star
                         className={cn(
@@ -246,7 +247,7 @@ export default function TickerSearchPanel({
                         ? "text-[hsl(var(--trading-success))]"
                         : "text-[hsl(var(--trading-error))]"
                     )}>
-                      {market.priceChangePercent24h >= 0 ? '+' : ''}{market.priceChangePercent24h.toFixed(2)}%
+                      {market.priceChangePercent24h >= 0 ? '+' : ''}{formatNumber(market.priceChangePercent24h, 2)}%
                     </div>
                   </div>
                 </div>
@@ -259,18 +260,18 @@ export default function TickerSearchPanel({
   }
 
   return (
-    <div className="bg-[hsl(var(--trading-background))] border border-[hsl(var(--trading-border))] rounded-lg h-full flex flex-col">
+    <div className="bg-[hsl(var(--trading-bg-secondary))] border border-[hsl(var(--trading-border))] rounded-lg h-full flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-[hsl(var(--trading-border))]">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-[hsl(var(--trading-foreground))]">
+          <h3 className="text-lg font-semibold text-[hsl(var(--trading-text))]">
             Markets
           </h3>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setShowFilters(!showFilters)}
-            className="text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-foreground))]"
+            className="text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))]"
           >
             <Filter className="h-4 w-4 mr-1" />
             Filters
@@ -310,7 +311,7 @@ export default function TickerSearchPanel({
         {showFilters && (
           <div className="space-y-3">
             <div>
-              <label className="text-sm font-medium text-[hsl(var(--trading-foreground))] mb-2 block">
+              <label className="text-sm font-medium text-[hsl(var(--trading-text))] mb-2 block">
                 Sort by
               </label>
               <div className="flex space-x-2">
@@ -375,9 +376,9 @@ export default function TickerSearchPanel({
                   onClick={() => handleMarketClick(market)}
                   className={cn(
                     "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 group",
-                    selectedMarket === market.symbol
-                      ? "bg-[hsl(var(--trading-accent))] text-[hsl(var(--trading-accent-foreground))] shadow-sm"
-                      : "hover:bg-[hsl(var(--trading-muted))] hover:shadow-sm"
+                    normalizeMarketId(selectedMarket) === market.symbol
+                      ? "bg-[hsl(var(--trading-accent))] text-white shadow-sm"
+                      : "hover:bg-[hsl(var(--trading-bg-tertiary))] hover:shadow-sm"
                   )}
                 >
                   <div className="flex items-center space-x-3">
@@ -386,7 +387,7 @@ export default function TickerSearchPanel({
                         e.stopPropagation();
                         toggleFavorite(market.symbol);
                       }}
-                      className="p-1 hover:bg-[hsl(var(--trading-muted))] rounded transition-colors"
+                      className="p-1 hover:bg-[hsl(var(--trading-bg-tertiary))] rounded transition-colors"
                     >
                       <Star
                         className={cn(
@@ -400,7 +401,7 @@ export default function TickerSearchPanel({
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
-                        <div className="font-medium text-[hsl(var(--trading-foreground))]">
+                        <div className="font-medium text-[hsl(var(--trading-text))]">
                           {market.symbol}
                         </div>
                         {market.tags.length > 0 && (
@@ -416,7 +417,7 @@ export default function TickerSearchPanel({
                   </div>
 
                   <div className="text-right">
-                    <div className="font-medium text-[hsl(var(--trading-foreground))]">
+                    <div className="font-medium text-[hsl(var(--trading-text))]">
                       {formatNumber(market.lastPrice, 4)}
                     </div>
                     <div className="flex items-center space-x-2">
@@ -424,7 +425,7 @@ export default function TickerSearchPanel({
                         "text-sm font-medium",
                         isPositive ? "text-[hsl(var(--trading-success))]" : "text-[hsl(var(--trading-error))]"
                       )}>
-                        {isPositive ? '+' : ''}{priceChange.toFixed(2)}%
+                        {isPositive ? '+' : ''}{formatNumber(priceChange, 2)}%
                       </div>
                       {isPositive ? (
                         <TrendingUp className="h-3 w-3 text-[hsl(var(--trading-success))]" />
@@ -445,7 +446,7 @@ export default function TickerSearchPanel({
       </div>
 
       {/* Footer */}
-      <div className="p-3 border-t border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-muted))]">
+      <div className="p-3 border-t border-[hsl(var(--trading-border))] bg-[hsl(var(--trading-bg-tertiary))]">
         <div className="flex items-center justify-between text-xs text-[hsl(var(--trading-text-muted))]">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-1">

@@ -9,39 +9,46 @@ import {
   V2InternalTransfer,
   V2Stats
 } from '../types/api_v2';
+import {
+  BACKEND_RUST_ENDPOINTS,
+  normalizeBackendArray,
+  unwrapBackendData,
+} from '../backend-rust';
 
 // Account API endpoints - Updated to match V2 API structure
 const ACCOUNT_ENDPOINTS = {
-  balances: '/api/v2/account/balances',
+  balances: BACKEND_RUST_ENDPOINTS.account.balances,
   balance: '/api/v2/account/balances/:currency',
-  deposits: '/api/v2/account/deposits',
+  deposits: BACKEND_RUST_ENDPOINTS.account.deposits,
   deposit: '/api/v2/account/deposits/:txid',
   depositAddress: '/api/v2/account/deposit_address/:currency',
-  withdraws: '/api/v2/account/withdraws',
+  withdraws: BACKEND_RUST_ENDPOINTS.account.withdraws,
   withdraw: '/api/v2/account/withdraws/:txid',
-  transactions: '/api/v2/account/transactions',
+  transactions: BACKEND_RUST_ENDPOINTS.account.transactions,
   transaction: '/api/v2/account/transactions/:txid',
-  beneficiaries: '/api/v2/account/beneficiaries',
+  beneficiaries: BACKEND_RUST_ENDPOINTS.account.beneficiaries,
   beneficiary: '/api/v2/account/beneficiaries/:id',
-  internalTransfers: '/api/v2/account/internal_transfers',
-  internalTransfer: '/api/v2/account/internal_transfers/:id',
-  stats: '/api/v2/account/stats',
+  internalTransfers: BACKEND_RUST_ENDPOINTS.account.internalTransfers,
+  internalTransfer: '/api/v2/account/internal-transfers/:id',
+  stats: BACKEND_RUST_ENDPOINTS.account.stats,
 } as const;
 
-// Real V2 API functions - Standalone (No ObjectWrapper to avoid TDZ)
-const unwrapData = <T>(payload: T | { data?: T }): T =>
-  ((payload as { data?: T })?.data ?? payload) as T;
+const hasAccessToken = (): boolean =>
+  typeof window !== 'undefined' && Boolean(localStorage.getItem('access_token'));
 
 export const getBalances = async (): Promise<V2Account[]> => {
-  const response = await apiClient.get<V2Account[]>(ACCOUNT_ENDPOINTS.balances);
-  return unwrapData(response.data) || [];
+  const response = await apiClient.get<V2Account[]>(ACCOUNT_ENDPOINTS.balances, {
+    retry: false,
+    timeout: 10000,
+  });
+  return normalizeBackendArray<V2Account>(response.data, 'balances');
 };
 
 export const getBalance = async (currency: string): Promise<V2Account | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.balance.replace(':currency', currency);
     const response = await apiClient.get<{ data: V2Account }>(url);
-    return unwrapData(response.data);
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }
@@ -56,14 +63,14 @@ export const getDeposits = async (params?: {
   const response = await apiClient.get<V2Deposit[]>(ACCOUNT_ENDPOINTS.deposits, {
     params
   });
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<V2Deposit>(response.data, 'deposits');
 };
 
 export const getDeposit = async (txid: string): Promise<V2Deposit | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.deposit.replace(':txid', txid);
     const response = await apiClient.get<{ data: V2Deposit }>(url);
-    return unwrapData(response.data);
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }
@@ -76,7 +83,7 @@ export const createDepositAddress = async (currency: string): Promise<{
 }> => {
   const url = ACCOUNT_ENDPOINTS.depositAddress.replace(':currency', currency);
   const response = await apiClient.post<{ data: { currency: string; address: string; state: string } }>(url);
-  return unwrapData(response.data);
+  return unwrapBackendData(response.data);
 };
 
 export const getWithdraws = async (params?: {
@@ -88,14 +95,14 @@ export const getWithdraws = async (params?: {
   const response = await apiClient.get<V2Withdraw[]>(ACCOUNT_ENDPOINTS.withdraws, {
     params
   });
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<V2Withdraw>(response.data, 'withdraws');
 };
 
 export const getWithdraw = async (txid: string): Promise<V2Withdraw | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.withdraw.replace(':txid', txid);
     const response = await apiClient.get<{ data: V2Withdraw }>(url);
-    return unwrapData(response.data);
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }
@@ -126,7 +133,7 @@ export const createWithdraw = async (data: {
       created_at: number;
     }
   }>(ACCOUNT_ENDPOINTS.withdraws, data);
-  return unwrapData(response.data);
+  return unwrapBackendData(response.data);
 };
 
 export const getTransactions = async (params?: {
@@ -138,14 +145,14 @@ export const getTransactions = async (params?: {
   const response = await apiClient.get<V2Transaction[]>(ACCOUNT_ENDPOINTS.transactions, {
     params
   });
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<V2Transaction>(response.data, 'transactions');
 };
 
 export const getTransaction = async (txid: string): Promise<V2Transaction | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.transaction.replace(':txid', txid);
     const response = await apiClient.get<{ data: V2Transaction }>(url);
-    return unwrapData(response.data);
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }
@@ -153,14 +160,14 @@ export const getTransaction = async (txid: string): Promise<V2Transaction | null
 
 export const getBeneficiaries = async (): Promise<V2Beneficiary[]> => {
   const response = await apiClient.get<V2Beneficiary[]>(ACCOUNT_ENDPOINTS.beneficiaries);
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<V2Beneficiary>(response.data, 'beneficiaries');
 };
 
 export const getBeneficiary = async (id: number): Promise<V2Beneficiary | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.beneficiary.replace(':id', id.toString());
     const response = await apiClient.get<{ data: V2Beneficiary }>(url);
-    return unwrapData(response.data);
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }
@@ -172,7 +179,7 @@ export const createBeneficiary = async (data: {
   data: any;
 }): Promise<V2Beneficiary> => {
   const response = await apiClient.post<{ data: V2Beneficiary }>(ACCOUNT_ENDPOINTS.beneficiaries, data);
-  return unwrapData(response.data);
+  return unwrapBackendData(response.data);
 };
 
 export const deleteBeneficiary = async (id: number): Promise<{ message: string }> => {
@@ -190,14 +197,14 @@ export const getInternalTransfers = async (params?: {
   const response = await apiClient.get<V2InternalTransfer[]>(ACCOUNT_ENDPOINTS.internalTransfers, {
     params
   });
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<V2InternalTransfer>(response.data, 'internal_transfers');
 };
 
 export const getInternalTransfer = async (id: number): Promise<V2InternalTransfer | null> => {
   try {
     const url = ACCOUNT_ENDPOINTS.internalTransfer.replace(':id', id.toString());
     const response = await apiClient.get<{ data: V2InternalTransfer }>(url);
-    return unwrapData(response.data);
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }
@@ -224,18 +231,20 @@ export const createInternalTransfer = async (data: {
       created_at: number;
     }
   }>(ACCOUNT_ENDPOINTS.internalTransfers, data);
-  return unwrapData(response.data);
+  return unwrapBackendData(response.data);
 };
 
 export const getStats = async (): Promise<V2Stats> => {
-  const response = await apiClient.get<{ data: V2Stats }>(ACCOUNT_ENDPOINTS.stats);
-  return unwrapData(response.data);
+  const response = await apiClient.get<{ data: V2Stats }>(ACCOUNT_ENDPOINTS.stats, {
+    retry: false,
+    timeout: 10000,
+  });
+  return unwrapBackendData(response.data);
 };
 
 // React Query hooks
 export const useAccountBalances = () => {
-  // Check if authenticated
-  const isAuthenticated = typeof window !== 'undefined' ? !!localStorage.getItem('access_token') : false;
+  const isAuthenticated = hasAccessToken();
 
   return useQuery({
     queryKey: ['account', 'balances'],
@@ -243,13 +252,7 @@ export const useAccountBalances = () => {
     enabled: isAuthenticated, // Only run if authenticated
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: isAuthenticated ? 30 * 1000 : false, // Refetch every 30 seconds if authenticated
-    retry: (failureCount, error: any) => {
-      // Don't retry on 403 permission errors
-      if (error?.status === 403 || error?.code === 'user.ability.not_permitted') {
-        return false;
-      }
-      return failureCount < 3;
-    },
+    retry: false,
   });
 };
 
@@ -257,7 +260,7 @@ export const useAccountBalance = (currency: string) => {
   return useQuery({
     queryKey: ['account', 'balance', currency],
     queryFn: () => getBalance(currency),
-    enabled: !!currency,
+    enabled: !!currency && hasAccessToken(),
     staleTime: 30 * 1000, // 30 seconds
   });
 };
@@ -271,7 +274,9 @@ export const useAccountDeposits = (params?: {
   return useQuery({
     queryKey: ['account', 'deposits', params],
     queryFn: () => getDeposits(params),
-    staleTime: 60 * 1000, // 1 minute
+    enabled: hasAccessToken(),
+    staleTime: 60 * 1000, // 1 minute,
+    retry: false
   });
 };
 
@@ -279,7 +284,7 @@ export const useAccountDeposit = (txid: string) => {
   return useQuery({
     queryKey: ['account', 'deposit', txid],
     queryFn: () => getDeposit(txid),
-    enabled: !!txid,
+    enabled: !!txid && hasAccessToken(),
     staleTime: 60 * 1000, // 1 minute
   });
 };
@@ -304,7 +309,9 @@ export const useAccountWithdraws = (params?: {
   return useQuery({
     queryKey: ['account', 'withdraws', params],
     queryFn: () => getWithdraws(params),
-    staleTime: 60 * 1000, // 1 minute
+    enabled: hasAccessToken(),
+    staleTime: 60 * 1000, // 1 minute,
+    retry: false
   });
 };
 
@@ -312,7 +319,7 @@ export const useAccountWithdraw = (txid: string) => {
   return useQuery({
     queryKey: ['account', 'withdraw', txid],
     queryFn: () => getWithdraw(txid),
-    enabled: !!txid,
+    enabled: !!txid && hasAccessToken(),
     staleTime: 60 * 1000, // 1 minute
   });
 };
@@ -338,7 +345,9 @@ export const useAccountTransactions = (params?: {
   return useQuery({
     queryKey: ['account', 'transactions', params],
     queryFn: () => getTransactions(params),
-    staleTime: 60 * 1000, // 1 minute
+    enabled: hasAccessToken(),
+    staleTime: 60 * 1000, // 1 minute,
+    retry: false
   });
 };
 
@@ -346,7 +355,7 @@ export const useAccountTransaction = (txid: string) => {
   return useQuery({
     queryKey: ['account', 'transaction', txid],
     queryFn: () => getTransaction(txid),
-    enabled: !!txid,
+    enabled: !!txid && hasAccessToken(),
     staleTime: 60 * 1000, // 1 minute
   });
 };
@@ -355,7 +364,9 @@ export const useBeneficiaries = () => {
   return useQuery({
     queryKey: ['account', 'beneficiaries'],
     queryFn: getBeneficiaries,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: hasAccessToken(),
+    staleTime: 5 * 60 * 1000, // 5 minutes,
+    retry: false
   });
 };
 
@@ -363,7 +374,7 @@ export const useBeneficiary = (id: number) => {
   return useQuery({
     queryKey: ['account', 'beneficiary', id],
     queryFn: () => getBeneficiary(id),
-    enabled: !!id,
+    enabled: !!id && hasAccessToken(),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -397,9 +408,11 @@ export const useInternalTransfers = (params?: {
   page?: number;
 }) => {
   return useQuery({
-    queryKey: ['account', 'internal_transfers', params],
+    queryKey: ['account', 'internal-transfers', params],
     queryFn: () => getInternalTransfers(params),
-    staleTime: 60 * 1000, // 1 minute
+    enabled: hasAccessToken(),
+    staleTime: 60 * 1000, // 1 minute,
+    retry: false
   });
 };
 
@@ -407,7 +420,7 @@ export const useInternalTransfer = (id: number) => {
   return useQuery({
     queryKey: ['account', 'internal_transfer', id],
     queryFn: () => getInternalTransfer(id),
-    enabled: !!id,
+    enabled: !!id && hasAccessToken(),
     staleTime: 60 * 1000, // 1 minute
   });
 };
@@ -418,26 +431,21 @@ export const useCreateInternalTransfer = () => {
   return useMutation({
     mutationFn: createInternalTransfer,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account', 'internal_transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['account', 'internal-transfers'] });
       queryClient.invalidateQueries({ queryKey: ['account', 'balances'] });
     },
   });
 };
 
 export const useAccountStats = () => {
-  const isAuthenticated = typeof window !== 'undefined' ? !!localStorage.getItem('access_token') : false;
+  const isAuthenticated = hasAccessToken();
 
   return useQuery({
     queryKey: ['account', 'stats'],
     queryFn: getStats,
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: (failureCount, error: any) => {
-      if (error?.status === 401 || error?.status === 403 || error?.code === 'user.ability.not_permitted') {
-        return false;
-      }
-      return failureCount < 2;
-    },
+    retry: false,
   });
 };
 

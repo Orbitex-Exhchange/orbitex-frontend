@@ -26,7 +26,7 @@ export const useHFTPerformance = (): HFTPerformance => {
   const errorCountRef = useRef(0);
   const frameCountRef = useRef(0);
   const lastTimeRef = useRef(performance.now());
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | null>(null);
 
   // Calculate FPS
   const updateMetrics = useCallback(() => {
@@ -55,7 +55,7 @@ export const useHFTPerformance = (): HFTPerformance => {
       animationFrameRef.current = requestAnimationFrame(updateMetrics);
 
       return () => {
-        if (animationFrameRef.current) {
+        if (animationFrameRef.current !== null) {
           cancelAnimationFrame(animationFrameRef.current);
         }
       };

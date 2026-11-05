@@ -20,8 +20,10 @@ export function ConditionalNavigation({ user }: ConditionalNavigationProps) {
   // Define pages that should show navigation
   const authenticatedPages = [
     '/trade',
-    '/wallets', 
+    '/perps',
+    '/wallets',
     '/dashboard',
+    '/orders',
     '/profile',
     '/settings',
     '/security',
@@ -32,13 +34,19 @@ export function ConditionalNavigation({ user }: ConditionalNavigationProps) {
     '/analytics',
     '/alerts',
     '/history',
+    '/verification',
+    '/kyc',
+    '/address-book',
     '/support',
     '/institutional'
   ];
   
-  // Define pages that should never show navigation
+  // Define pages that should never show the GLOBAL navigation.
+  // '/trade' is a bespoke full-height terminal that renders its own nav inside
+  // its viewport-exact layout, so the global (sticky) nav is excluded there.
   const excludedPages = [
     '/',
+    '/trade',
     '/auth/signin',
     '/auth/signup',
     '/auth/forgot-password',

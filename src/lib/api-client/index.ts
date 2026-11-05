@@ -1,4 +1,5 @@
 import { apiConfig, getAuthHeaders } from './config';
+import { normalizeBackendRustEndpoint } from '@/lib/api/backend-rust';
 
 // Types for API responses and errors
 export interface APIResponse<T = any> {
@@ -40,7 +41,8 @@ async function makeRequest<T>(
 ): Promise<T> {
   const { timeout = apiConfig.timeout, retries = apiConfig.retries, authToken, ...fetchOptions } = options;
   
-  const url = `${apiConfig.baseUrl}${endpoint}`;
+  const normalizedEndpoint = normalizeBackendRustEndpoint(endpoint);
+  const url = `${apiConfig.baseUrl}${normalizedEndpoint}`;
   
   // Get auth headers if token is provided
   const authHeaders = authToken ? getAuthHeaders(authToken) : {};

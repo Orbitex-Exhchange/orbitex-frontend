@@ -4,11 +4,9 @@ import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } fr
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Navigation } from '@/components/layout/Navigation';
 import {
   ChevronDown,
   X,
-  Bell,
   RefreshCw,
   Settings,
   User,
@@ -32,7 +30,8 @@ import {
   AlertTriangle,
   Bitcoin
 } from 'lucide-react';
-import { cn, formatNumber } from '@/lib/utils';
+import { cn, formatNumber, toFiniteNumber } from '@/lib/utils';
+import { Navigation } from '@/components/layout/Navigation';
 import { TradingViewChart } from '@/components/trade/TradingViewChart';
 import { EnhancedOrderBook } from '@/components/trade/EnhancedOrderBook';
 import { EnhancedOrderForm } from '@/components/trade/EnhancedOrderForm';
@@ -260,11 +259,11 @@ function TradingPage() {
     // Safely parse values with fallbacks
     const tickerData = ticker.ticker || ticker;
     return {
-      lastPrice: parseFloat(tickerData?.last || '0') || 0,
-      change24h: parseFloat(tickerData?.price_change_percent || '0') || 0,
-      high24h: parseFloat(tickerData?.high || '0') || 0,
-      low24h: parseFloat(tickerData?.low || '0') || 0,
-      volume: parseFloat(tickerData?.vol || '0') || 0,
+      lastPrice: toFiniteNumber(tickerData?.last),
+      change24h: toFiniteNumber(tickerData?.price_change_percent),
+      high24h: toFiniteNumber(tickerData?.high),
+      low24h: toFiniteNumber(tickerData?.low),
+      volume: toFiniteNumber(tickerData?.vol),
     };
   }, [currentTickerData, tickersData, selectedMarket, isPublicDataLoading]);
 
@@ -275,7 +274,7 @@ function TradingPage() {
     return balancesData.reduce((sum: number, balance: any) => {
       const price = normalizeMarketSymbol(selectedMarket) === normalizeMarketSymbol(`${balance.currency}usdt`) ?
         processedMarketData.lastPrice : 1;
-      return sum + (parseFloat(balance.balance || '0') * price);
+      return sum + (toFiniteNumber(balance.balance) * price);
     }, 0);
   }, [isAuthenticated, balancesData, processedMarketData, selectedMarket]);
 
@@ -295,8 +294,12 @@ function TradingPage() {
   // Get current market ticker data - prioritize real-time ticker data
   const normalizedSelectedMarket = normalizeMarketSymbol(selectedMarket);
   const currentTicker = currentTickerData || tickersData?.find((ticker: any) => normalizeMarketSymbol(ticker.market) === normalizedSelectedMarket);
-  const currentPriceFromAPI = currentTicker ? parseFloat(currentTicker.ticker?.last || currentTicker.last || '0') : currentPrice;
-  const priceChangeFromAPI = currentTicker ? parseFloat(currentTicker.ticker?.price_change_percent || currentTicker.price_change_percent || '0') : priceChange24h;
+  const currentPriceFromAPI = currentTicker
+    ? Math.max(toFiniteNumber(currentTicker.ticker?.last ?? currentTicker.last, currentPrice), 0) || currentPrice
+    : currentPrice;
+  const priceChangeFromAPI = currentTicker
+    ? toFiniteNumber(currentTicker.ticker?.price_change_percent ?? currentTicker.price_change_percent, priceChange24h)
+    : priceChange24h;
 
   // Legacy balance calculation (replaced by memoized version above)
 
@@ -455,11 +458,12 @@ function TradingPage() {
   }, [toast]);
 
   const handlePriceClick = useCallback((price: number) => {
+    const selectedPrice = Math.max(toFiniteNumber(price, currentPrice), 0) || currentPrice;
     toast({
       title: "Price Selected",
-      description: `Price set to $${price.toFixed(2)}`,
+      description: `Price set to $${formatNumber(selectedPrice, 2)}`,
     });
-  }, [toast]);
+  }, [toast, currentPrice]);
 
   const handleRefresh = useCallback(() => {
     setIsLoading(true);
@@ -493,7 +497,7 @@ function TradingPage() {
   };
 
   const handleWalletClick = () => {
-    router.push('/wallet');
+    router.push('/wallets');
   };
 
   const handleHistoryClick = () => {
@@ -512,7 +516,6 @@ function TradingPage() {
 
   return (
     <div className="h-screen trading-layout flex flex-col trading-font overflow-hidden bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
-      {/* Navigation */}
       <Navigation user={user} />
 
       {accountDataErrorMessage && (
@@ -535,9 +538,6 @@ function TradingPage() {
             <div className="flex items-center space-x-2">
               <User className="h-3 w-3 text-[hsl(var(--trading-text-muted))]" />
               <span className="text-[hsl(var(--trading-text))] font-medium">{user.email}</span>
-              <Badge variant="outline" className="text-xs">
-                KYC Level {user.kyc_level || 0}
-              </Badge>
             </div>
           )}
           {/* Market Selection Button */}
@@ -552,42 +552,7 @@ function TradingPage() {
             <ChevronDown className="h-3 w-3 ml-1" />
           </Button>
         </div>
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isLoading}
-            className="text-[hsl(var(--trading-text-muted))] hover:text-[hsl(var(--trading-text))] h-6 px-2 transition-all duration-300"
-          >
-            <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <div className="flex items-center space-x-2">
-            <span className="text-[hsl(var(--trading-text-muted))]">Ping:</span>
-            <span className="text-[#00ff88] font-mono font-medium">12ms</span>
-          </div>
-          {/* Socketeer WebSocket Status */}
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${hftConnected ? 'bg-[#00ff88]' : 'bg-[#ff4444]'}`}></div>
-            <span className="text-[hsl(var(--trading-text-muted))]">Socketeer:</span>
-            <span className={`font-mono font-medium ${hftConnected ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
-              {hftConnected ? 'Connected' : 'Disconnected'}
-            </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-[hsl(var(--trading-text-muted))]">Health:</span>
-            <span className={`font-mono font-medium ${isHealthy ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
-              {healthScore}%
-            </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-[hsl(var(--trading-text-muted))]">FPS:</span>
-            <span className={`font-mono font-medium ${metrics.fps >= 30 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
-              {Math.round(metrics.fps)}
-            </span>
-          </div>
-        </div>
+        <div className="flex items-center space-x-4" />
       </div>
 
       {/* Enhanced Main Content */}
@@ -676,7 +641,7 @@ function TradingPage() {
               <Suspense fallback={<LoadingFallback />}>
                 <EnhancedOrderForm
                   market={selectedMarket}
-                  currentPrice={processedMarketData?.lastPrice || currentPrice}
+                  currentPrice={Math.max(toFiniteNumber(processedMarketData?.lastPrice, currentPrice), 0) || currentPrice}
                   onPriceClick={handlePriceClick}
                   compact={true}
                   balancesData={balancesData || []}
@@ -684,34 +649,6 @@ function TradingPage() {
               </Suspense>
             </SimpleErrorBoundary>
           </div>
-        </div>
-      </div>
-
-      {/* Enhanced Bottom Status Bar */}
-      <div className="h-6 bg-gradient-to-r from-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] border-t border-[hsl(var(--trading-border))] flex items-center justify-between px-4 text-xs glass">
-        <div className="flex items-center space-x-4">
-          <span className="text-[hsl(var(--trading-text-muted))]">Connection: <span className={`font-medium ${hftConnected ? 'text-[#00ff88]' : 'text-[#ffb020]'}`}>{hftConnected ? 'Realtime' : 'Polling only'}</span></span>
-          <span className="text-[hsl(var(--trading-text-muted))]">Orders: <span className="text-[hsl(var(--trading-text))] font-medium">{activeOrdersCount} Active</span></span>
-          <span className="text-[hsl(var(--trading-text-muted))]">Balance: <span className="text-[hsl(var(--trading-text))] font-medium">${formatNumber(totalBalance, 2)}</span></span>
-          {isAuthenticated && isAccountDataLoading && (
-            <span className="text-[hsl(var(--trading-text-muted))]">Account data: <span className="text-yellow-400 font-medium">Refreshing</span></span>
-          )}
-          {isAuthenticated && accountDataErrorMessage && (
-            <span className="text-[hsl(var(--trading-text-muted))]">Account data: <span className="text-[#ffb020] font-medium">Unavailable</span></span>
-          )}
-          {user && (
-            <>
-              <span className="text-[hsl(var(--trading-text-muted))]">KYC: <span className={`font-medium ${user.kyc_level >= 2 ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>Level {user.kyc_level || 0}</span></span>
-              <span className="text-[hsl(var(--trading-text-muted))]">Email: <span className={`font-medium ${user.email_verified ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>{user.email_verified ? 'Verified' : 'Unverified'}</span></span>
-            </>
-          )}
-        </div>
-        <div className="flex items-center space-x-4">
-          <span className="text-[hsl(var(--trading-text-muted))]">24h P&L: <span className="text-[#00ff88] font-medium">+$0.00</span></span>
-          <span className="text-[hsl(var(--trading-text-muted))]">Total P&L: <span className="text-[#00ff88] font-medium">+$0.00</span></span>
-          {!isAuthenticated && (
-            <span className="text-[#ff4444] font-medium">⚠️ Demo Mode</span>
-          )}
         </div>
       </div>
 
@@ -779,7 +716,7 @@ function TradingPage() {
       {showMarketSelector && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-40">
           <div className="glass border border-[#2a2a2a] rounded-lg shadow-2xl backdrop-blur-xl w-[500px] max-h-[600px] overflow-hidden">
-            <div className="p-3 border-b border-[#2a2a2a] bg-[#1a1a1a] flex items-center justify-between">
+            <div className="p-3 border-b border-[#2a2a2a] bg-[hsl(222_40%_8%_/_1)] flex items-center justify-between">
               <h3 className="text-sm font-semibold text-[#00ff88]">Market Selection</h3>
               <Button
                 variant="ghost"
@@ -840,10 +777,8 @@ function TradingPage() {
 // Wrap with Error Boundary and AuthGuard
 export default function TradingPageWrapper() {
   return (
-    <AuthGuard>
-      <TradePageErrorBoundary>
-        <TradingPage />
-      </TradePageErrorBoundary>
-    </AuthGuard>
+    <TradePageErrorBoundary>
+      <TradingPage />
+    </TradePageErrorBoundary>
   );
 }

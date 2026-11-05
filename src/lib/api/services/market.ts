@@ -3,16 +3,16 @@ import { apiClient } from '../client';
 import {
   V2Order,
   V2Trade,
-  ApiResponse
 } from '../types/api_v2';
+import { BACKEND_RUST_ENDPOINTS, normalizeBackendArray, unwrapBackendData } from '../backend-rust';
 
 // Market API endpoints - Updated to match V2 API structure
 const MARKET_ENDPOINTS = {
-  orders: '/api/v2/market/orders',
+  orders: BACKEND_RUST_ENDPOINTS.market.orders,
   order: '/api/v2/market/orders/:id',
-  cancelOrder: '/api/v2/market/orders/:id/cancel',
-  cancelAllOrders: '/api/v2/market/orders/cancel',
-  trades: '/api/v2/market/trades',
+  cancelOrder: '/api/v2/market/orders/:id',
+  cancelAllOrders: BACKEND_RUST_ENDPOINTS.market.cancelOrders,
+  trades: BACKEND_RUST_ENDPOINTS.market.trades,
   trade: '/api/v2/market/trades/:id',
 } as const;
 
@@ -27,14 +27,14 @@ export const getOrders = async (params?: {
   const response = await apiClient.get<V2Order[]>(MARKET_ENDPOINTS.orders, {
     params
   });
-  return response.data;
+  return normalizeBackendArray<V2Order>(response.data, 'orders');
 };
 
 export const getOrder = async (id: number): Promise<V2Order | null> => {
   try {
     const url = MARKET_ENDPOINTS.order.replace(':id', id.toString());
     const response = await apiClient.get<V2Order>(url);
-    return response.data;
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }
@@ -48,13 +48,13 @@ export const createOrder = async (data: {
   price?: string;
 }): Promise<V2Order> => {
   const response = await apiClient.post<V2Order>(MARKET_ENDPOINTS.orders, data);
-  return response.data;
+  return unwrapBackendData(response.data);
 };
 
 export const cancelOrder = async (id: number): Promise<V2Order> => {
   const url = MARKET_ENDPOINTS.cancelOrder.replace(':id', id.toString());
-  const response = await apiClient.post<V2Order>(url);
-  return response.data;
+  const response = await apiClient.delete<V2Order>(url);
+  return unwrapBackendData(response.data);
 };
 
 export const cancelAllOrders = async (params?: {
@@ -62,7 +62,7 @@ export const cancelAllOrders = async (params?: {
   side?: string;
 }): Promise<V2Order[]> => {
   const response = await apiClient.post<V2Order[]>(MARKET_ENDPOINTS.cancelAllOrders, params);
-  return response.data;
+  return normalizeBackendArray<V2Order>(response.data, 'orders');
 };
 
 export const getTrades = async (params?: {
@@ -74,14 +74,14 @@ export const getTrades = async (params?: {
   const response = await apiClient.get<V2Trade[]>(MARKET_ENDPOINTS.trades, {
     params
   });
-  return response.data;
+  return normalizeBackendArray<V2Trade>(response.data, 'trades');
 };
 
 export const getTrade = async (id: number): Promise<V2Trade | null> => {
   try {
     const url = MARKET_ENDPOINTS.trade.replace(':id', id.toString());
     const response = await apiClient.get<V2Trade>(url);
-    return response.data;
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }

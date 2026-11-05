@@ -1,12 +1,12 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable React strict mode for better development experience
   reactStrictMode: true,
-
-  // Standalone output for Docker
   output: 'standalone',
-
-  // Image configuration
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   images: {
     remotePatterns: [
       {
@@ -29,59 +29,9 @@ const nextConfig = {
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60,
   },
-
-  // Webpack configuration
-  webpack: (config, { dev, isServer }) => {
-    // Fallback for Node.js modules
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-    };
-
-    // Optimize bundle size
-    if (!dev && !isServer) {
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
-          },
-        },
-      };
-    }
-
-    return config;
-  },
-
-  // Experimental features for Next.js 15
-  experimental: {
-    // Enable server actions
-    serverActions: {
-      bodySizeLimit: '2mb',
-    },
-  },
-
-  // Turbopack configuration (stable in Next.js 15)
-  turbopack: {
-    root: __dirname,
-    rules: {
-      '*.svg': {
-        loaders: ['@svgr/webpack'],
-        as: '*.js',
-      },
-    },
-  },
-
-  // Environment variables validation
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
-
-  // Headers for security
   async headers() {
     const isDev = process.env.NODE_ENV === 'development';
 
@@ -111,8 +61,6 @@ const nextConfig = {
       },
     ];
   },
-
-  // Redirects
   async redirects() {
     return [
       {
@@ -122,33 +70,16 @@ const nextConfig = {
       },
     ];
   },
-
-  // Rewrites for API proxying (if needed)
   async rewrites() {
-    return [
-      // Add API rewrites here if needed
-    ];
+    return [];
   },
-
-  // Compiler configuration
   compiler: {
-    // Remove console logs in production
     removeConsole: process.env.NODE_ENV === 'production',
   },
-
-  // TypeScript configuration
   typescript: {
-    // Don't run TypeScript during build in CI/CD
     ignoreBuildErrors: process.env.CI === 'true',
   },
-
-  // Output configuration
-  output: 'standalone',
-
-  // Trailing slash configuration
   trailingSlash: false,
-
-  // Powered by header
   poweredByHeader: false,
 };
 

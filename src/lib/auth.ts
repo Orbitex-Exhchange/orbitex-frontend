@@ -53,23 +53,38 @@ class AuthService {
     return AuthService.instance;
   }
 
+  private normalizeUser(rawUser: any): AuthUser | null {
+    if (!rawUser || typeof rawUser !== 'object') return null;
+
+    const kycLevel = Number(rawUser.kyc_level ?? rawUser.level ?? 0);
+    return {
+      id: rawUser.id || rawUser.uid || rawUser.sub || rawUser.email || 'unknown',
+      email: rawUser.email || '',
+      role: rawUser.role || 'member',
+      kyc_level: Number.isFinite(kycLevel) ? kycLevel : 0,
+      email_verified: rawUser.email_verified ?? rawUser.state === 'active',
+      phone_verified: rawUser.phone_verified ?? (Array.isArray(rawUser.phones) && rawUser.phones.length > 0),
+      two_factor_enabled: rawUser.two_factor_enabled ?? rawUser.otp ?? false,
+    };
+  }
+
   private getStoredUser(): AuthUser | null {
     if (typeof window === 'undefined') return null;
 
     try {
       const storedUser = localStorage.getItem('user');
-      return storedUser ? JSON.parse(storedUser) as AuthUser : null;
+      return storedUser ? this.normalizeUser(JSON.parse(storedUser)) : null;
     } catch (error) {
       console.error('Failed to parse stored user:', error);
       return null;
     }
   }
 
-  private getUserFromToken(): AuthUser | null {
-    if (!this.accessToken) return null;
+  private getUserFromToken(token = this.accessToken): AuthUser | null {
+    if (!token) return null;
 
     try {
-      const decoded = jwtDecode<DecodedToken>(this.accessToken);
+      const decoded = jwtDecode<DecodedToken>(token);
       const kycLevel = Number(decoded.kyc_level ?? decoded.level ?? 0);
       
       return {
@@ -85,6 +100,15 @@ class AuthService {
       console.error('Failed to decode token:', error);
       return this.getStoredUser();
     }
+  }
+
+  private clearStoredSession(): void {
+    if (typeof window === 'undefined') return;
+
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+    this.removeCookie('access_token');
   }
 
   private isTokenExpired(token: string): boolean {
@@ -113,12 +137,15 @@ class AuthService {
 
   public async login(email: string, password: string, otpCode?: string): Promise<{ success: boolean; user: AuthUser; token: string }> {
     const { authAPI } = await import('./api/auth');
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
+    const normalizedOtpCode = otpCode?.trim();
     
     try {
       const response = await authAPI.login({
-        email,
-        password,
-        ...(otpCode && { otp_code: otpCode }),
+        email: normalizedEmail,
+        password: normalizedPassword,
+        ...(normalizedOtpCode && { otp_code: normalizedOtpCode }),
       });
       
       // Convert Orbisigner user to AuthUser format
@@ -133,8 +160,8 @@ class AuthService {
         two_factor_enabled: response.user.otp || false,
       };
 
-      // Use the generated JWT token for Orbitex-Clean API access
-      this.accessToken = response.jwt_token || '';
+      // Use the Orbisigner JWT token for backend-rust API access
+      this.accessToken = response.jwt_token;
       this.refreshToken = response.user.csrf_token; // Use CSRF token as refresh token
 
       // Store tokens in localStorage and cookie (for middleware access)
@@ -182,8 +209,8 @@ class AuthService {
         two_factor_enabled: response.user.otp || false,
       };
 
-      // Use the generated JWT token for Orbitex-Clean API access
-      this.accessToken = response.jwt_token || '';
+      // Use the Orbisigner JWT token for backend-rust API access
+      this.accessToken = response.jwt_token;
       this.refreshToken = response.user.csrf_token; // Use CSRF token as refresh token
 
       // Store tokens in localStorage and cookie (for middleware access)
@@ -216,12 +243,37 @@ class AuthService {
     this.user = null;
 
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
-      // Also remove cookie
-      this.removeCookie('access_token');
+      this.clearStoredSession();
+      window.dispatchEvent(new Event('auth:changed'));
     }
+  }
+
+  public syncFromStorage(): { token: string; user: AuthUser } | null {
+    if (typeof window === 'undefined') {
+      return this.accessToken && this.user ? { token: this.accessToken, user: this.user } : null;
+    }
+
+    const token = localStorage.getItem('access_token');
+    this.refreshToken = localStorage.getItem('refresh_token');
+
+    if (!token || this.isTokenExpired(token)) {
+      this.accessToken = null;
+      this.user = null;
+      if (token) this.clearStoredSession();
+      return null;
+    }
+
+    this.accessToken = token;
+    this.user = this.getStoredUser() || this.getUserFromToken(token);
+
+    if (!this.user) {
+      this.accessToken = null;
+      this.clearStoredSession();
+      return null;
+    }
+
+    this.setCookie('access_token', token, 1);
+    return { token, user: this.user };
   }
 
   public async refreshAccessToken(): Promise<{ success: boolean; user: AuthUser; token: string } | null> {
@@ -320,10 +372,16 @@ class AuthService {
   }
 
   public getUser(): AuthUser | null {
+    if (typeof window !== 'undefined') {
+      this.syncFromStorage();
+    }
     return this.user;
   }
 
   public isAuthenticated(): boolean {
+    if (typeof window !== 'undefined') {
+      this.syncFromStorage();
+    }
     return !!this.accessToken && !this.isTokenExpired(this.accessToken);
   }
 
@@ -352,6 +410,9 @@ class AuthService {
   }
 
   public getAccessToken(): string | null {
+    if (typeof window !== 'undefined') {
+      this.syncFromStorage();
+    }
     return this.accessToken;
   }
 }

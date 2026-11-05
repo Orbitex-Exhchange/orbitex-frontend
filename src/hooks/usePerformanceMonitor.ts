@@ -36,8 +36,8 @@ export const usePerformanceMonitor = (
   const frameCountRef = useRef(0);
   const lastTimeRef = useRef(performance.now());
   const updateCountRef = useRef(0);
-  const animationFrameRef = useRef<number>();
-  const intervalRef = useRef<NodeJS.Timeout>();
+  const animationFrameRef = useRef<number | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const measureFrame = useCallback(() => {
     frameCountRef.current++;
@@ -72,7 +72,7 @@ export const usePerformanceMonitor = (
   }, [updateInterval, enableMemoryTracking]);
 
   const startMonitoring = useCallback(() => {
-    if (animationFrameRef.current) {
+    if (animationFrameRef.current !== null) {
       cancelAnimationFrame(animationFrameRef.current);
     }
     
@@ -82,14 +82,14 @@ export const usePerformanceMonitor = (
   }, [measureFrame]);
 
   const stopMonitoring = useCallback(() => {
-    if (animationFrameRef.current) {
+    if (animationFrameRef.current !== null) {
       cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = undefined;
+      animationFrameRef.current = null;
     }
     
-    if (intervalRef.current) {
+    if (intervalRef.current !== null) {
       clearInterval(intervalRef.current);
-      intervalRef.current = undefined;
+      intervalRef.current = null;
     }
   }, []);
 

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Settings, Activity, Database, Wifi, TrendingUp, RefreshCw } from 'lucide-react';
+import { env } from '@/lib/env';
+import { publicApiService } from '@/services/publicService';
 
 interface SystemStatus {
   backend: 'loading' | 'online' | 'offline';
@@ -22,7 +24,7 @@ export default function ApiTestPage() {
     database: 'loading',
     websocket: 'loading'
   });
-  const [selectedMarket, setSelectedMarket] = useState('SUI-USDC');
+  const [selectedMarket, setSelectedMarket] = useState('BTC-USD');
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunningTests, setIsRunningTests] = useState(false);
   const [activeTab, setActiveTab] = useState<'integration' | 'endpoints'>('integration');
@@ -33,7 +35,7 @@ export default function ApiTestPage() {
   // Check system status based on real API responses
   useEffect(() => {
     const checkSystemStatus = async () => {
-      const baseUrl = 'http://localhost:3100';
+      const baseUrl = env.NEXT_PUBLIC_API_URL;
       
       // Check backend health
       try {
@@ -53,14 +55,11 @@ export default function ApiTestPage() {
 
       // Check database health by testing a database-dependent endpoint
       try {
-        const response = await fetch(`${baseUrl}/api/v2/public/markets`);
-        if (response.ok) {
-          const data = await response.json();
-          // If we get a response (even empty array), database connection is working
-          console.log('Database health check - response:', response.status, data);
+        const markets = await publicApiService.getMarkets();
+        if (markets) {
           setSystemStatus(prev => ({ ...prev, database: 'online' }));
+          setMarkets(markets);
         } else {
-          console.log('Database health check failed - status:', response.status);
           setSystemStatus(prev => ({ ...prev, database: 'offline' }));
         }
       } catch (error) {
@@ -92,17 +91,6 @@ export default function ApiTestPage() {
       } catch (error) {
         setSystemStatus(prev => ({ ...prev, websocket: 'offline' }));
       }
-
-      // Load markets data
-      try {
-        const response = await fetch(`${baseUrl}/api/v2/public/markets`);
-        if (response.ok) {
-          const data = await response.json();
-          setMarkets(data.markets || []);
-        }
-      } catch (error) {
-        console.error('Failed to load markets:', error);
-      }
     };
 
     checkSystemStatus();
@@ -111,24 +99,16 @@ export default function ApiTestPage() {
   // Load ticker and orderbook data when market changes
   useEffect(() => {
     const loadMarketData = async () => {
-      const baseUrl = 'http://localhost:3100';
-      
       try {
-        const response = await fetch(`${baseUrl}/api/v2/public/markets/${selectedMarket}/tickers`);
-        if (response.ok) {
-          const data = await response.json();
-          setTicker(data);
-        }
+        const tickerData = await publicApiService.getTicker(selectedMarket);
+        setTicker(tickerData);
       } catch (error) {
         console.error('Failed to load ticker:', error);
       }
 
       try {
-        const response = await fetch(`${baseUrl}/api/v2/public/markets/${selectedMarket}/order-book`);
-        if (response.ok) {
-          const data = await response.json();
-          setOrderBook(data);
-        }
+        const orderBookData = await publicApiService.getOrderBook(selectedMarket);
+        setOrderBook(orderBookData);
       } catch (error) {
         console.error('Failed to load orderbook:', error);
       }
@@ -143,7 +123,7 @@ export default function ApiTestPage() {
     setIsRunningTests(true);
     setTestResults([]);
 
-    const baseUrl = 'http://localhost:3100';
+    const baseUrl = env.NEXT_PUBLIC_API_URL;
 
     const tests = [
       {
@@ -162,11 +142,21 @@ export default function ApiTestPage() {
         name: 'Markets Data Fetch',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/v2/public/markets`);
-            const data = await response.json();
-            return { success: response.ok, data };
-          } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+            const data = await publicApiService.getMarkets();
+            return { success: !!data, data };
+          } catch (error: any) {
+            return { success: false, error: error.message };
+          }
+        }
+      },
+      {
+        name: 'All Tickers',
+        test: async () => {
+          try {
+            const data = await publicApiService.getTickers();
+            return { success: !!data, data };
+          } catch (error: any) {
+            return { success: false, error: error.message };
           }
         }
       },
@@ -174,11 +164,10 @@ export default function ApiTestPage() {
         name: 'Market Ticker Data',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/v2/public/markets/${selectedMarket}/tickers`);
-            const data = await response.json();
-            return { success: response.ok, data };
-          } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+            const data = await publicApiService.getTicker(selectedMarket);
+            return { success: !!data, data };
+          } catch (error: any) {
+            return { success: false, error: error.message };
           }
         }
       },
@@ -186,11 +175,10 @@ export default function ApiTestPage() {
         name: 'OrderBook Data',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/v2/public/markets/${selectedMarket}/order-book`);
-            const data = await response.json();
-            return { success: response.ok, data };
-          } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+            const data = await publicApiService.getOrderBook(selectedMarket);
+            return { success: !!data, data };
+          } catch (error: any) {
+            return { success: false, error: error.message };
           }
         }
       },
@@ -198,11 +186,68 @@ export default function ApiTestPage() {
         name: 'Currencies Data',
         test: async () => {
           try {
-            const response = await fetch(`${baseUrl}/api/v2/public/currencies`);
+            const data = await publicApiService.getCurrencies();
+            return { success: !!data, data };
+          } catch (error: any) {
+            return { success: false, error: error.message };
+          }
+        }
+      },
+      {
+        name: 'Market Trades',
+        test: async () => {
+          try {
+            const data = await publicApiService.getTrades(selectedMarket, 20);
+            return { success: Array.isArray(data), data };
+          } catch (error: any) {
+            return { success: false, error: error.message };
+          }
+        }
+      },
+      {
+        name: 'K-Line Data',
+        test: async () => {
+          try {
+            const data = await publicApiService.getMarketKLine(selectedMarket, 1, 20);
+            return { success: Array.isArray(data), data };
+          } catch (error: any) {
+            return { success: false, error: error.message };
+          }
+        }
+      },
+      {
+        name: 'Trading Fees',
+        test: async () => {
+          try {
+            const response = await fetch(`${baseUrl}/api/v2/public/trading-fees`);
             const data = await response.json();
             return { success: response.ok, data };
-          } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+          } catch (error: any) {
+            return { success: false, error: error.message };
+          }
+        }
+      },
+      {
+        name: 'Withdraw Limits',
+        test: async () => {
+          try {
+            const response = await fetch(`${baseUrl}/api/v2/public/withdraw-limits`);
+            const data = await response.json();
+            return { success: response.ok, data };
+          } catch (error: any) {
+            return { success: false, error: error.message };
+          }
+        }
+      },
+      {
+        name: 'Member Levels',
+        test: async () => {
+          try {
+            const response = await fetch(`${baseUrl}/api/v2/public/member-levels`);
+            const data = await response.json();
+            return { success: response.ok, data };
+          } catch (error: any) {
+            return { success: false, error: error.message };
           }
         }
       },
@@ -478,7 +523,6 @@ export default function ApiTestPage() {
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Health Check</h4>
                       <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /health</code>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300 mt-1">GET /api/v2/health</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Markets</h4>
@@ -486,7 +530,7 @@ export default function ApiTestPage() {
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Tickers</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets/{'{market}'}/tickers</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/tickers</code>
                       <code className="text-sm bg-gray-800 p-2 rounded block text-green-300 mt-1">GET /api/v2/public/markets/{'{market}'}/tickers</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
@@ -494,8 +538,8 @@ export default function ApiTestPage() {
                       <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets/{'{market}'}/order-book</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
-                      <h4 className="font-medium mb-2 text-white">Market Depth</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets/{'{market}'}/depth</code>
+                      <h4 className="font-medium mb-2 text-white">K-Line</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/markets/{'{market}'}/k-line</code>
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Recent Trades</h4>
@@ -507,7 +551,28 @@ export default function ApiTestPage() {
                     </div>
                     <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
                       <h4 className="font-medium mb-2 text-white">Trading Fees</h4>
-                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/trading_fees</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/trading-fees</code>
+                    </div>
+                    <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
+                      <h4 className="font-medium mb-2 text-white">Withdraw Limits</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/withdraw-limits</code>
+                    </div>
+                    <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
+                      <h4 className="font-medium mb-2 text-white">Member Levels</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/public/member-levels</code>
+                    </div>
+                    <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
+                      <h4 className="font-medium mb-2 text-white">Order Cancel</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">DELETE /api/v2/market/orders/{'{id}'}</code>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300 mt-1">POST /api/v2/market/orders/cancel</code>
+                    </div>
+                    <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
+                      <h4 className="font-medium mb-2 text-white">Deposit Address</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">POST /api/v2/account/deposit_address/{'{currency}'}</code>
+                    </div>
+                    <div className="p-4 border border-gray-600 rounded-lg bg-gray-600">
+                      <h4 className="font-medium mb-2 text-white">Internal Transfers</h4>
+                      <code className="text-sm bg-gray-800 p-2 rounded block text-green-300">GET /api/v2/account/internal-transfers</code>
                     </div>
                   </div>
                 </div>

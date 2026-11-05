@@ -30,9 +30,27 @@ interface SignInFormData {
   otpCode: string;
 }
 
+const demoAccounts = [
+  {
+    label: 'Member Account',
+    email: 'demo@orbitex.io',
+    password: 'DemoOrbitex2024!',
+  },
+  {
+    label: 'Trader Account',
+    email: 'trader@demo.orbitex.com',
+    password: 'TraderDemo2024!@#',
+  },
+  {
+    label: 'Admin Account',
+    email: 'admin@orbitex.io',
+    password: 'AdminOrbitex2024!@#',
+  },
+];
+
 export default function SignInPage() {
   const router = useRouter();
-  const { login, refreshAuthState, isAuthenticated, user } = useAuth();
+  const { login, isAuthenticated, user, isAuthReady } = useAuth();
   const [formData, setFormData] = useState<SignInFormData>({
     email: '',
     password: '',
@@ -45,10 +63,11 @@ export default function SignInPage() {
   const [success, setSuccess] = useState<string>('');
   const [rememberMe, setRememberMe] = useState(false);
 
-  // Debug auth state changes
   useEffect(() => {
-    console.log('Auth state changed:', { isAuthenticated, user });
-  }, [isAuthenticated, user]);
+    if (isAuthReady && isAuthenticated && user) {
+      router.replace('/dashboard');
+    }
+  }, [isAuthReady, isAuthenticated, router, user]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -95,29 +114,15 @@ export default function SignInPage() {
     setSuccess('');
     
     try {
-      // Handle login with authService (supports both regular and 2FA)
-      const { AuthService } = await import('@/lib/auth');
-      const auth = AuthService.getInstance();
+      const loginSucceeded = await login(
+        formData.email.trim().toLowerCase(),
+        formData.password.trim(),
+        formData.otpCode.trim() || undefined
+      );
       
-      const result = await auth.login(formData.email, formData.password, formData.otpCode);
-      
-      if (result.success) {
-        // Refresh auth state first
-        refreshAuthState();
-        console.log('Login successful');
-        
-        // Wait a moment for state to update, then redirect
+      if (loginSucceeded) {
         setSuccess('Login successful! Redirecting...');
-        
-        // Give time for localStorage, cookies, and context state to sync
-        // Then use window.location for a full page reload which will re-initialize AuthContext
-        setTimeout(() => {
-          console.log('Executing redirect to dashboard...');
-          console.log('Token in localStorage:', !!localStorage.getItem('access_token'));
-          // Use window.location.href for full page reload to ensure auth state is read from localStorage
-          // Cookie is already set by auth.login(), so middleware will see it on next request
-          window.location.href = '/dashboard';
-        }, 500);
+        router.replace('/dashboard');
       } else {
         setErrors({ general: 'Login failed. Please check your credentials and try again.' });
       }
@@ -125,15 +130,21 @@ export default function SignInPage() {
     } catch (error: any) {
       console.error('Login error:', error);
       
-      if (error.message?.toLowerCase().includes('2fa') || error.message?.toLowerCase().includes('otp')) {
+      const errorMessage = error.message || '';
+      const normalizedError = errorMessage.toLowerCase();
+
+      if (normalizedError.includes('2fa') || normalizedError.includes('otp')) {
         setShowOtp(true);
         setErrors({ general: 'Please enter your 2FA code' });
-      } else if (error.message?.includes('Invalid credentials')) {
+      } else if (
+        normalizedError.includes('invalid credentials') ||
+        normalizedError.includes('identity.session.invalid_params')
+      ) {
         setErrors({ general: 'Invalid email or password' });
-      } else if (error.message?.includes('Account locked')) {
+      } else if (errorMessage.includes('Account locked')) {
         setErrors({ general: 'Account is temporarily locked. Please try again later.' });
       } else {
-        setErrors({ general: error.message || 'Login failed. Please try again.' });
+        setErrors({ general: errorMessage || 'Login failed. Please try again.' });
       }
     } finally {
       setIsLoading(false);
@@ -331,18 +342,18 @@ export default function SignInPage() {
 
         {/* Demo Credentials (for testing) */}
         <div className="mt-4 p-4 border border-[hsl(var(--trading-border))] rounded-lg bg-[hsl(var(--trading-bg-tertiary))]">
-          <h3 className="text-sm font-medium text-[hsl(var(--trading-text))] mb-2">Demo Credentials (seeded in database):</h3>
+          <h3 className="text-sm font-medium text-[hsl(var(--trading-text))] mb-2">Live Orbitex demo accounts:</h3>
           <div className="space-y-2 text-xs text-[hsl(var(--trading-text-secondary))]">
-            <div>
-              <p><strong>Member Account:</strong></p>
-              <p>Email: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">john@orbisigner.io</code></p>
-              <p>Password: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">Am8icnzEI3d!</code></p>
-            </div>
-            <div className="pt-2 border-t border-[hsl(var(--trading-border))]">
-              <p><strong>Admin Account:</strong></p>
-              <p>Email: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">admin@orbisigner.io</code></p>
-              <p>Password: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">0lDHd9ufs9t@</code></p>
-            </div>
+            {demoAccounts.map((account, index) => (
+              <div
+                key={account.email}
+                className={index === 0 ? '' : 'pt-2 border-t border-[hsl(var(--trading-border))]'}
+              >
+                <p><strong>{account.label}:</strong></p>
+                <p>Email: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">{account.email}</code></p>
+                <p>Password: <code className="bg-[hsl(var(--trading-bg))] px-1 rounded">{account.password}</code></p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

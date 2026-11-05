@@ -43,6 +43,7 @@ import {
 import TickerSearchPanel from './TickerSearchPanel';
 import { usePublicTickers } from '@/lib/api/services/public';
 import { useKline } from '@/lib/api/services/trading';
+import { formatNumber, normalizeMarketId, toFiniteNumber } from '@/lib/utils';
 
 interface TradingViewChartProps {
   symbol: string;
@@ -92,6 +93,20 @@ const drawingTools = [
   { value: 'fibonacci', icon: TrendingDown, label: 'Fibonacci' },
   { value: 'measure', icon: Ruler, label: 'Measure' }
 ];
+
+const DEFAULT_MARKET_DATA = {
+  lastPrice: 43250.50,
+  change24h: 2.45,
+  high24h: 44100.00,
+  low24h: 42800.00,
+  volume: 2847.65,
+  openInterest: 125000000
+};
+
+const positiveNumber = (value: unknown, fallback: number) => {
+  const parsed = toFiniteNumber(value, fallback);
+  return parsed > 0 ? parsed : fallback;
+};
 
 // Memoized chart configuration
 const getChartConfig = (theme: 'light' | 'dark', timeframe: string) => ({
@@ -220,15 +235,19 @@ export const TradingViewChart = React.memo(({
   }, [selectedTimeframe, refetchKlines, propKlineData]);
 
   // Get current market ticker data
-  const currentTicker = tickersData?.find(ticker => ticker.market === symbol);
-  const marketData = useMemo(() => ({
-    lastPrice: currentTicker ? parseFloat(currentTicker.ticker.last) : 43250.50,
-    change24h: currentTicker ? parseFloat(currentTicker.ticker.price_change_percent) : 2.45,
-    high24h: currentTicker ? parseFloat(currentTicker.ticker.high) : 44100.00,
-    low24h: currentTicker ? parseFloat(currentTicker.ticker.low) : 42800.00,
-    volume: currentTicker ? parseFloat(currentTicker.ticker.vol) : 2847.65,
-    openInterest: 125000000
-  }), [currentTicker]);
+  const currentTicker = tickersData?.find(ticker => normalizeMarketId(ticker.market) === normalizeMarketId(symbol));
+  const marketData = useMemo(() => {
+    const tickerData = currentTicker?.ticker || currentTicker;
+
+    return {
+      lastPrice: positiveNumber(tickerData?.last, DEFAULT_MARKET_DATA.lastPrice),
+      change24h: toFiniteNumber(tickerData?.price_change_percent, DEFAULT_MARKET_DATA.change24h),
+      high24h: positiveNumber(tickerData?.high, DEFAULT_MARKET_DATA.high24h),
+      low24h: positiveNumber(tickerData?.low, DEFAULT_MARKET_DATA.low24h),
+      volume: toFiniteNumber(tickerData?.vol, DEFAULT_MARKET_DATA.volume),
+      openInterest: DEFAULT_MARKET_DATA.openInterest
+    };
+  }, [currentTicker]);
 
   // Memoized indicators
   const indicators = useMemo(() => [
@@ -296,8 +315,15 @@ export const TradingViewChart = React.memo(({
     // Set initial data - use real k-line data from API with fallback
     let chartData;
     try {
-      if (finalKlineData && finalKlineData.k_line && finalKlineData.k_line.length > 0) {
-        chartData = processKlineData(finalKlineData.k_line, theme);
+      const rows = Array.isArray(finalKlineData)
+        ? finalKlineData
+        : finalKlineData?.k_line;
+
+      if (Array.isArray(rows) && rows.length > 0) {
+        chartData = processKlineData(rows, theme);
+        if (chartData.candlesticks.length === 0) {
+          chartData = generateFallbackData();
+        }
       } else {
         // Generate minimal fallback data to prevent chart crash
         chartData = generateFallbackData();
@@ -650,23 +676,23 @@ export const TradingViewChart = React.memo(({
             <div className="bg-[hsl(var(--trading-bg-tertiary))]/50 px-2 py-1 rounded border border-[hsl(var(--trading-border))]">
               <span className="text-[hsl(var(--trading-text-muted))] text-xs">Price: </span>
               <span className="font-mono font-bold text-[hsl(var(--trading-text))] text-xs">
-                ${marketData.lastPrice.toFixed(2)}
+                ${formatNumber(marketData.lastPrice, 2)}
               </span>
               <span className={`font-medium ml-1 text-xs ${marketData.change24h >= 0 ? 'text-[hsl(var(--trading-success))]' : 'text-[hsl(var(--trading-error))]'}`}>
-                {marketData.change24h >= 0 ? '+' : ''}{marketData.change24h}%
+                {marketData.change24h >= 0 ? '+' : ''}{formatNumber(marketData.change24h, 2)}%
               </span>
             </div>
             <div className="bg-[hsl(var(--trading-bg-tertiary))]/50 px-2 py-1 rounded border border-[hsl(var(--trading-border))]">
               <span className="text-[hsl(var(--trading-text-muted))] text-xs">High: </span>
-              <span className="font-mono text-[hsl(var(--trading-text))] text-xs">${marketData.high24h.toFixed(2)}</span>
+              <span className="font-mono text-[hsl(var(--trading-text))] text-xs">${formatNumber(marketData.high24h, 2)}</span>
             </div>
             <div className="bg-[hsl(var(--trading-bg-tertiary))]/50 px-2 py-1 rounded border border-[hsl(var(--trading-border))]">
               <span className="text-[hsl(var(--trading-text-muted))] text-xs">Low: </span>
-              <span className="font-mono text-[hsl(var(--trading-text))] text-xs">${marketData.low24h.toFixed(2)}</span>
+              <span className="font-mono text-[hsl(var(--trading-text))] text-xs">${formatNumber(marketData.low24h, 2)}</span>
             </div>
             <div className="bg-[hsl(var(--trading-bg-tertiary))]/50 px-2 py-1 rounded border border-[hsl(var(--trading-border))]">
               <span className="text-[hsl(var(--trading-text-muted))] text-xs">Vol: </span>
-              <span className="font-mono text-[hsl(var(--trading-text))] text-xs">{marketData.volume.toFixed(2)} BTC</span>
+              <span className="font-mono text-[hsl(var(--trading-text))] text-xs">{formatNumber(marketData.volume, 2)} BTC</span>
             </div>
           </div>
         </div>
@@ -715,6 +741,16 @@ export const TradingViewChart = React.memo(({
 TradingViewChart.displayName = 'TradingViewChart';
 
 // Process real k-line data from API
+const normalizeKlineTime = (value: unknown): number => {
+  const numeric = toFiniteNumber(value, NaN);
+  if (Number.isFinite(numeric)) {
+    return numeric > 10_000_000_000 ? Math.floor(numeric / 1000) : Math.floor(numeric);
+  }
+
+  const parsed = new Date(String(value)).getTime();
+  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : NaN;
+};
+
 const processKlineData = (klines: any[], theme: 'light' | 'dark' = 'dark') => {
   const candlesticks = [];
   const volumes = [];
@@ -724,20 +760,24 @@ const processKlineData = (klines: any[], theme: 'light' | 'dark' = 'dark') => {
     let time, open, high, low, close, volume;
 
     if (Array.isArray(kline)) {
-      time = Math.floor(new Date(kline[0]).getTime() / 1000);
-      open = parseFloat(kline[1]);
-      high = parseFloat(kline[2]);
-      low = parseFloat(kline[3]);
-      close = parseFloat(kline[4]);
-      volume = parseFloat(kline[5]);
+      time = normalizeKlineTime(kline[0]);
+      open = toFiniteNumber(kline[1], NaN);
+      high = toFiniteNumber(kline[2], NaN);
+      low = toFiniteNumber(kline[3], NaN);
+      close = toFiniteNumber(kline[4], NaN);
+      volume = toFiniteNumber(kline[5]);
     } else {
       // Object format from API
-      time = Math.floor(new Date(kline.time).getTime() / 1000);
-      open = parseFloat(kline.open);
-      high = parseFloat(kline.high);
-      low = parseFloat(kline.low);
-      close = parseFloat(kline.close);
-      volume = parseFloat(kline.volume);
+      time = normalizeKlineTime(kline.time);
+      open = toFiniteNumber(kline.open, NaN);
+      high = toFiniteNumber(kline.high, NaN);
+      low = toFiniteNumber(kline.low, NaN);
+      close = toFiniteNumber(kline.close, NaN);
+      volume = toFiniteNumber(kline.volume);
+    }
+
+    if (![time, open, high, low, close].every(Number.isFinite)) {
+      continue;
     }
 
     candlesticks.push({
@@ -792,4 +832,3 @@ const generateFallbackData = () => {
 
   return { candlesticks, volumes };
 };
-

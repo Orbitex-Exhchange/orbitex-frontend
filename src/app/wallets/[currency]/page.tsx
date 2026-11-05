@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
+import { useState, use, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { QRCode } from '@/components/ui/qr-code';
 import { 
   Wallet, 
   TrendingUp, 
@@ -37,11 +38,16 @@ import {
   ExternalLink,
   Shield,
   Globe,
-  Users
+  Users,
+  type LucideIcon
 } from 'lucide-react';
-import { formatNumber, formatCurrency } from '@/lib/utils';
+import { formatNumber, formatCurrency, toFiniteNumber } from '@/lib/utils';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAccountBalance, useCreateDepositAddress } from '@/lib/api/services/account';
+import { usePublicMarkets, usePublicTickers, getCurrencyByCode } from '@/lib/api/services/public';
+import { LoadingState, AuthRequiredState, AmbientPageShell } from '@/components/ambient/AmbientExchange';
 
 interface WalletPageProps {
   params: Promise<{
@@ -49,32 +55,85 @@ interface WalletPageProps {
   }>;
 }
 
-const mockWalletData = {
-  ETH: {
-    name: 'Ethereum',
-    symbol: 'ETH',
-    balance: '0.00214719',
-    value: 178.92,
-    change24h: 2.47,
-    lastPrice: 83185.00,
-    depositAddress: '0xf6b87DD8b45573d7634cd290a842BFbDfA5504bd',
-    network: 'Ethereum',
-    depositEnabled: true,
-    withdrawalEnabled: true,
-    minWithdrawal: '0.00050000',
-    withdrawalFee: '0.00014000',
-    icon: Activity
-  }
+interface WalletDetails {
+  name: string;
+  symbol: string;
+  balance: string;
+  locked: string;
+  value: number;
+  change24h: number;
+  lastPrice: number;
+  depositAddress: string;
+  network: string;
+  depositEnabled: boolean;
+  withdrawalEnabled: boolean;
+  minWithdrawal: string;
+  withdrawalFee: string;
+  icon: LucideIcon;
+}
+
+const currencyMeta: Record<string, { name: string; icon: LucideIcon; network: string }> = {
+  BTC: { name: 'Bitcoin', icon: Bitcoin, network: 'Bitcoin' },
+  ETH: { name: 'Ethereum', icon: Activity, network: 'Ethereum' },
+  USDT: { name: 'Tether', icon: DollarSign, network: 'Ethereum' },
+  USDC: { name: 'USD Coin', icon: DollarSign, network: 'Ethereum' },
+  USD: { name: 'US Dollar', icon: DollarSign, network: 'Fiat' },
+  EUR: { name: 'Euro', icon: DollarSign, network: 'Fiat' },
+  ZAR: { name: 'Rand', icon: DollarSign, network: 'Bank Transfer' },
+  SOL: { name: 'Solana', icon: Activity, network: 'Solana' },
+  SUI: { name: 'Sui', icon: Activity, network: 'Sui' },
+  NEAR: { name: 'NEAR Protocol', icon: Activity, network: 'NEAR' },
+  TAO: { name: 'Bittensor', icon: Activity, network: 'Bittensor' },
+  MON: { name: 'Monad', icon: Activity, network: 'Monad' },
+  TEMPO: { name: 'Tempo', icon: Activity, network: 'Tempo' },
+  POL: { name: 'Polygon', icon: Activity, network: 'Polygon' },
+  BNB: { name: 'BNB Chain', icon: Activity, network: 'BNB Smart Chain' },
 };
 
 export default function WalletPage(props: WalletPageProps) {
   const params = use(props.params);
-  const { currency } = params;
+  const currencyCode = String(params.currency || '').toUpperCase();
+  const { user, isAuthenticated, isAuthReady } = useAuth();
+  
   const [showBalances, setShowBalances] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'deposit' | 'withdraw'>('overview');
   const [copied, setCopied] = useState(false);
 
-  const walletData = mockWalletData[currency as keyof typeof mockWalletData];
+  // API Data
+  const { data: markets = [] } = usePublicMarkets();
+  const { data: tickers = [] } = usePublicTickers();
+  const { data: balance, isLoading: isLoadingBalance, refetch: refetchBalance } = useAccountBalance(currencyCode.toLowerCase());
+  const { data: depositAddressData, mutate: createAddress, isPending: isCreatingAddress } = useCreateDepositAddress();
+
+  const currencyInfo = useMemo(() => {
+    const meta = currencyMeta[currencyCode] || { name: currencyCode, icon: Wallet, network: 'Orbitex' };
+    const apiCurrency = markets.find(m => m.base_unit === currencyCode.toLowerCase())?.base_currency || 
+                        markets.find(m => m.quote_unit === currencyCode.toLowerCase())?.quote_currency;
+    
+    // Find ticker for this currency (usually against USD/USDT)
+    const ticker = tickers.find(t => t.market.startsWith(currencyCode.toLowerCase()))?.ticker || { last: '0', price_change_percent: '+0.00%' };
+    
+    return {
+      name: meta.name,
+      symbol: currencyCode,
+      balance: balance?.balance || '0.00000000',
+      locked: balance?.locked || '0.00000000',
+      price: toFiniteNumber(ticker.last),
+      change24h: parseFloat(ticker.price_change_percent) || 0,
+      icon: meta.icon,
+      network: meta.network,
+    };
+  }, [currencyCode, markets, tickers, balance]);
+
+  const depositAddress = useMemo(() => {
+    return (balance as any)?.deposit_address?.address || depositAddressData?.address || '';
+  }, [balance, depositAddressData]);
+
+  const WalletIcon = currencyInfo.icon;
+
+  const handleCreateAddress = () => {
+    createAddress(currencyCode.toLowerCase());
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -97,9 +156,9 @@ export default function WalletPage(props: WalletPageProps) {
     }
   };
 
-  if (!walletData) {
+  if (!currencyCode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))] flex items-center justify-center">
         <motion.div 
           className="text-center"
           initial={{ opacity: 0, scale: 0.9 }}
@@ -109,7 +168,7 @@ export default function WalletPage(props: WalletPageProps) {
           <h1 className="text-2xl font-bold text-white mb-4">Wallet Not Found</h1>
           <p className="text-gray-300 mb-6">The requested wallet could not be found.</p>
           <Link href="/wallets">
-            <Button className="bg-[#00ff88] text-black hover:bg-[#00cc6a]">
+            <Button className="btn-gradient-primary">
               Back to Wallets
             </Button>
           </Link>
@@ -148,7 +207,7 @@ export default function WalletPage(props: WalletPageProps) {
         <CardContent>
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm text-gray-400">
-              {walletData.change24h}% in the past 24 hours
+              {currencyInfo.change24h}% in the past 24 hours
             </div>
             <div className="text-sm text-gray-400">
               Price in ZAR ▼
@@ -178,13 +237,13 @@ export default function WalletPage(props: WalletPageProps) {
                 <div>
                   <p className="text-sm text-gray-400">Balance</p>
                   <p className="text-2xl font-bold text-white">
-                    {showBalances ? `${walletData.balance} ${walletData.symbol}` : '****'}
+                    {showBalances ? `{currencyInfo.balance} {currencyInfo.symbol}` : '****'}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Value</p>
                   <p className="text-xl font-semibold text-white">
-                    {showBalances ? formatCurrency(walletData.value) : '****'}
+                    {showBalances ? formatCurrency(toFiniteNumber(currencyInfo.balance) * currencyInfo.price) : '****'}
                   </p>
                 </div>
               </div>
@@ -213,12 +272,12 @@ export default function WalletPage(props: WalletPageProps) {
       {/* Buy/Sell Section */}
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
-          <CardTitle className="text-white">Buy & Sell {walletData.symbol}</CardTitle>
+          <CardTitle className="text-white">Buy & Sell {currencyInfo.symbol}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4">Buy {walletData.symbol}</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Buy {currencyInfo.symbol}</h3>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">With</label>
@@ -233,7 +292,7 @@ export default function WalletPage(props: WalletPageProps) {
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4">Sell {walletData.symbol}</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Sell {currencyInfo.symbol}</h3>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Get</label>
@@ -260,13 +319,13 @@ export default function WalletPage(props: WalletPageProps) {
             <div>
               <p className="text-sm text-gray-400">Last traded price</p>
               <p className="text-lg font-semibold text-white">
-                {formatCurrency(walletData.lastPrice)}
+                {formatCurrency(currencyInfo.price)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-400">24hr change</p>
-              <p className={`text-lg font-semibold ${walletData.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                ▲{walletData.change24h}%
+              <p className={`text-lg font-semibold ${currencyInfo.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                ▲{currencyInfo.change24h}%
               </p>
             </div>
           </div>
@@ -279,20 +338,20 @@ export default function WalletPage(props: WalletPageProps) {
     <motion.div className="space-y-6" variants={itemVariants}>
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
-          <CardTitle className="text-white">Deposit {walletData.symbol}</CardTitle>
+          <CardTitle className="text-white">Deposit {currencyInfo.symbol}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-gray-400">Available balance:</p>
               <p className="text-lg font-semibold text-white">
-                {showBalances ? `${walletData.balance} ${walletData.symbol}` : '****'}
+                {showBalances ? `{currencyInfo.balance} {currencyInfo.symbol}` : '****'}
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Deposit network</label>
-              <Input value={walletData.network} readOnly className="bg-slate-700 border-slate-600 text-white" />
+              <Input value={currencyInfo.network} readOnly className="bg-slate-700 border-slate-600 text-white" />
             </div>
           </div>
         </CardContent>
@@ -302,8 +361,22 @@ export default function WalletPage(props: WalletPageProps) {
         <CardContent className="p-6">
           <div className="text-center space-y-4">
             {/* QR Code */}
-            <div className="mx-auto w-48 h-48 bg-slate-700 rounded-lg flex items-center justify-center">
-              <QrCode className="h-24 w-24 text-gray-400" />
+            <div className="mx-auto w-48 h-48 bg-slate-700 rounded-lg flex items-center justify-center overflow-hidden">
+              {depositAddress ? (
+                <QRCode data={depositAddress} size={176} />
+              ) : (
+                <div className="flex flex-col items-center gap-3 p-4">
+                  <QrCode className="h-16 w-16 text-gray-500" />
+                  <Button
+                    size="sm"
+                    onClick={handleCreateAddress}
+                    disabled={isCreatingAddress}
+                    className="bg-[#00ff88] text-black hover:bg-[#00cc6a]"
+                  >
+                    {isCreatingAddress ? 'Generating…' : 'Generate address'}
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Warning */}
@@ -311,24 +384,24 @@ export default function WalletPage(props: WalletPageProps) {
               <div className="flex items-center">
                 <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
                 <p className="text-sm text-red-300">
-                  Do not send coins on any chain except {walletData.network} to this address.
+                  Do not send coins on any chain except {currencyInfo.network} to this address.
                 </p>
               </div>
             </div>
 
             {/* Address */}
             <div>
-              <p className="text-sm text-gray-400 mb-2">Your {walletData.network} {walletData.symbol} address</p>
+              <p className="text-sm text-gray-400 mb-2">Your {currencyInfo.network} {currencyInfo.symbol} address</p>
               <div className="flex items-center space-x-2">
                 <Input 
-                  value={walletData.depositAddress} 
+                  value={depositAddress} 
                   readOnly 
                   className="font-mono text-sm bg-slate-700 border-slate-600 text-white"
                 />
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => copyToClipboard(walletData.depositAddress)}
+                  onClick={() => copyToClipboard(depositAddress)}
                   className="border-slate-600 text-gray-300 hover:bg-slate-700"
                 >
                   {copied ? <CheckCircle className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
@@ -342,7 +415,7 @@ export default function WalletPage(props: WalletPageProps) {
               <ul className="text-sm text-gray-300 space-y-1">
                 <li className="flex items-center">
                   <CheckCircle className="h-4 w-4 text-green-400 mr-2" />
-                  Send only {walletData.symbol} ({walletData.network} chain) to this address.
+                  Send only {currencyInfo.symbol} ({currencyInfo.network} chain) to this address.
                 </li>
                 <li className="flex items-center">
                   <AlertTriangle className="h-4 w-4 text-yellow-400 mr-2" />
@@ -360,13 +433,13 @@ export default function WalletPage(props: WalletPageProps) {
     <motion.div className="space-y-6" variants={itemVariants}>
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
-          <CardTitle className="text-white">Withdraw {walletData.symbol}</CardTitle>
+          <CardTitle className="text-white">Withdraw {currencyInfo.symbol}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                {walletData.network} wallet address
+                {currencyInfo.network} wallet address
               </label>
               <div className="flex items-center space-x-2">
                 <Input placeholder="Enter wallet address" className="bg-slate-700 border-slate-600 text-white" />
@@ -376,7 +449,7 @@ export default function WalletPage(props: WalletPageProps) {
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Withdrawal network</label>
-              <Input value={walletData.network} readOnly className="bg-slate-700 border-slate-600 text-white" />
+              <Input value={currencyInfo.network} readOnly className="bg-slate-700 border-slate-600 text-white" />
             </div>
 
             <div className="flex items-start space-x-2">
@@ -392,7 +465,7 @@ export default function WalletPage(props: WalletPageProps) {
             <div>
               <p className="text-sm text-gray-400">Available to withdraw:</p>
               <p className="text-lg font-semibold text-white">
-                {showBalances ? `${walletData.balance} ${walletData.symbol}` : '****'}
+                {showBalances ? `{currencyInfo.balance} {currencyInfo.symbol}` : '****'}
               </p>
             </div>
 
@@ -400,7 +473,7 @@ export default function WalletPage(props: WalletPageProps) {
               <label className="block text-sm font-medium text-gray-300 mb-2">Amount</label>
               <div className="flex items-center space-x-2">
                 <Input placeholder="0" className="bg-slate-700 border-slate-600 text-white" />
-                <Button variant="outline" size="sm" className="border-slate-600 text-gray-300 hover:bg-slate-700">{walletData.symbol} Max</Button>
+                <Button variant="outline" size="sm" className="border-slate-600 text-gray-300 hover:bg-slate-700">{currencyInfo.symbol} Max</Button>
               </div>
               <input 
                 type="range" 
@@ -421,15 +494,15 @@ export default function WalletPage(props: WalletPageProps) {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-400">Withdrawal Network:</span>
-              <span className="text-white">{walletData.network}</span>
+              <span className="text-white">{currencyInfo.network}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Min amount:</span>
-              <span className="text-white">{walletData.minWithdrawal} {walletData.symbol}</span>
+              <span className="text-white">{0.0001} {currencyInfo.symbol}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Transaction fee:</span>
-              <span className="text-white">{walletData.withdrawalFee} {walletData.symbol}</span>
+              <span className="text-white">{0.00005} {currencyInfo.symbol}</span>
             </div>
           </div>
         </CardContent>
@@ -438,10 +511,10 @@ export default function WalletPage(props: WalletPageProps) {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
       {/* Header */}
       <motion.div 
-        className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700"
+        className="glass border-b border-[hsl(var(--trading-border))]"
         initial="hidden"
         animate="visible"
         variants={containerVariants}
@@ -482,14 +555,14 @@ export default function WalletPage(props: WalletPageProps) {
         <motion.div className="mb-8" variants={itemVariants}>
           <div className="flex items-center space-x-4">
             <div className="h-12 w-12 bg-gradient-to-r from-slate-600 to-slate-500 rounded-full flex items-center justify-center">
-              <walletData.icon className="h-6 w-6 text-white" />
+              <WalletIcon className="h-6 w-6 text-white" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white">
-                {walletData.name} {walletData.symbol} Wallet
+                {currencyInfo.name} {currencyInfo.symbol} Wallet
               </h1>
               <p className="text-gray-300">
-                {walletData.change24h}% in the past 24 hours
+                {currencyInfo.change24h}% in the past 24 hours
               </p>
             </div>
           </div>

@@ -10,7 +10,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Navigation } from '@/components/layout/Navigation';
 import { 
   Settings,
   Shield,
@@ -56,7 +55,6 @@ export default function SettingsPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
-        <Navigation user={user} />
         <div className="container mx-auto p-6">
           <Card className="border-yellow-500 bg-yellow-900/20">
             <CardContent className="pt-6">
@@ -130,7 +128,6 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
-      <Navigation user={user} />
       
       <div className="container mx-auto p-6 space-y-6">
         {/* Header */}

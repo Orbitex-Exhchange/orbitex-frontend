@@ -78,7 +78,7 @@ function KYCContent() {
       try {
         const token = localStorage.getItem('auth_token');
         if (token) {
-          const authServiceUrl = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'https://orbitex-auth-service-976099405307.us-central1.run.app';
+          const authServiceUrl = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'https://orbisigner-ih6wdmcn3q-uc.a.run.app/api/v2/identity';
           const response = await fetch(`${authServiceUrl}/auth/me`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -181,7 +181,7 @@ function KYCContent() {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const authServiceUrl = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'https://orbitex-auth-service-976099405307.us-central1.run.app';
+      const authServiceUrl = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'https://orbisigner-ih6wdmcn3q-uc.a.run.app/api/v2/identity';
 
       // Upload documents first
       const documentUploads = await Promise.all(

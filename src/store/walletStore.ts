@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { toFiniteNumber } from '@/lib/utils';
 
 
 // ===== TYPES =====
@@ -68,8 +69,8 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           currency: b.currency,
           balance: b.balance,
           locked: b.locked,
-          available: (parseFloat(b.balance) - parseFloat(b.locked)).toString(),
-          total: b.balance // Assuming total represents the full balance
+          available: Math.max(toFiniteNumber(b.balance) - toFiniteNumber(b.locked), 0).toString(),
+          total: (toFiniteNumber(b.balance) + toFiniteNumber(b.locked)).toString()
         }));
 
         set({
@@ -99,8 +100,8 @@ export const useWalletStore = create<WalletState & WalletActions>()(
               ...b,
               balance,
               locked,
-              available: (parseFloat(balance) - parseFloat(locked)).toString(),
-              total: balance
+              available: Math.max(toFiniteNumber(balance) - toFiniteNumber(locked), 0).toString(),
+              total: (toFiniteNumber(balance) + toFiniteNumber(locked)).toString()
             }
             : b
         )
@@ -123,7 +124,7 @@ export const useBalanceByCurrency = (currency: string) =>
 
 export const useTotalBalance = () =>
   useWalletStore((state) =>
-    state.balances.reduce((total, balance) => total + parseFloat(balance.total || '0'), 0)
+    state.balances.reduce((total, balance) => total + toFiniteNumber(balance.total), 0)
   );
 
 // ===== ACTIONS =====

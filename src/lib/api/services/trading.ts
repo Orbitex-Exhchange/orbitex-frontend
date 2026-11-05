@@ -2,21 +2,32 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { throttle, memoize, performanceMonitor } from '../performance';
 import { useMarketWebSocket } from '../websocket';
+import { normalizeMarketId } from '@/lib/utils';
+import {
+  BACKEND_RUST_ENDPOINTS,
+  normalizeBackendOrderBook,
+  normalizeBackendTicker,
+  normalizeBackendTickerMap,
+  normalizeBackendTrades,
+  normalizeBackendKline,
+  normalizeBackendArray,
+  unwrapBackendData,
+} from '../backend-rust';
 
 // Trading API endpoints
 const TRADING_ENDPOINTS = {
   // Order management
-  orders: '/api/v2/market/orders',
+  orders: BACKEND_RUST_ENDPOINTS.market.orders,
   order: '/api/v2/market/orders/:id',
-  cancelOrder: '/api/v2/market/orders/:id/cancel',
-  cancelAllOrders: '/api/v2/market/orders_cancel',
+  cancelOrder: '/api/v2/market/orders/:id',
+  cancelAllOrders: BACKEND_RUST_ENDPOINTS.market.cancelOrders,
 
   // Trade history
-  trades: '/api/v2/market/trades',
+  trades: BACKEND_RUST_ENDPOINTS.market.trades,
   trade: '/api/v2/market/trades/:id',
 
   // Market data (real-time)
-  ticker: '/api/v2/public/markets/:market/tickers/',
+  ticker: '/api/v2/public/markets/:market/tickers',
   orderbook: '/api/v2/public/markets/:market/order-book',
   marketTrades: '/api/v2/public/markets/:market/trades',
   kline: '/api/v2/public/markets/:market/k-line'
@@ -38,7 +49,7 @@ const KLINE_PERIOD_MAP: Record<string, number> = {
 };
 
 export const normalizeMarketSymbol = (market: string): string =>
-  market.replace(/[-_/]/g, '').toLowerCase();
+  normalizeMarketId(market);
 
 const resolveKlinePeriod = (period: string): number => KLINE_PERIOD_MAP[period] || 60;
 
@@ -63,15 +74,17 @@ export interface Order {
 export interface Trade {
   id: number;
   market: string;
-  side: 'buy' | 'sell';
+  side?: 'buy' | 'sell';
+  taker_type?: 'buy' | 'sell';
   price: string;
   volume: string;
   amount: string;
+  total?: string;
   fee: string;
-  created_at: string;
+  created_at: string | number;
   createdAt: string;
-  maker_order_id: number;
-  taker_order_id: number;
+  maker_order_id?: number;
+  taker_order_id?: number;
 }
 
 export interface Ticker {
@@ -119,9 +132,8 @@ export interface CreateOrderRequest {
   time_in_force?: 'GTC' | 'IOC' | 'FOK';
 }
 
-// Trading API functions - Standalone (No ObjectWrapper to avoid TDZ)
-const unwrapData = <T>(payload: T | { data?: T }): T =>
-  ((payload as { data?: T })?.data ?? payload) as T;
+const hasAccessToken = (): boolean =>
+  typeof window !== 'undefined' && Boolean(localStorage.getItem('access_token'));
 
 // Order management
 export const getOrders = async (params?: {
@@ -134,14 +146,14 @@ export const getOrders = async (params?: {
   const response = await apiClient.get<any>(TRADING_ENDPOINTS.orders, {
     params
   });
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<Order>(response.data, 'orders');
 };
 
 export const getOrder = async (id: number): Promise<Order | null> => {
   try {
     const url = TRADING_ENDPOINTS.order.replace(':id', id.toString());
     const response = await apiClient.get<Order | { data: Order }>(url);
-    return unwrapData(response.data);
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }
@@ -149,13 +161,13 @@ export const getOrder = async (id: number): Promise<Order | null> => {
 
 export const createOrder = async (data: CreateOrderRequest): Promise<Order> => {
   const response = await apiClient.post<Order | { data: Order }>(TRADING_ENDPOINTS.orders, data);
-  return unwrapData(response.data);
+  return unwrapBackendData(response.data);
 };
 
 export const cancelOrder = async (id: number): Promise<Order> => {
   const url = TRADING_ENDPOINTS.cancelOrder.replace(':id', id.toString());
-  const response = await apiClient.post<Order | { data: Order }>(url);
-  return unwrapData(response.data);
+  const response = await apiClient.delete<Order | { data: Order }>(url);
+  return unwrapBackendData(response.data);
 };
 
 export const cancelAllOrders = async (params?: {
@@ -175,14 +187,14 @@ export const getTrades = async (params?: {
   const response = await apiClient.get<any>(TRADING_ENDPOINTS.trades, {
     params
   });
-  return unwrapData(response.data) || [];
+  return normalizeBackendTrades(response.data);
 };
 
 export const getTrade = async (id: number): Promise<Trade | null> => {
   try {
     const url = TRADING_ENDPOINTS.trade.replace(':id', id.toString());
     const response = await apiClient.get<Trade | { data: Trade }>(url);
-    return unwrapData(response.data);
+    return unwrapBackendData(response.data);
   } catch (error) {
     return null;
   }
@@ -192,21 +204,40 @@ export const getTrade = async (id: number): Promise<Trade | null> => {
 export const getTicker = async (market: string): Promise<Ticker> => {
   const symbol = normalizeMarketSymbol(market);
   const url = TRADING_ENDPOINTS.ticker.replace(':market', symbol);
-  const response = await apiClient.get<Ticker>(url);
-  // Handle wrapper if present
-  // Handle wrapper if present
-  return (response.data as any)?.ticker ? response.data : ((response.data as any)?.data || response.data);
+  try {
+    const response = await apiClient.get<Ticker>(url, { retry: false });
+    return normalizeBackendTicker(unwrapBackendData(response.data), symbol);
+  } catch (_error) {
+    const response = await apiClient.get<any>(BACKEND_RUST_ENDPOINTS.public.tickers, { retry: false });
+    const tickers = normalizeBackendTickerMap(response.data);
+    const ticker = tickers[symbol];
+    if (ticker) {
+      return normalizeBackendTicker(ticker, symbol);
+    }
+    return {
+      market: symbol,
+      at: Date.now(),
+      ticker: {
+        buy: '0',
+        sell: '0',
+        low: '0',
+        high: '0',
+        last: '0',
+        vol: '0',
+        amount: '0',
+        price_change_percent: '0'
+      }
+    };
+  }
 };
 
 export const getOrderBook = async (market: string, limit?: number): Promise<OrderBook> => {
   const symbol = normalizeMarketSymbol(market);
   const url = TRADING_ENDPOINTS.orderbook.replace(':market', symbol);
   const response = await apiClient.get<OrderBook>(url, {
-    params: limit ? { limit } : undefined
+    params: limit ? { asks_limit: limit, bids_limit: limit } : undefined
   });
-  // Handle wrapper if present
-  // Handle wrapper if present
-  return (response.data as any)?.asks ? response.data : ((response.data as any)?.data || { asks: [], bids: [], market: market, at: Date.now() });
+  return normalizeBackendOrderBook(response.data, symbol);
 };
 
 export const getMarketTrades = async (market: string, limit?: number): Promise<Trade[]> => {
@@ -215,7 +246,7 @@ export const getMarketTrades = async (market: string, limit?: number): Promise<T
   const response = await apiClient.get<Trade[] | { data: Trade[] }>(url, {
     params: limit ? { limit } : undefined
   });
-  return unwrapData(response.data) || [];
+  return normalizeBackendTrades(response.data, symbol);
 };
 
 export const getKline = async (market: string, period: string = '1m', limit?: number): Promise<Kline> => {
@@ -224,9 +255,7 @@ export const getKline = async (market: string, period: string = '1m', limit?: nu
   const response = await apiClient.get<Kline>(url, {
     params: { period: resolveKlinePeriod(period), ...(limit && { limit }) }
   });
-  // Handle wrapper if present
-  // Handle wrapper if present
-  return (response.data as any)?.k_line ? response.data : ((response.data as any)?.data || response.data);
+  return normalizeBackendKline(response.data, symbol, period);
 };
 
 // Performance-optimized React Query hooks for trading
@@ -246,6 +275,8 @@ export const useOrders = (params?: {
     staleTime: 2 * 1000, // 2 seconds for high-frequency trading
     refetchInterval: 2 * 1000, // Refetch every 2 seconds
     refetchIntervalInBackground: true,
+    enabled: hasAccessToken(),
+    retry: false,
   });
 };
 
@@ -253,7 +284,7 @@ export const useOrder = (id: number) => {
   return useQuery({
     queryKey: ['trading', 'order', id],
     queryFn: () => getOrder(id),
-    enabled: !!id,
+    enabled: !!id && hasAccessToken(),
     staleTime: 5 * 1000, // 5 seconds
     refetchInterval: 5 * 1000, // Refetch every 5 seconds
   });
@@ -304,7 +335,9 @@ export const useTrades = (params?: {
   return useQuery({
     queryKey: ['trading', 'trades', params],
     queryFn: () => getTrades(params),
-    staleTime: 10 * 1000, // 10 seconds
+    enabled: hasAccessToken(),
+    staleTime: 10 * 1000, // 10 seconds,
+    retry: false,
     refetchInterval: 10 * 1000, // Refetch every 10 seconds
   });
 };
@@ -313,7 +346,7 @@ export const useTrade = (id: number) => {
   return useQuery({
     queryKey: ['trading', 'trade', id],
     queryFn: () => getTrade(id),
-    enabled: !!id,
+    enabled: !!id && hasAccessToken(),
     staleTime: 30 * 1000, // 30 seconds
   });
 };

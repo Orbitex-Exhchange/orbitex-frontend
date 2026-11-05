@@ -15,7 +15,7 @@ import {
   Target,
   Rocket
 } from 'lucide-react';
-import { cn, formatNumber } from '@/lib/utils';
+import { cn, formatNumber, normalizeMarketId, toFiniteNumber } from '@/lib/utils';
 import { usePublicTickers } from '@/lib/api/services/public';
 
 interface MarketDataPanelProps {
@@ -35,23 +35,28 @@ export function MarketDataPanel({
   const { data: tickersData, isLoading: tickersLoading } = usePublicTickers();
 
   // Get current market ticker data - prioritize prop data
-  const currentTicker = propTickerData || tickersData?.find(ticker => ticker.market === market);
+  const currentTicker = propTickerData || tickersData?.find(ticker => normalizeMarketId(ticker.market) === normalizeMarketId(market));
+  const ticker = currentTicker?.ticker || currentTicker;
+  const fallbackBid = Math.max(toFiniteNumber(ticker?.last, 43250.00), 0) || 43250.00;
+  const bid = Math.max(toFiniteNumber(ticker?.buy, fallbackBid), 0) || fallbackBid;
+  const ask = Math.max(toFiniteNumber(ticker?.sell, bid), 0) || bid;
+  const lastPrice = Math.max(toFiniteNumber(ticker?.last, 43250.50), 0) || 43250.50;
 
   const marketData = {
-    lastPrice: currentTicker ? parseFloat(currentTicker.ticker.last) : 43250.50,
-    change24h: currentTicker ? parseFloat(currentTicker.ticker.price_change_percent) : 2.45,
-    high24h: currentTicker ? parseFloat(currentTicker.ticker.high) : 44100.00,
-    low24h: currentTicker ? parseFloat(currentTicker.ticker.low) : 42800.00,
-    volume: currentTicker ? parseFloat(currentTicker.ticker.vol) : 2847.65,
+    lastPrice,
+    change24h: toFiniteNumber(ticker?.price_change_percent, 2.45),
+    high24h: Math.max(toFiniteNumber(ticker?.high, 44100.00), 0) || 44100.00,
+    low24h: Math.max(toFiniteNumber(ticker?.low, 42800.00), 0) || 42800.00,
+    volume: toFiniteNumber(ticker?.vol ?? ticker?.volume, 2847.65),
     openInterest: 125000000,
-    bid: currentTicker ? parseFloat(currentTicker.ticker.buy) : 43250.00,
-    ask: currentTicker ? parseFloat(currentTicker.ticker.sell) : 43251.00,
-    spread: currentTicker ? (parseFloat(currentTicker.ticker.sell) - parseFloat(currentTicker.ticker.buy)) / parseFloat(currentTicker.ticker.last) * 100 : 0.0023
+    bid,
+    ask,
+    spread: lastPrice > 0 ? ((ask - bid) / lastPrice) * 100 : 0.0023
   };
 
   return (
     <div className={cn(
-      "bg-[#1a1a1a] h-full flex flex-col",
+      "bg-[hsl(222_40%_8%_/_1)] h-full flex flex-col",
       compact ? "p-3" : "p-4"
     )}>
       {/* Header */}
@@ -70,7 +75,7 @@ export function MarketDataPanel({
         </div>
         <div className="flex items-center justify-between">
           <span className="text-2xl font-bold text-white font-mono">
-            ${marketData.lastPrice.toFixed(2)}
+            ${formatNumber(marketData.lastPrice, 2)}
           </span>
           <div className="flex items-center gap-1">
             {marketData.change24h >= 0 ? (
@@ -82,7 +87,7 @@ export function MarketDataPanel({
               "text-sm font-medium",
               marketData.change24h >= 0 ? "text-[#00ff88]" : "text-[#ff4444]"
             )}>
-              {marketData.change24h >= 0 ? '+' : ''}{marketData.change24h.toFixed(2)}%
+              {marketData.change24h >= 0 ? '+' : ''}{formatNumber(marketData.change24h, 2)}%
             </span>
           </div>
         </div>
@@ -94,16 +99,16 @@ export function MarketDataPanel({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <div className="text-xs text-[#888888]">Bid</div>
-            <div className="text-sm font-mono text-[#ff4444]">${marketData.bid.toFixed(2)}</div>
+            <div className="text-sm font-mono text-[#ff4444]">${formatNumber(marketData.bid, 2)}</div>
           </div>
           <div>
             <div className="text-xs text-[#888888]">Ask</div>
-            <div className="text-sm font-mono text-[#00ff88]">${marketData.ask.toFixed(2)}</div>
+            <div className="text-sm font-mono text-[#00ff88]">${formatNumber(marketData.ask, 2)}</div>
           </div>
         </div>
         <div className="mt-2 pt-2 border-t border-[#2a2a2a]">
           <div className="text-xs text-[#888888]">Spread</div>
-          <div className="text-sm font-mono text-white">{marketData.spread.toFixed(4)}%</div>
+          <div className="text-sm font-mono text-white">{formatNumber(marketData.spread, 4)}%</div>
         </div>
       </div>
 
@@ -111,11 +116,11 @@ export function MarketDataPanel({
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="p-2 bg-[#0f0f0f] rounded border border-[#2a2a2a]">
           <div className="text-xs text-[#888888]">24h High</div>
-          <div className="text-sm font-mono text-white">${marketData.high24h.toFixed(2)}</div>
+          <div className="text-sm font-mono text-white">${formatNumber(marketData.high24h, 2)}</div>
         </div>
         <div className="p-2 bg-[#0f0f0f] rounded border border-[#2a2a2a]">
           <div className="text-xs text-[#888888]">24h Low</div>
-          <div className="text-sm font-mono text-white">${marketData.low24h.toFixed(2)}</div>
+          <div className="text-sm font-mono text-white">${formatNumber(marketData.low24h, 2)}</div>
         </div>
         <div className="p-2 bg-[#0f0f0f] rounded border border-[#2a2a2a]">
           <div className="text-xs text-[#888888]">Volume</div>

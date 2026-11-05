@@ -69,7 +69,7 @@ export interface LoginRequest {
 
 export interface AuthResponse {
   user: OrbisignerUser;
-  jwt_token?: string; // Generated client-side
+  jwt_token: string;
 }
 
 export interface VerifyEmailRequest {
@@ -152,12 +152,7 @@ class AuthAPI {
     });
 
     if (!response.jwt_token) {
-      console.warn('No jwt_token in Orbisigner register response, falling back to local generation');
-      // Fallback for dev/test environments that might not return token
-      return {
-        user: response,
-        jwt_token: await this.generateJWTToken(response)
-      };
+      throw new Error('Authentication failed: Orbisigner did not return a backend-valid jwt_token');
     }
 
     return {
@@ -168,58 +163,27 @@ class AuthAPI {
 
   // Login user
   async login(data: LoginRequest): Promise<AuthResponse> {
+    const normalizedData: LoginRequest = {
+      ...data,
+      email: data.email.trim().toLowerCase(),
+      password: data.password.trim(),
+      ...(data.otp_code ? { otp_code: data.otp_code.trim() } : {}),
+    };
+
     // POST /api/v2/identity/sessions
     const response = await this.request<OrbisignerUser & { jwt_token?: string }>('/sessions', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(normalizedData),
     });
 
     if (!response.jwt_token) {
-      console.warn('No jwt_token in Orbisigner login response, falling back to local generation');
-      return {
-        user: response,
-        jwt_token: await this.generateJWTToken(response)
-      };
+      throw new Error('Authentication failed: Orbisigner did not return a backend-valid jwt_token');
     }
 
     return {
       user: response,
       jwt_token: response.jwt_token
     };
-  }
-
-  // Generate JWT token for Orbitex-Clean API access
-  private async generateJWTToken(user: OrbisignerUser): Promise<string> {
-    const payload = {
-      uid: user.uid,
-      email: user.email,
-      username: user.username || user.email.split('@')[0],
-      role: user.role,
-      level: user.level,
-      state: user.state,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (1 * 60 * 60), // 1 hour
-      iss: 'Orbisigner',
-      aud: 'Orbitex',
-      sub: 'session',
-      jti: Math.random().toString(36).substring(2, 15)
-    };
-
-    // Use jose library for browser-compatible JWT signing
-    const { SignJWT } = await import('jose');
-    const secret = new TextEncoder().encode('6d69b7b372c13d635ed4abd69b7a7b30edcaa7eeda14e3970c5f1b4ae24b9258542476e3b4a01550a44d1e5d948f4ac0d44ebc2e2b36cb691504516fd0ab508e');
-
-    const jwt = await new SignJWT(payload)
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime('1h')
-      .setIssuer('Orbisigner')
-      .setAudience('Orbitex')
-      .setSubject('session')
-      .setJti(payload.jti)
-      .sign(secret);
-
-    return jwt;
   }
 
   // Verify email

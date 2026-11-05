@@ -96,15 +96,16 @@ export const createUser = async (userData: {
   recaptcha_response?: string;
   refid?: string;
 }): Promise<AuthResponse> => {
-  // Orbisigner returns user data but may not include jwt_token for pending users
+  // Orbisigner must return the backend-valid JWT used by backend-rust.
   const response = await orbisignerClient.request<OrbisignerUser & { jwt_token?: string }>(IDENTITY_ENDPOINTS.users, {
     method: 'POST',
     body: JSON.stringify(userData),
   });
 
-  // For registration, jwt_token may not be present if email verification is required
-  // User will get token after email confirmation via login
-  const jwtToken = response.jwt_token || '';
+  const jwtToken = response.jwt_token;
+  if (!jwtToken) {
+    throw new Error('Authentication failed: Orbisigner did not return a backend-valid jwt_token');
+  }
 
   return {
     user: response,
@@ -136,41 +137,6 @@ export const confirmPasswordCode = async (data: {
   });
 };
 
-// Generate JWT token for Orbitex-Clean API access
-// Exporting this as a standalone function too
-export async function generateJWTToken(user: OrbisignerUser): Promise<string> {
-  const payload = {
-    uid: user.uid,
-    email: user.email,
-    username: user.username || user.email.split('@')[0],
-    role: user.role,
-    level: user.level,
-    state: user.state,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + (1 * 60 * 60), // 1 hour
-    iss: 'Orbisigner',
-    aud: 'Orbitex',
-    sub: 'session',
-    jti: Math.random().toString(36).substring(2, 15)
-  };
-
-  // Use jose library for browser-compatible JWT signing
-  const { SignJWT } = await import('jose');
-  const secret = new TextEncoder().encode('6d69b7b372c13d635ed4abd69b7a7b30edcaa7eeda14e3970c5f1b4ae24b9258542476e3b4a01550a44d1e5d948f4ac0d44ebc2e2b36cb691504516fd0ab508e');
-
-  const jwt = await new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .setIssuer('Orbisigner')
-    .setAudience('Orbitex')
-    .setSubject('session')
-    .setJti(payload.jti)
-    .sign(secret);
-
-  return jwt;
-}
-
 // React Query hooks
 export const useIdentityPing = () => {
   return useQuery({
@@ -196,7 +162,7 @@ export const useCreateSession = () => {
     onSuccess: (response) => {
       // Store tokens in localStorage
       if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', response.jwt_token || '');
+        localStorage.setItem('access_token', response.jwt_token);
         localStorage.setItem('refresh_token', response.user.csrf_token);
         localStorage.setItem('user', JSON.stringify(response.user));
       }

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { V2Account, ApiResponse } from '../types/api_v2';
+import { V2Account } from '../types/api_v2';
+import { BACKEND_RUST_ENDPOINTS, normalizeBackendArray, unwrapBackendData } from '../backend-rust';
 
 // Wallet interface based on the V2 API response
 export interface Wallet {
@@ -13,18 +14,14 @@ export interface Wallet {
 
 // Wallets API endpoints - Updated to match V2 API structure
 const WALLETS_ENDPOINTS = {
-  list: '/api/v2/account/balances',
+  list: BACKEND_RUST_ENDPOINTS.account.balances,
   balance: '/api/v2/account/balances/:currency',
   depositAddress: '/api/v2/account/deposit_address/:currency',
 } as const;
 
-// Real V2 API functions - Standalone (No ObjectWrapper to avoid TDZ)
-const unwrapData = <T>(payload: T | { data?: T }): T =>
-  ((payload as { data?: T })?.data ?? payload) as T;
-
 export const getWallets = async (): Promise<Wallet[]> => {
-  const response = await apiClient.get<ApiResponse<V2Account[]>>(WALLETS_ENDPOINTS.list);
-  const accounts = unwrapData(response.data) || [];
+  const response = await apiClient.get<V2Account[]>(WALLETS_ENDPOINTS.list);
+  const accounts = normalizeBackendArray<V2Account>(response.data, 'balances');
   return accounts.map(account => ({
     currency: account.currency,
     balance: account.balance,
@@ -37,7 +34,7 @@ export const getWallet = async (currency: string): Promise<Wallet | null> => {
   try {
     const url = WALLETS_ENDPOINTS.balance.replace(':currency', currency);
     const response = await apiClient.get<V2Account | { data: V2Account }>(url);
-    const account = unwrapData(response.data);
+    const account = unwrapBackendData<V2Account>(response.data);
     return {
       currency: account.currency,
       balance: account.balance,
@@ -52,7 +49,7 @@ export const getWallet = async (currency: string): Promise<Wallet | null> => {
 export const getDepositAddress = async (currency: string): Promise<{ currency: string; address: string; state: string }> => {
   const url = WALLETS_ENDPOINTS.depositAddress.replace(':currency', currency);
   const response = await apiClient.post<{ data: { currency: string; address: string; state: string } }>(url);
-  return unwrapData(response.data);
+  return unwrapBackendData(response.data);
 };
 
 // React Query hooks

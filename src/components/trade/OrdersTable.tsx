@@ -14,7 +14,7 @@ import {
   XCircle,
   RefreshCw
 } from 'lucide-react';
-import { cn, formatNumber, formatCurrency } from '../../lib/utils';
+import { cn, formatNumber, formatCurrency, toFiniteNumber } from '../../lib/utils';
 import { useOrders, useCancelOrder, useCancelAllOrders } from '@/lib/api/services/trading';
 import { useToast } from '@/hooks/use-toast';
 
@@ -275,20 +275,20 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
                     </div>
                   </td>
                   <td className="p-2 text-right text-xs text-[hsl(var(--trading-text))] font-mono">
-                    {order.price ? formatCurrency(parseFloat(order.price)) : 'Market'}
+                    {order.price ? formatCurrency(order.price) : 'Market'}
                   </td>
                   <td className="p-2 text-right text-xs">
                     <div className="space-y-1">
                       <div className="text-[hsl(var(--trading-text-muted))]">
-                        {formatNumber(parseFloat(order.executed_volume || '0'), 4)}
+                        {formatNumber(order.executed_volume, 4)}
                       </div>
                       <div className="text-[hsl(var(--trading-text))] font-mono">
-                        {formatNumber(parseFloat((order as any).origin_volume || order.volume || '0'), 4)}
+                        {formatNumber((order as any).origin_volume || order.volume, 4)}
                       </div>
                     </div>
                   </td>
                   <td className="p-2 text-right text-xs text-[hsl(var(--trading-text))] font-mono">
-                    {formatCurrency(parseFloat(order.price || '0') * parseFloat((order as any).origin_volume || order.volume || '0'))}
+                    {formatCurrency(toFiniteNumber(order.price) * toFiniteNumber((order as any).origin_volume || order.volume))}
                   </td>
                   <td className="p-2 text-center">
                     <div className="flex items-center justify-center space-x-1">
@@ -326,7 +326,7 @@ export function OrdersTable({ market, compact = false }: OrdersTableProps) {
             {orders.length} order{orders.length !== 1 ? 's' : ''} •
             Total Value: {formatCurrency(
               orders.reduce((sum, order) =>
-                sum + (parseFloat(order.price || '0') * parseFloat((order as any).origin_volume || order.volume || '0')), 0
+                sum + (toFiniteNumber(order.price) * toFiniteNumber((order as any).origin_volume || order.volume)), 0
               )
             )}
           </span>

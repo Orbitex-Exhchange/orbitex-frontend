@@ -13,8 +13,8 @@ export interface SocketeerResponse {
 }
 
 export interface SocketeerConfig {
-  publicUrl: string;
-  privateUrl: string;
+  publicUrl: string | undefined;
+  privateUrl: string | undefined;
   reconnectInterval: number;
   maxReconnectAttempts: number;
   enableLogging: boolean;
@@ -31,9 +31,10 @@ export class SocketeerClient {
   private authToken: string | null = null;
 
   constructor(config?: Partial<SocketeerConfig>) {
+    const publicUrl = env.NEXT_PUBLIC_WS_URL;
     this.config = {
-      publicUrl: env.NEXT_PUBLIC_WS_URL,
-      privateUrl: env.NEXT_PUBLIC_WS_URL.replace('/public', '/private'),
+      publicUrl,
+      privateUrl: publicUrl?.replace('/public', '/private'),
       reconnectInterval: 5000,
       maxReconnectAttempts: 10,
       enableLogging: process.env.NODE_ENV === 'development',
@@ -66,6 +67,11 @@ export class SocketeerClient {
       this.log(`Connecting to ${type} WebSocket: ${url}`);
 
       try {
+        if (!url) {
+          reject(new Error('WebSocket URL is not configured'));
+          return;
+        }
+
         const ws = new WebSocket(url);
 
         if (type === 'public') {
@@ -343,9 +349,10 @@ export class SocketeerClient {
 // Singleton instance
 export const socketeerClient = new SocketeerClient();
 
-// Auto-connect to public endpoint
-socketeerClient.connectPublic().catch(error => {
-  console.error('Failed to connect to Socketeer public endpoint:', error);
-});
+if (env.NEXT_PUBLIC_WS_URL) {
+  socketeerClient.connectPublic().catch(error => {
+    console.warn('Socketeer public endpoint unavailable; falling back to HTTP polling.', error);
+  });
+}
 
 export default socketeerClient;

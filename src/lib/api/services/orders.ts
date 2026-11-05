@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api-client';
+import { BACKEND_RUST_ENDPOINTS } from '../backend-rust';
 
 // Order interface based on the real backend response
 export interface Order {
@@ -22,9 +23,9 @@ export interface Order {
 
 // Orders API endpoints
 const ORDERS_ENDPOINTS = {
-  list: '/api/v2/market/orders',
-  create: '/api/v2/market/orders',
-  cancel: '/api/v2/market/orders/:id/cancel',
+  list: BACKEND_RUST_ENDPOINTS.market.orders,
+  create: BACKEND_RUST_ENDPOINTS.market.orders,
+  cancel: '/api/v2/market/orders/:id',
   get: '/api/v2/market/orders/:id',
 } as const;
 
@@ -58,7 +59,7 @@ export const createOrder = async (orderData: {
 
 export const cancelOrder = async (id: number, authToken: string): Promise<Order> => {
   const url = ORDERS_ENDPOINTS.cancel.replace(':id', id.toString());
-  const response = await api.post(url, {}, { authToken });
+  const response = await api.delete(url, { authToken });
   return response;
 };
 

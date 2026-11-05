@@ -12,7 +12,7 @@ import {
   DollarSign,
   Lock
 } from 'lucide-react';
-import { cn, formatNumber, formatCurrency } from '../../lib/utils';
+import { cn, formatNumber, formatCurrency, toFiniteNumber } from '../../lib/utils';
 import { useTrades } from '@/lib/api/services/trading';
 import { useToast } from '@/hooks/use-toast';
 
@@ -40,17 +40,25 @@ export function TradesTable({ market, compact = false }: TradesTableProps) {
   const trades = Array.isArray(tradesData) ? tradesData.map((trade: any) => ({
     id: trade.id,
     market: trade.market || market,
-    side: trade.side || 'buy',
+    side: trade.side || trade.taker_type || 'buy',
     price: trade.price,
     amount: trade.amount || trade.volume,
-    total: trade.total || (parseFloat(trade.price || '0') * parseFloat(trade.amount || trade.volume || '0')).toString(),
+    total: trade.total || (toFiniteNumber(trade.price) * toFiniteNumber(trade.amount || trade.volume)).toString(),
     fee_amount: trade.fee_amount || '0',
     fee_currency: trade.fee_currency || 'USDT',
     created_at: trade.created_at
   })) : [];
 
-  const formatTradeTime = (createdAt: string) => {
-    const date = new Date(createdAt);
+  const normalizeTradeDate = (createdAt: string | number) => {
+    const numeric = toFiniteNumber(createdAt, NaN);
+    if (Number.isFinite(numeric)) {
+      return new Date(numeric > 10_000_000_000 ? numeric : numeric * 1000);
+    }
+    return new Date(createdAt);
+  };
+
+  const formatTradeTime = (createdAt: string | number) => {
+    const date = normalizeTradeDate(createdAt);
     return date.toLocaleTimeString('en-US', {
       hour12: false,
       hour: '2-digit',
@@ -59,8 +67,8 @@ export function TradesTable({ market, compact = false }: TradesTableProps) {
     });
   };
 
-  const formatTradeDate = (createdAt: string) => {
-    const date = new Date(createdAt);
+  const formatTradeDate = (createdAt: string | number) => {
+    const date = normalizeTradeDate(createdAt);
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric'
@@ -224,18 +232,18 @@ export function TradesTable({ market, compact = false }: TradesTableProps) {
                     </div>
                   </td>
                   <td className="p-2 text-right text-xs text-[hsl(var(--trading-text))] font-mono">
-                    {formatCurrency(parseFloat(trade.price || '0'))}
+                    {formatCurrency(trade.price)}
                   </td>
                   <td className="p-2 text-right text-xs text-[hsl(var(--trading-text))] font-mono">
-                    {formatNumber(parseFloat(trade.amount || '0'), 4)}
+                    {formatNumber(trade.amount, 4)}
                   </td>
                   <td className="p-2 text-right text-xs text-[hsl(var(--trading-text))] font-mono">
-                    {formatCurrency(parseFloat(trade.total || '0'))}
+                    {formatCurrency(trade.total)}
                   </td>
                   <td className="p-2 text-right text-xs">
                     <div className="space-y-1">
                       <div className="text-[hsl(var(--trading-text-muted))]">
-                        {formatNumber(parseFloat(trade.fee_amount || '0'), 4)}
+                        {formatNumber(trade.fee_amount, 4)}
                       </div>
                       <div className="text-[hsl(var(--trading-text))] font-mono">
                         {trade.fee_currency || 'USDT'}
@@ -255,7 +263,7 @@ export function TradesTable({ market, compact = false }: TradesTableProps) {
           <span>
             {trades.length} trade{trades.length !== 1 ? 's' : ''} •
             Total Volume: {formatCurrency(
-              trades.reduce((sum, trade) => sum + parseFloat(trade.total || '0'), 0)
+              trades.reduce((sum, trade) => sum + toFiniteNumber(trade.total), 0)
             )}
           </span>
           <div className="flex items-center space-x-2">

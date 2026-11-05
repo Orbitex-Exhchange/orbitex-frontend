@@ -184,8 +184,9 @@ const config: Config = {
           background: 'linear-gradient(135deg, hsl(var(--trading-accent)), hsl(var(--trading-accent-secondary)))',
         },
         '.card-gradient-primary': {
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
+          background: 'radial-gradient(circle at top left, hsl(var(--trading-accent) / 0.18), transparent 18rem), linear-gradient(135deg, hsl(var(--trading-bg-secondary)) 0%, hsl(var(--trading-bg-tertiary)) 100%)',
+          border: '1px solid hsl(var(--trading-accent) / 0.24)',
+          color: 'hsl(var(--trading-text))',
         },
         '.btn-gradient-primary': {
           background: 'linear-gradient(135deg, hsl(var(--trading-accent)), hsl(var(--trading-accent-secondary)))',
@@ -198,14 +199,14 @@ const config: Config = {
           boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)',
         },
         '.glass': {
-          background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(10px)',
-          '-webkit-backdrop-filter': 'blur(10px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          background: 'hsl(var(--trading-bg-secondary) / 0.82)',
+          backdropFilter: 'blur(16px)',
+          '-webkit-backdrop-filter': 'blur(16px)',
+          border: '1px solid hsl(var(--trading-border) / 0.85)',
         },
         '.dark .glass': {
-          background: 'rgba(0, 0, 0, 0.2)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          background: 'hsl(var(--trading-bg-secondary) / 0.82)',
+          border: '1px solid hsl(var(--trading-border) / 0.85)',
         },
         '.trading-input': {
           background: 'hsl(var(--trading-bg-tertiary))',

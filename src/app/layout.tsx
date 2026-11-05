@@ -3,6 +3,7 @@ import Script from "next/script";
 import './globals.css';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ConditionalNavigation } from '@/components/layout/ConditionalNavigation';
 import { Toaster } from '@/components/ui/toaster';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { QueryClientWrapper } from '@/components/QueryClientWrapper';
@@ -112,6 +113,7 @@ export default function RootLayout({
             <AuthProvider>
               <ThemeProvider>
                 <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
+                  <ConditionalNavigation />
                   {children}
                 </div>
                 <Toaster />

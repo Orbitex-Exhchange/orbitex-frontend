@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Navigation } from '@/components/layout/Navigation';
 import {
   Wallet,
   ArrowUpRight,
@@ -160,7 +159,6 @@ export default function WithdrawPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
-        <Navigation user={user} />
         <div className="container mx-auto p-6">
           <Card className="border-yellow-500 bg-yellow-900/20">
             <CardContent className="pt-6">
@@ -183,7 +181,6 @@ export default function WithdrawPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[hsl(var(--trading-bg))] via-[hsl(var(--trading-bg-secondary))] to-[hsl(var(--trading-bg))]">
-      <Navigation user={user} />
 
       <div className="container mx-auto p-6 space-y-6">
         {/* Header */}

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
 import {
   DollarSign,
   Percent,
@@ -19,7 +18,7 @@ import {
   BarChart3,
   RefreshCw
 } from 'lucide-react';
-import { cn, formatNumber, formatCurrency } from '../../lib/utils';
+import { cn, formatNumber, toFiniteNumber } from '../../lib/utils';
 import { env } from '@/lib/env';
 import { authService } from '@/lib/auth';
 import { useCreateOrder } from '@/lib/api/services/trading';
@@ -73,6 +72,26 @@ const orderTypes = [
 
 const percentageButtons = [10, 25, 50, 75, 100];
 
+const tradeControlClass =
+  "h-9 rounded-md border-[hsl(var(--trading-border))] bg-[hsl(222_40%_8%_/_1)] text-sm text-[hsl(var(--trading-text))] shadow-inner placeholder:text-[hsl(var(--trading-text-muted))] focus-visible:border-[hsl(var(--trading-accent))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--trading-accent))] focus-visible:ring-offset-0";
+const tradeSelectClass =
+  "w-full h-8 rounded-md border border-[hsl(var(--trading-border))] bg-[hsl(222_40%_8%_/_1)] px-2 text-xs text-[hsl(var(--trading-text))] outline-none focus:border-[hsl(var(--trading-accent))] focus:ring-1 focus:ring-[hsl(var(--trading-accent))]";
+const tradeMiniPanelClass =
+  "rounded-md border border-[hsl(var(--trading-border))] bg-[hsl(222_40%_8%_/_1)]";
+const tradeMutedTextClass = "text-[hsl(var(--trading-text-muted))]";
+
+const splitMarketSymbol = (market: string): [string, string] => {
+  if (market.includes('-')) {
+    const [base = '', quote = ''] = market.split('-');
+    return [base.toUpperCase(), quote.toUpperCase()];
+  }
+
+  const normalized = market.replace(/[-_/]/g, '').toUpperCase();
+  const quote = ['USDT', 'USDC', 'USD', 'EUR', 'ZAR'].find((candidate) => normalized.endsWith(candidate)) || '';
+  const base = quote ? normalized.slice(0, -quote.length) : normalized.slice(0, 3);
+  return [base, quote || normalized.slice(base.length)];
+};
+
 export function EnhancedOrderForm({
   market,
   currentPrice,
@@ -80,10 +99,12 @@ export function EnhancedOrderForm({
   compact = false,
   balancesData: propBalancesData
 }: EnhancedOrderFormProps) {
+  const safeCurrentPrice = Math.max(toFiniteNumber(currentPrice, 43250.50), 0) || 43250.50;
+  const [baseAsset, quoteAsset] = splitMarketSymbol(market);
   const [orderData, setOrderData] = useState<OrderFormData>({
     side: 'buy',
     type: 'limit',
-    price: currentPrice?.toString() || '0',
+    price: safeCurrentPrice.toString(),
     size: '',
     total: '',
     stopPrice: '',
@@ -124,7 +145,7 @@ export function EnhancedOrderForm({
       const map: Record<string, number> = {};
       finalBalancesData.forEach((balance: any) => {
         const currency = (balance.currency || '').toUpperCase();
-        const balanceValue = parseFloat(balance.balance || '0');
+        const balanceValue = toFiniteNumber(balance.balance);
         map[currency] = balanceValue;
         console.log(`Balance for ${currency}:`, balanceValue);
       });
@@ -135,16 +156,16 @@ export function EnhancedOrderForm({
 
   // Update price when current price changes
   useEffect(() => {
-    if (orderData.type === 'market') {
-      setOrderData(prev => ({ ...prev, price: currentPrice.toString() }));
+    if (orderData.type === 'market' && safeCurrentPrice > 0) {
+      setOrderData(prev => ({ ...prev, price: safeCurrentPrice.toString() }));
     }
-  }, [currentPrice, orderData.type]);
+  }, [safeCurrentPrice, orderData.type]);
 
   // Calculate total when price or size changes
   useEffect(() => {
     if (orderData.price && orderData.size) {
-      const total = parseFloat(orderData.price) * parseFloat(orderData.size);
-      setOrderData(prev => ({ ...prev, total: total.toFixed(2) }));
+      const total = toFiniteNumber(orderData.price) * toFiniteNumber(orderData.size);
+      setOrderData(prev => ({ ...prev, total: Number.isFinite(total) && total > 0 ? total.toFixed(2) : '' }));
     }
   }, [orderData.price, orderData.size]);
 
@@ -152,26 +173,27 @@ export function EnhancedOrderForm({
     setOrderData(prev => ({
       ...prev,
       type,
-      price: type === 'market' ? currentPrice.toString() : prev.price
+      price: type === 'market' ? safeCurrentPrice.toString() : prev.price
     }));
   };
 
   const handlePercentageClick = (percentage: number) => {
     // Get real balances from API data
-    const [baseCurrency, quoteCurrency] = market.split('-');
+    const [baseCurrency, quoteCurrency] = splitMarketSymbol(market);
     const baseBalance = balances[baseCurrency?.toUpperCase() || ''] || 0;
     const quoteBalance = balances[quoteCurrency?.toUpperCase() || ''] || 0;
 
     const availableBalance = orderData.side === 'buy' ? quoteBalance : baseBalance;
+    const price = Math.max(toFiniteNumber(orderData.price, safeCurrentPrice), 0) || safeCurrentPrice;
     const maxAmount = orderData.side === 'buy'
-      ? (availableBalance * (percentage / 100)) / parseFloat(orderData.price || '1')
+      ? (availableBalance * (percentage / 100)) / price
       : availableBalance * (percentage / 100);
 
-    setOrderData(prev => ({ ...prev, size: maxAmount.toFixed(4) }));
+    setOrderData(prev => ({ ...prev, size: toFiniteNumber(maxAmount).toFixed(4) }));
   };
 
   const handleQuickPrice = (adjustment: number) => {
-    const newPrice = currentPrice * (1 + adjustment);
+    const newPrice = safeCurrentPrice * (1 + adjustment);
     setOrderData(prev => ({ ...prev, price: newPrice.toFixed(2) }));
     onPriceClick?.(newPrice);
   };
@@ -179,23 +201,23 @@ export function EnhancedOrderForm({
   const validateOrder = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (orderData.type !== 'market' && (!orderData.price || parseFloat(orderData.price) <= 0)) {
+    if (orderData.type !== 'market' && (!orderData.price || toFiniteNumber(orderData.price) <= 0)) {
       newErrors.price = 'Price is required';
     }
 
-    if (!orderData.size || parseFloat(orderData.size) <= 0) {
+    if (!orderData.size || toFiniteNumber(orderData.size) <= 0) {
       newErrors.size = 'Size is required';
     }
 
     if (orderData.type === 'stop' || orderData.type === 'stop_limit') {
-      if (!orderData.stopPrice || parseFloat(orderData.stopPrice) <= 0) {
+      if (!orderData.stopPrice || toFiniteNumber(orderData.stopPrice) <= 0) {
         newErrors.stopPrice = 'Stop price is required';
       }
     }
 
     // Balance check
     try {
-      const [base, quote] = market.split('-');
+      const [base, quote] = splitMarketSymbol(market);
       if (base && quote) {
         const needBase = orderData.side === 'sell';
         const needQuote = orderData.side === 'buy';
@@ -212,8 +234,8 @@ export function EnhancedOrderForm({
   };
 
   const needSellOrBuyInsufficient = (needBase: boolean, needQuote: boolean, base: string, quote: string): boolean => {
-    const size = parseFloat(orderData.size || '0');
-    const price = parseFloat(orderData.price || String(currentPrice) || '0');
+    const size = toFiniteNumber(orderData.size);
+    const price = Math.max(toFiniteNumber(orderData.price, safeCurrentPrice), 0) || safeCurrentPrice;
     if (needBase) {
       const have = balances[(base || '').toUpperCase()] || 0;
       return size > have;
@@ -264,7 +286,7 @@ export function EnhancedOrderForm({
 
       toast({
         title: "Order Submitted",
-        description: `${orderData.side.toUpperCase()} order for ${orderData.size} ${market.split('-')[0]} has been submitted successfully.`,
+        description: `${orderData.side.toUpperCase()} order for ${orderData.size} ${baseAsset} has been submitted successfully.`,
       });
 
       // Reset form
@@ -284,19 +306,19 @@ export function EnhancedOrderForm({
   };
 
   const getEstimatedFee = () => {
-    const notionalValue = parseFloat(orderData.total || '0');
+    const notionalValue = toFiniteNumber(orderData.total);
     const feeRate = orderData.postOnly ? 0.0002 : 0.0004; // Example fee rates
     return notionalValue * feeRate;
   };
 
   const getMarginRequired = () => {
-    const notionalValue = parseFloat(orderData.total || '0');
+    const notionalValue = toFiniteNumber(orderData.total);
     return notionalValue / orderData.leverage;
   };
 
   return (
     <div className={cn(
-      "bg-[#1a1a1a] h-full flex flex-col overflow-y-auto",
+      "bg-[hsl(222_40%_8%_/_1)] h-full flex flex-col overflow-y-auto",
       compact ? "p-3" : "p-4"
     )}>
       {/* Buy/Sell Tabs - Moved to top */}
@@ -405,9 +427,9 @@ export function EnhancedOrderForm({
           max="100"
           value={orderData.leverage}
           onChange={(e) => setOrderData(prev => ({ ...prev, leverage: parseInt(e.target.value) }))}
-          className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer slider"
+          className="w-full h-2 rounded-lg appearance-none cursor-pointer slider bg-[hsl(222_40%_8%_/_1)]"
         />
-        <div className="flex justify-between text-[10px] text-[#888] mt-1">
+        <div className={cn("flex justify-between text-[10px] mt-1", tradeMutedTextClass)}>
           <span>1x</span>
           <span>25x</span>
           <span>50x</span>
@@ -417,8 +439,8 @@ export function EnhancedOrderForm({
 
       {/* Quick Price Buttons */}
       {quickOrderMode && (
-        <div className="mb-3 p-2 bg-[#0f0f0f] rounded-lg border border-[#2a2a2a]">
-          <div className="text-[10px] text-[#888] mb-1">Quick Price Adjustment</div>
+        <div className={cn("mb-3 p-2", tradeMiniPanelClass)}>
+          <div className={cn("text-[10px] mb-1", tradeMutedTextClass)}>Quick Price Adjustment</div>
           <div className="grid grid-cols-3 gap-1">
             <Button
               variant="ghost"
@@ -439,8 +461,8 @@ export function EnhancedOrderForm({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setOrderData(prev => ({ ...prev, price: currentPrice.toString() }))}
-              className="h-6 text-[10px] text-white hover:bg-[#3a3a3a]"
+              onClick={() => setOrderData(prev => ({ ...prev, price: safeCurrentPrice.toString() }))}
+              className="h-6 text-[10px] text-white hover:bg-[hsl(var(--trading-bg-tertiary))]"
             >
               Market
             </Button>
@@ -475,18 +497,18 @@ export function EnhancedOrderForm({
       {/* Price Input */}
       {orderData.type !== 'market' && (
         <div className="mb-4">
-          <label className="block text-sm font-medium text-[#888] mb-2">
-            Price ({(market.split('-')[1] || market.slice(-3)).toUpperCase()})
+          <label className={cn("block text-xs font-medium mb-1.5", tradeMutedTextClass)}>
+            Price ({quoteAsset})
           </label>
           <div className="relative">
             <Input
               value={orderData.price}
               onChange={(e) => setOrderData(prev => ({ ...prev, price: e.target.value }))}
               placeholder="0.00"
-              className="bg-[#2a2a2a] border-[#3a3a3a] text-white focus:border-[#4a4a4a] pr-12"
+              className={cn(tradeControlClass, "pr-12")}
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <DollarSign className="h-4 w-4 text-[#888]" />
+              <DollarSign className={cn("h-4 w-4", tradeMutedTextClass)} />
             </div>
           </div>
           {errors.price && (
@@ -501,12 +523,12 @@ export function EnhancedOrderForm({
       {/* Stop Price Input */}
       {(orderData.type === 'stop' || orderData.type === 'stop_limit') && (
         <div className="mb-4">
-          <label className="block text-sm font-medium text-[#888] mb-2">Stop Price</label>
+          <label className={cn("block text-xs font-medium mb-1.5", tradeMutedTextClass)}>Stop Price</label>
           <Input
             value={orderData.stopPrice}
             onChange={(e) => setOrderData(prev => ({ ...prev, stopPrice: e.target.value }))}
             placeholder="0.00"
-            className="bg-[#2a2a2a] border-[#3a3a3a] text-white focus:border-[#4a4a4a]"
+            className={tradeControlClass}
           />
           {errors.stopPrice && (
             <div className="text-xs text-red-400 mt-1 flex items-center gap-1">
@@ -519,14 +541,14 @@ export function EnhancedOrderForm({
 
       {/* Size Input */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-[#888] mb-2">
-          Size ({(market.split('-')[0] || market.slice(0, -3)).toUpperCase()})
+        <label className={cn("block text-xs font-medium mb-1.5", tradeMutedTextClass)}>
+          Size ({baseAsset})
         </label>
         <Input
           value={orderData.size}
           onChange={(e) => setOrderData(prev => ({ ...prev, size: e.target.value }))}
           placeholder="0.0000"
-          className="bg-[#2a2a2a] border-[#3a3a3a] text-white focus:border-[#4a4a4a]"
+          className={tradeControlClass}
         />
         {errors.size && (
           <div className="text-xs text-red-400 mt-1 flex items-center gap-1">
@@ -544,7 +566,7 @@ export function EnhancedOrderForm({
             variant="ghost"
             size="sm"
             onClick={() => handlePercentageClick(percentage)}
-            className="flex-1 h-7 text-xs bg-[#2a2a2a] text-[#d1d5db] hover:bg-[#3a3a3a]"
+            className="flex-1 h-7 rounded-md border border-[hsl(var(--trading-border))] bg-[hsl(222_40%_8%_/_1)] text-xs text-[hsl(var(--trading-text-secondary))] hover:bg-[hsl(var(--trading-bg-tertiary))] hover:text-white"
           >
             {percentage}%
           </Button>
@@ -553,32 +575,32 @@ export function EnhancedOrderForm({
 
       {/* Total */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-[#888] mb-2">
-          Total ({(market.split('-')[1] || market.slice(-3)).toUpperCase()})
+        <label className={cn("block text-xs font-medium mb-1.5", tradeMutedTextClass)}>
+          Total ({quoteAsset})
         </label>
         <Input
           value={orderData.total}
           onChange={(e) => setOrderData(prev => ({ ...prev, total: e.target.value }))}
           placeholder="0.00"
-          className="bg-[#2a2a2a] border-[#3a3a3a] text-white focus:border-[#4a4a4a]"
+          className={tradeControlClass}
         />
       </div>
 
       {/* Order Summary */}
       {calculatorMode && (
-        <div className="mb-4 p-3 bg-[#0f0f0f] rounded-lg border border-[#2a2a2a]">
-          <div className="text-xs text-[#888] mb-2">Order Summary</div>
+        <div className={cn("mb-4 p-3", tradeMiniPanelClass)}>
+          <div className={cn("text-xs mb-2", tradeMutedTextClass)}>Order Summary</div>
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
-              <span className="text-[#888]">Est. Fee:</span>
+              <span className={tradeMutedTextClass}>Est. Fee:</span>
               <span className="text-white">${formatNumber(getEstimatedFee(), 2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#888]">Margin Required:</span>
+              <span className={tradeMutedTextClass}>Margin Required:</span>
               <span className="text-white">${formatNumber(getMarginRequired(), 2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#888]">Margin Available:</span>
+              <span className={tradeMutedTextClass}>Margin Available:</span>
               <span className="text-green-400">${formatNumber(portfolio.marginAvailable, 2)}</span>
             </div>
           </div>
@@ -593,10 +615,10 @@ export function EnhancedOrderForm({
 
       {/* Advanced Options */}
       {showAdvanced && (
-        <div className="mb-4 p-3 bg-[#0f0f0f] rounded-lg border border-[#2a2a2a]">
+        <div className={cn("mb-4 p-3", tradeMiniPanelClass)}>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-[#888]">Reduce Only</label>
+              <label className={cn("text-xs", tradeMutedTextClass)}>Reduce Only</label>
               <input
                 type="checkbox"
                 checked={orderData.reduceOnly}
@@ -605,7 +627,7 @@ export function EnhancedOrderForm({
               />
             </div>
             <div className="flex items-center justify-between">
-              <label className="text-xs text-[#888]">Post Only</label>
+              <label className={cn("text-xs", tradeMutedTextClass)}>Post Only</label>
               <input
                 type="checkbox"
                 checked={orderData.postOnly}
@@ -614,11 +636,11 @@ export function EnhancedOrderForm({
               />
             </div>
             <div>
-              <label className="text-xs text-[#888] mb-1 block">Time in Force</label>
+              <label className={cn("text-xs mb-1 block", tradeMutedTextClass)}>Time in Force</label>
               <select
                 value={orderData.timeInForce}
                 onChange={(e) => setOrderData(prev => ({ ...prev, timeInForce: e.target.value as any }))}
-                className="w-full h-8 bg-[#2a2a2a] border border-[#3a3a3a] rounded text-white text-xs"
+                className={tradeSelectClass}
               >
                 <option value="GTC">Good Till Cancel</option>
                 <option value="IOC">Immediate or Cancel</option>
@@ -634,7 +656,7 @@ export function EnhancedOrderForm({
         variant="ghost"
         size="sm"
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="w-full h-8 mb-4 text-xs text-[#888] hover:text-white"
+        className={cn("w-full h-8 mb-4 text-xs hover:text-white hover:bg-[hsl(var(--trading-bg-tertiary))]", tradeMutedTextClass)}
       >
         {showAdvanced ? 'Hide' : 'Show'} Advanced Options
       </Button>
@@ -657,22 +679,22 @@ export function EnhancedOrderForm({
           </>
         ) : (
           <>
-            {orderData.side === 'buy' ? 'Buy' : 'Sell'} {(market.split('-')[0] || market.slice(0, -3)).toUpperCase()}
-            {orderData.total && ` (~${formatNumber(parseFloat(orderData.total), 2)} ${(market.split('-')[1] || market.slice(-3)).toUpperCase()})`}
+            {orderData.side === 'buy' ? 'Buy' : 'Sell'} {baseAsset}
+            {orderData.total && ` (~${formatNumber(orderData.total, 2)} ${quoteAsset})`}
           </>
         )}
       </Button>
 
       {/* Portfolio Summary */}
-      <div className="mt-4 p-3 bg-[#0f0f0f] rounded-lg border border-[#2a2a2a]">
-        <div className="text-xs text-[#888] mb-2">Portfolio</div>
+      <div className={cn("mt-4 p-3", tradeMiniPanelClass)}>
+        <div className={cn("text-xs mb-2", tradeMutedTextClass)}>Portfolio</div>
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
-            <span className="text-[#888]">Margin Available:</span>
+            <span className={tradeMutedTextClass}>Margin Available:</span>
             <span className="text-white">${formatNumber(portfolio.marginAvailable, 2)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[#888]">Unrealized PnL:</span>
+            <span className={tradeMutedTextClass}>Unrealized PnL:</span>
             <span className={cn(
               "font-medium",
               portfolio.unrealizedPnL >= 0 ? "text-green-400" : "text-red-400"
@@ -682,7 +704,7 @@ export function EnhancedOrderForm({
           </div>
           {portfolio.positions.length > 0 && (
             <div className="flex justify-between">
-              <span className="text-[#888]">Position:</span>
+              <span className={tradeMutedTextClass}>Position:</span>
               <span className="text-white">
                 {formatNumber(portfolio.positions[0]?.size || 0, 4)} BTC
               </span>

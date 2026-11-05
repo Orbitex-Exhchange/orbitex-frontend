@@ -5,7 +5,7 @@ import { env } from '@/lib/env';
 // ===== WEBSOCKET CONFIGURATION =====
 
 export interface WebSocketConfig {
-  url: string;
+  url: string | undefined;
   reconnectInterval: number;
   maxReconnectAttempts: number;
   enableLogging: boolean;

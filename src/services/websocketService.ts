@@ -22,10 +22,8 @@ class WebSocketService {
   private config: WebSocketConfig;
 
   constructor(config?: Partial<WebSocketConfig>) {
-    const baseUrl = (env.NEXT_PUBLIC_API_URL || 'http://localhost:3333').replace('https://', 'wss://').replace('http://', 'ws://');
-
     this.config = {
-      url: `${baseUrl}/ws`,
+      url: env.NEXT_PUBLIC_WS_URL || '',
       reconnectInterval: 5000,
       maxReconnectAttempts: 10,
       heartbeatInterval: 30000,
@@ -36,6 +34,11 @@ class WebSocketService {
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        if (!this.config.url) {
+          resolve();
+          return;
+        }
+
         this.ws = new WebSocket(this.config.url);
 
         this.ws.onopen = () => {
@@ -115,6 +118,10 @@ class WebSocketService {
   }
 
   send(message: any): void {
+    if (!this.config.url) {
+      return;
+    }
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     } else {

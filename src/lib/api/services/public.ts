@@ -1,20 +1,27 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { env } from '../../env';
+import {
+  BACKEND_RUST_ENDPOINTS,
+  normalizeBackendMarkets,
+  normalizeBackendTickerMap,
+  normalizeBackendTickers,
+  normalizeBackendArray,
+  unwrapBackendData,
+} from '../backend-rust';
 
 // Public API endpoints - No authentication required
 const PUBLIC_ENDPOINTS = {
   // Market data
-  markets: '/api/v2/public/markets',
-  currencies: '/api/v2/public/currencies',
-  tradingFees: '/api/v2/public/trading_fees',
-  memberLevels: '/api/v2/public/member_levels',
-  withdrawLimits: '/api/v2/public/withdraw_limits',
+  markets: BACKEND_RUST_ENDPOINTS.public.markets,
+  currencies: BACKEND_RUST_ENDPOINTS.public.currencies,
+  tradingFees: BACKEND_RUST_ENDPOINTS.public.tradingFees,
+  memberLevels: BACKEND_RUST_ENDPOINTS.public.memberLevels,
+  withdrawLimits: BACKEND_RUST_ENDPOINTS.public.withdrawLimits,
 
   // Tools
-  timestamp: '/api/v2/public/timestamp',
-  version: '/api/v2/public/version',
-  health: '/api/v2/public/health',
+  timestamp: BACKEND_RUST_ENDPOINTS.public.timestamp,
+  version: BACKEND_RUST_ENDPOINTS.public.version,
+  health: BACKEND_RUST_ENDPOINTS.health,
 } as const;
 
 // Types for public API responses
@@ -94,43 +101,41 @@ export interface VersionInfo {
 }
 
 // Public API functions - Standalone (No ObjectWrapper to avoid TDZ)
-const unwrapData = <T>(payload: T | { data?: T }): T =>
-  ((payload as { data?: T })?.data ?? payload) as T;
-
 export const getMarkets = async (): Promise<PublicMarket[]> => {
   const response = await apiClient.get<PublicMarket[]>(PUBLIC_ENDPOINTS.markets);
-  return unwrapData(response.data) || [];
+  return normalizeBackendMarkets(response.data) as PublicMarket[];
 };
 
 export const getCurrencies = async (): Promise<PublicCurrency[]> => {
   const response = await apiClient.get<{ data: PublicCurrency[] }>(PUBLIC_ENDPOINTS.currencies);
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<PublicCurrency>(response.data, 'currencies');
 };
 
 export const getTradingFees = async (): Promise<TradingFee[]> => {
   const response = await apiClient.get<{ data: TradingFee[] }>(PUBLIC_ENDPOINTS.tradingFees);
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<TradingFee>(response.data, 'trading_fees');
 };
 
 export const getMemberLevels = async (): Promise<MemberLevel[]> => {
   const response = await apiClient.get<{ data: MemberLevel[] }>(PUBLIC_ENDPOINTS.memberLevels);
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<MemberLevel>(response.data, 'member_levels');
 };
 
 export const getWithdrawLimits = async (): Promise<WithdrawLimit[]> => {
   const response = await apiClient.get<{ data: WithdrawLimit[] }>(PUBLIC_ENDPOINTS.withdrawLimits);
-  return unwrapData(response.data) || [];
+  return normalizeBackendArray<WithdrawLimit>(response.data, 'withdraw_limits');
 };
 
 // Tools
 export const getTimestamp = async (): Promise<string> => {
-  const response = await apiClient.get<string>(PUBLIC_ENDPOINTS.timestamp);
-  return response.data;
+  const response = await apiClient.get<string | { timestamp: string | number }>(PUBLIC_ENDPOINTS.timestamp);
+  const payload = unwrapBackendData<any>(response.data);
+  return String(payload?.timestamp ?? payload);
 };
 
 export const getVersion = async (): Promise<VersionInfo> => {
   const response = await apiClient.get<{ data: VersionInfo }>(PUBLIC_ENDPOINTS.version);
-  return unwrapData(response.data);
+  return unwrapBackendData(response.data);
 };
 
 export const getHealth = async (): Promise<{ status: string; timestamp: string }> => {
@@ -139,16 +144,13 @@ export const getHealth = async (): Promise<{ status: string; timestamp: string }
 };
 
 export const getTickers = async (): Promise<any[]> => {
-  const response = await apiClient.get<any>('/api/v2/public/markets/tickers');
-  // The API returns a hash of market_id -> ticker_data, convert to array
-  const tickersHash = response.data;
-  if (typeof tickersHash === 'object' && tickersHash !== null) {
-    return Object.entries(tickersHash).map(([market, ticker]) => ({
-      market,
-      ticker
-    }));
-  }
-  return [];
+  const response = await apiClient.get<any>(BACKEND_RUST_ENDPOINTS.public.tickers);
+  return normalizeBackendTickers(response.data);
+};
+
+export const getTickerMap = async (): Promise<Record<string, any>> => {
+  const response = await apiClient.get<any>(BACKEND_RUST_ENDPOINTS.public.tickers);
+  return normalizeBackendTickerMap(response.data);
 };
 
 // React Query hooks for public data
@@ -172,7 +174,7 @@ export const usePublicCurrencies = () => {
 
 export const useTradingFees = () => {
   return useQuery({
-    queryKey: ['public', 'trading_fees'],
+    queryKey: ['public', 'trading-fees'],
     queryFn: getTradingFees,
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
@@ -180,7 +182,7 @@ export const useTradingFees = () => {
 
 export const useMemberLevels = () => {
   return useQuery({
-    queryKey: ['public', 'member_levels'],
+    queryKey: ['public', 'member-levels'],
     queryFn: getMemberLevels,
     staleTime: 60 * 60 * 1000, // 1 hour
   });
@@ -188,7 +190,7 @@ export const useMemberLevels = () => {
 
 export const useWithdrawLimits = () => {
   return useQuery({
-    queryKey: ['public', 'withdraw_limits'],
+    queryKey: ['public', 'withdraw-limits'],
     queryFn: getWithdrawLimits,
     staleTime: 60 * 60 * 1000, // 1 hour
   });

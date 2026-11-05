@@ -3,7 +3,7 @@ import { WebSocketMessage, RangerEvent } from '@/types';
 import { env } from '@/lib/env';
 
 interface UseWebSocketOptions {
-  url: string;
+  url: string | undefined;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
   heartbeatInterval?: number;
@@ -47,6 +47,13 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   }, [enableLogging]);
 
   const connect = useCallback(() => {
+    if (!url) {
+      setConnected(false);
+      setConnecting(false);
+      setError(null);
+      return;
+    }
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
