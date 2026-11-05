@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from "next/script";
 import './globals.css';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -118,6 +119,8 @@ export default function RootLayout({
             </AuthProvider>
           </QueryClientWrapper>
         </ErrorBoundary>
+              {/* Umami (self-hosted, cookie-free) — counts only the production hostname. */}
+        <Script defer src="https://umami-976099405307.us-central1.run.app/script.js" data-website-id="94861c37-dccc-4309-8a2b-e55300309a64" data-domains="orbitex-rust-ui.vercel.app" strategy="afterInteractive" />
       </body>
     </html>
   );
